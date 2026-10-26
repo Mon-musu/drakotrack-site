@@ -1,0 +1,109 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="theme-color" id="theme-color" content="#0a0a0c">
+<meta name="description" content="DrakoTrack — tu compañero de gimnasio. Entrenamientos, récords y control de peso, guardados en tu dispositivo.">
+<title>DrakoTrack — Seguimiento de entrenamiento</title>
+<link rel="icon" href="https://rxamdcgcpjzfeygxeukj.supabase.co/storage/v1/object/public/drakotrack-assets/logo.png?v=4">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="https://rxamdcgcpjzfeygxeukj.supabase.co/storage/v1/object/public/drakotrack-assets/styles.css?v=6">
+</head>
+<body>
+<div class="bg-glow" aria-hidden="true"></div>
+
+<!-- ============ PANTALLA DE ACCESO ============ -->
+<div id="auth-screen" class="screen">
+  <div class="auth-wrap">
+    <div class="auth-brand">
+      <div class="brand-mark"><img src="https://rxamdcgcpjzfeygxeukj.supabase.co/storage/v1/object/public/drakotrack-assets/logo.png?v=4" alt="DrakoTrack"></div>
+      <h1>Drako<span class="accent">Track</span></h1>
+      <p>Tu compañero de gimnasio. Entrenamientos, récords y peso corporal — en este dispositivo y, si quieres, en la nube para recuperarlos.</p>
+      <ul class="auth-points">
+        <li>Carga una sesión del entrenador en un toque</li>
+        <li>Registra récords con una gráfica mensual</li>
+        <li>Lleva tu peso y fotos de progreso</li>
+      </ul>
+    </div>
+    <div class="auth-card">
+      <div class="auth-tabs">
+        <button type="button" class="auth-tab active" data-auth="login">Iniciar sesión</button>
+        <button type="button" class="auth-tab" data-auth="signup">Crear cuenta</button>
+        <button type="button" class="auth-tab" data-auth="cloud">Nube</button>
+      </div>
+      <form id="auth-form" novalidate>
+        <div id="auth-err" class="auth-err hidden"></div>
+        <label class="field">
+          <span id="auth-user-label">Usuario</span>
+          <input id="auth-user" autocomplete="username" placeholder="p. ej. entrenador_marco" spellcheck="false">
+        </label>
+        <label class="field" id="auth-pass-field">
+          <span>Contraseña</span>
+          <input id="auth-pass" type="password" autocomplete="current-password" placeholder="••••••••">
+        </label>
+        <div id="cloud-extra" class="cloud-extra hidden">
+          <button type="button" class="linklike" id="cloud-toggle" data-auth-alt="cloud-signup">¿No tienes cuenta en la nube? Crear cuenta</button>
+          <button type="button" class="linklike" data-auth-alt="forgot">¿Olvidaste tu contraseña?</button>
+        </div>
+        <button type="submit" class="btn btn-primary btn-block btn-lg" id="auth-submit">Iniciar sesión</button>
+        <p class="auth-note" id="auth-note">Las cuentas locales viven solo en este dispositivo. Con <b>Nube</b> tus datos se guardan en Supabase y puedes restaurarlos desde cualquier dispositivo o si olvidas tu contraseña.</p>
+      </form>
+      <a class="btn btn-ghost btn-block" href="https://rxamdcgcpjzfeygxeukj.supabase.co/storage/v1/object/public/drakotrack-assets/drakotrack.apk" style="margin-top:14px">Descargar app Android (APK)</a>
+    </div>
+  </div>
+</div>
+
+<!-- ============ APLICACIÓN ============ -->
+<div id="app" class="screen hidden">
+  <header class="topbar">
+    <div class="brand">
+      <span class="brand-mark sm"><img src="https://rxamdcgcpjzfeygxeukj.supabase.co/storage/v1/object/public/drakotrack-assets/logo.png?v=4" alt=""></span>
+      <span class="brand-name">Drako<span class="accent">Track</span></span>
+    </div>
+    <div class="top-date" id="top-date"></div>
+    <button class="theme-btn" id="theme-btn" type="button" data-action="toggle-theme" aria-label="Cambiar a tema claro" title="Cambiar a tema claro"></button>
+    <div class="user-menu-wrap">
+      <button class="user-chip" id="user-chip" data-action="toggle-menu" type="button"></button>
+      <div class="user-menu" id="user-menu">
+        <div class="user-menu-head" id="user-menu-head"></div>
+        <div class="sb-status hidden" id="sb-status"></div>
+        <button type="button" class="hidden" id="sb-push" data-action="sb-push">Subir copia a la nube</button>
+        <button type="button" class="hidden" id="sb-restore" data-action="sb-pull">Restaurar copia de la nube</button>
+        <button type="button" class="hidden" id="sb-export" data-action="sb-export">Descargar mis datos (JSON)</button>
+        <button type="button" data-action="open-change-pass">Cambiar contraseña</button>
+        <button type="button" data-action="logout">Cerrar sesión</button>
+        <button type="button" data-action="reset-data">Borrar todos mis datos</button>
+      </div>
+    </div>
+  </header>
+
+  <nav class="sidebar" id="sidebar">
+    <button class="nav-btn active" data-action="tab" data-route="workouts"><span>Entrenamientos</span></button>
+    <button class="nav-btn" data-action="tab" data-route="history"><span>Historial</span></button>
+    <button class="nav-btn" data-action="tab" data-route="prs"><span>Récords</span></button>
+    <button class="nav-btn" data-action="tab" data-route="weight"><span>Peso</span></button>
+    <div class="sidebar-foot">Entrena como un dragón.</div>
+  </nav>
+
+  <nav class="bottomnav" id="bottomnav">
+    <button class="nav-btn active" data-action="tab" data-route="workouts"><span>Entrenamientos</span></button>
+    <button class="nav-btn" data-action="tab" data-route="history"><span>Historial</span></button>
+    <button class="nav-btn" data-action="tab" data-route="prs"><span>Récords</span></button>
+    <button class="nav-btn" data-action="tab" data-route="weight"><span>Peso</span></button>
+  </nav>
+
+  <main id="main" class="main"></main>
+</div>
+
+<div id="modal-root"></div>
+<div id="toast-root"></div>
+
+<script src="https://rxamdcgcpjzfeygxeukj.supabase.co/storage/v1/object/public/drakotrack-assets/supabase.js?v=1"></script>
+<script src="https://rxamdcgcpjzfeygxeukj.supabase.co/storage/v1/object/public/drakotrack-assets/boostcamp.js?v=3"></script>
+<script src="https://rxamdcgcpjzfeygxeukj.supabase.co/storage/v1/object/public/drakotrack-assets/share.js?v=4"></script>
+<script src="https://rxamdcgcpjzfeygxeukj.supabase.co/storage/v1/object/public/drakotrack-assets/app.js?v=10"></script>
+</body>
+</html>
