@@ -1,0 +1,414 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="theme-color" content="#0a0a0c">
+<meta name="description" content="DrakoTrack — información legal: privacidad, términos del servicio, terceros, licencias, menores y eliminación de datos.">
+<meta name="robots" content="index,follow">
+<title>DrakoTrack — Información legal y privacidad</title>
+<link rel="icon" href="logo.png?v=5">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="styles.css?v=8">
+</head>
+<body class="legal-page">
+<a class="skip-link" href="#contenido">Saltar al contenido</a>
+<div class="bg-glow" aria-hidden="true"></div>
+
+<header class="legal-topbar">
+  <a class="legal-brand" href="index.html">
+    <span class="brand-mark sm"><img src="logo.png?v=5" alt=""></span>
+    <span class="brand-name">Drako<span class="accent">Track</span></span>
+  </a>
+  <a class="btn btn-ghost btn-sm" href="index.html">← Volver a la app</a>
+</header>
+
+<main id="contenido" class="legal" tabindex="-1">
+  <div class="page-head legal-head">
+    <h1>Información legal y privacidad</h1>
+    <p class="muted">Todo lo que DrakoTrack hace con tus datos, en lenguaje claro. Versión 1.0 · última actualización: 27 de octubre de 2026.</p>
+  </div>
+
+  <nav class="legal-nav" aria-label="Índice de la información legal">
+    <a href="#titular">Titular y contacto</a>
+    <a href="#privacidad">Privacidad</a>
+    <a href="#cookies">Cookies y almacenamiento</a>
+    <a href="#terceros">Terceros (auditoría)</a>
+    <a href="#menores">Menores y edad</a>
+    <a href="#derechos">Tus derechos y borrado</a>
+    <a href="#terminos">Términos del Servicio</a>
+    <a href="#licencias">Licencias</a>
+    <a href="#accesibilidad">Accesibilidad</a>
+    <a href="#cambios">Cambios</a>
+  </nav>
+
+  <!-- ============================================================
+       DATOS DEL TITULAR
+       Edita únicamente los valores marcados con class="legal-todo"
+       (nombre/razón social, NIF, domicilio y correo de contacto).
+       ============================================================ -->
+  <section id="titular" class="legal-sec">
+    <h2>1. Titular del servicio y datos de contacto</h2>
+    <div class="legal-card">
+      <dl class="legal-dl">
+        <dt>Servicio</dt><dd>DrakoTrack — aplicación web y Android de seguimiento de entrenamiento</dd>
+        <dt>Titular (responsable del tratamiento)</dt><dd><span class="legal-todo">Nombre o razón social pendiente de completar</span></dd>
+        <dt>NIF / NIE / CIF</dt><dd><span class="legal-todo">Pendiente de completar</span></dd>
+        <dt>Domicilio</dt><dd><span class="legal-todo">Pendiente de completar</span></dd>
+        <dt>Correo de contacto y privacidad</dt><dd><span class="legal-todo">Correo de contacto pendiente de completar</span></dd>
+        <dt>País y normativa</dt><dd>España — RGPD (UE) 2016/679 y LOPDGDD 3/2018</dd>
+        <dt>Versión del documento</dt><dd>1.0 · 27 de octubre de 2026</dd>
+      </dl>
+      <p class="legal-note">
+        Los campos marcados como pendientes son los datos identificativos del titular del servicio. Mientras no estén
+        completos, cualquier solicitud legal o de privacidad puede ejercerse desde la propia app:
+        <a href="#derechos">descarga de tus datos y eliminación de la cuenta</a> son inmediatas y no dependen de un correo.
+      </p>
+    </div>
+  </section>
+
+  <section id="privacidad" class="legal-sec">
+    <h2>2. Política de Privacidad</h2>
+
+    <h3>2.1. Qué datos tratamos</h3>
+    <ul class="legal-list">
+      <li><b>Cuenta en la nube (opcional):</b> correo electrónico y contraseña. La contraseña no se guarda en claro: la gestiona Supabase Auth y se almacena cifrada con hash (bcrypt).</li>
+      <li><b>Cuenta local (opcional, solo este dispositivo):</b> nombre de usuario y contraseña cifrada con PBKDF2-SHA256 (150.000 iteraciones, sal aleatoria de 16 bytes). No sale del navegador.</li>
+      <li><b>Datos de entrenamiento:</b> entrenamientos, sesiones, series, repeticiones, pesos, récords personales, historial y registros de peso corporal.</li>
+      <li><b>Foto de progreso (opcional):</b> imagen que tú eliges. Se comprime en tu dispositivo, se guarda en tu cuenta y, si usas la nube, se sincroniza como parte de tu copia.</li>
+      <li><b>Consentimiento:</b> fecha, versión de este documento y las casillas que aceptaste al crear la cuenta.</li>
+      <li><b>Datos técnicos mínimos:</b> los registros habituales de los proveedores de alojamiento y base de datos (dirección IP, fecha y tipo de petición) necesarios para servir la app y protegerla frente a abusos.</li>
+    </ul>
+    <p class="legal-body">No pedimos tu nombre real, teléfono, dirección, fecha de nacimiento, contactos, salud médica ni ubicación. No hay analítica, publicidad, píxeles de redes sociales ni perfilado publicitario.</p>
+
+    <h3>2.2. Datos de salud: peso corporal y foto de progreso</h3>
+    <p class="legal-body">
+      El peso corporal y una foto de progreso pueden considerarse datos de categoría especial (salud) según el artículo 9 del RGPD.
+      Por eso son <b>estrictamente opcionales</b>, se tratan solo con tu <b>consentimiento explícito</b> (art. 9.2.a RGPD) al marcar la casilla de
+      consentimiento al crear la cuenta, y puedes retirarlo en cualquier momento borrando el registro o la foto (o toda la cuenta) desde la app.
+      Sin ellos la app sigue siendo plenamente funcional: entrenamientos, historial y récords no son datos de salud.
+    </p>
+
+    <h3>2.3. Para qué y con qué base legal</h3>
+    <ul class="legal-list">
+      <li><b>Prestarte el servicio</b> (guardar y sincronizar tus entrenamientos, restaurar tu cuenta): ejecución de un contrato, art. 6.1.b RGPD.</li>
+      <li><b>Peso y foto de progreso</b>: tu consentimiento explícito, art. 6.1.a y 9.2.a RGPD.</li>
+      <li><b>Seguridad y prevención de abuso</b> (límites de intentos de acceso, protección de la base de datos): interés legítimo, art. 6.1.f RGPD.</li>
+      <li><b>Cumplir obligaciones legales</b> que pudieran aplicarse: art. 6.1.c RGPD.</li>
+    </ul>
+    <p class="legal-body">No usamos tus datos para publicidad, perfilado, venta a terceros ni entrenamiento de modelos. No hay decisiones automatizadas con efectos legales sobre ti.</p>
+
+    <h3>2.4. Dónde se guardan</h3>
+    <ul class="legal-list">
+      <li><b>En tu dispositivo:</b> siempre hay una copia en el almacenamiento local del navegador (localStorage). Sin cuenta en la nube, es la única copia.</li>
+      <li><b>En la nube (solo si creas una cuenta en la nube):</b> en Supabase (Postgres + Auth), en la región del proyecto contratado por el titular. El acceso está aislado por fila: cada usuario autenticado solo puede leer y escribir su propio registro (Row Level Security).</li>
+      <li><b>Alojamiento del sitio:</b> Vercel sirve el HTML, los estilos y los scripts. Los programas de entrenamiento se sirven como JSON estático.</li>
+      <li><b>Transferencias internacionales:</b> si el proveedor trata datos fuera del Espacio Económico Europeo, se amparan en las cláusulas contractuales tipo de la Comisión Europea y en las garantías publicadas por el proveedor.</li>
+    </ul>
+
+    <h3>2.5. Cuánto tiempo</h3>
+    <p class="legal-body">
+      Mientras tu cuenta exista. No hay caducidad automática ni «retención por inactividad»: si quieres que desaparezca, bórrala y se elimina de inmediato.
+      Al eliminar la cuenta se borran el registro de acceso y los datos asociados; los registros técnicos del proveedor caducan según sus propias políticas.
+      Las copias JSON que hayas descargado son tuyas y quedan fuera de nuestro control.
+    </p>
+
+    <h3>2.6. Quién puede verlo</h3>
+    <p class="legal-body">
+      Solo tú. El titular no revisa los entrenamientos de los usuarios de forma rutinaria y el diseño (clave pública + RLS) impide que un usuario lea los datos de otro.
+      Los proveedores técnicos listados en <a href="#terceros">Terceros</a> actúan como encargados del tratamiento y solo acceden a lo necesario para prestar el servicio.
+      No vendemos, alquilamos ni cedemos datos personales.
+    </p>
+
+    <h3>2.7. Seguridad</h3>
+    <ul class="legal-list">
+      <li>HTTPS obligatorio, HSTS en producción y cabeceras de seguridad (CSP sin scripts inline, `frame-ancestors 'none'`, `nosniff`, `Referrer-Policy`).</li>
+      <li>Contraseñas: PBKDF2-SHA256 con sal en las cuentas locales; bcrypt gestionado por Supabase en las cuentas en la nube. Nunca se guardan en claro ni se registran en logs.</li>
+      <li>La clave «anon» de Supabase es pública por diseño: no da acceso a datos sin sesión y todas las filas están protegidas por RLS.</li>
+      <li>Mensajes de error genéricos al iniciar sesión para no revelar si una cuenta existe.</li>
+      <li>Ningún sistema es infalible. Si detectas un problema de seguridad, comunícalo por el canal de contacto del titular.</li>
+    </ul>
+  </section>
+
+  <section id="cookies" class="legal-sec">
+    <h2>3. Cookies y almacenamiento local</h2>
+    <p class="legal-body">
+      DrakoTrack <b>no usa cookies</b> de publicidad, analítica ni seguimiento, y no incorpora banners de consentimiento porque no hay cookies no esenciales.
+      Usamos únicamente almacenamiento técnico del navegador (localStorage) imprescindible para que la app funcione:
+    </p>
+    <div class="legal-table-wrap">
+      <table class="legal-table">
+        <caption>Almacenamiento técnico en tu dispositivo</caption>
+        <thead><tr><th scope="col">Clave</th><th scope="col">Para qué</th><th scope="col">Duración</th></tr></thead>
+        <tbody>
+          <tr><td><code>draktrack_v1</code></td><td>Cuentas locales y copia de tus datos en este dispositivo</td><td>Hasta que borres los datos</td></tr>
+          <tr><td><code>draktrack_session_v1</code></td><td>Recordar qué cuenta está abierta</td><td>Hasta cerrar sesión</td></tr>
+          <tr><td><code>draktrack_sb_session_v1</code></td><td>Token de sesión de la cuenta en la nube</td><td>Hasta cerrar sesión o caducar</td></tr>
+          <tr><td><code>draktrack_theme_v1</code></td><td>Tema claro u oscuro</td><td>Permanente (preferencia)</td></tr>
+          <tr><td><code>draktrack_ui_v1</code></td><td>Secciones plegadas (biblioteca y programas)</td><td>Permanente (preferencia)</td></tr>
+          <tr><td><code>draktrack_backup_due</code></td><td>Fecha del recordatorio quincenal de copia de seguridad</td><td>14 días, se renueva</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <section id="terceros" class="legal-sec">
+    <h2>4. Terceros: auditoría de servicios y SDK</h2>
+    <p class="legal-body">
+      Auditoría del 27 de octubre de 2026 sobre el código desplegado. La app es JavaScript propio sin dependencias en el navegador: no hay SDK de analítica,
+      publicidad, errores, mapas, redes sociales ni pagos. Estos son todos los terceros que intervienen:
+    </p>
+    <div class="legal-table-wrap">
+      <table class="legal-table">
+        <thead>
+          <tr><th scope="col">Proveedor</th><th scope="col">Para qué</th><th scope="col">Datos que recibe</th><th scope="col">Cuándo</th></tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>Supabase</td>
+            <td>Cuentas en la nube y base de datos (Auth + Postgres)</td>
+            <td>Correo, contraseña cifrada, token de sesión, copia de tus datos de entrenamiento</td>
+            <td>Solo si creas o usas una cuenta en la nube</td>
+          </tr>
+          <tr>
+            <td>Vercel</td>
+            <td>Alojamiento del HTML, CSS y JS</td>
+            <td>IP y datos técnicos de la petición (logs del proveedor)</td>
+            <td>Siempre, al cargar la app</td>
+          </tr>
+          <tr>
+            <td>Google Fonts</td>
+            <td>Tipografía «Outfit»</td>
+            <td>IP y datos técnicos de la petición de la fuente; sin cookies</td>
+            <td>Siempre, al cargar la app (si el navegador la solicita)</td>
+          </tr>
+          <tr>
+            <td>Boostcamp</td>
+            <td>Origen del catálogo público de programas</td>
+            <td>Ninguno: los programas se extrajeron y se sirven desde nuestro propio almacenamiento</td>
+            <td>Nunca en tiempo de ejecución</td>
+          </tr>
+          <tr>
+            <td>GitHub Actions</td>
+            <td>Despliegue y transferencia de archivos del sitio</td>
+            <td>Ninguno de usuarios; solo código y archivos del proyecto</td>
+            <td>Solo durante el despliegue</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+    <h3>4.1. Lo que no usamos</h3>
+    <ul class="legal-list">
+      <li>Sin Google Analytics, Meta Pixel, TikTok, Hotjar, Sentry ni ningún SDK de seguimiento o errores.</li>
+      <li>Sin cookies publicitarias, sin fingerprinting, sin SDKs de compra dentro de la app.</li>
+      <li>Sin permisos de cámara, micrófono, ubicación ni contactos. La foto de progreso la eliges tú desde el selector de archivos.</li>
+      <li>Sin conexiones salientes a servidores propios más allá de Supabase, Vercel y Google Fonts (declaradas arriba y limitadas por la Política de Seguridad de Contenidos).</li>
+    </ul>
+    <h3>4.2. Recomendación abierta</h3>
+    <p class="legal-body">
+      Google Fonts es el único tercero que se contacta al cargar la app sin que tú lo pidas. Si prefieres cero peticiones a Google,
+      el titular puede autoalojar la fuente o usar la pila de fuentes del sistema: es un cambio de una línea y no afecta a tus datos.
+    </p>
+  </section>
+
+  <section id="menores" class="legal-sec">
+    <h2>5. Menores de edad</h2>
+    <p class="legal-body">
+      DrakoTrack no está dirigida a menores de 16 años. Al crear una cuenta se exige confirmar que tienes <b>16 años o más</b>; sin esa confirmación
+      la cuenta no se crea, ni en la nube ni en local. No recogemos a sabiendas datos de menores de 16 años ni datos de salud de menores.
+    </p>
+    <p class="legal-body">
+      Si eres madre, padre o tutor y crees que un menor ha creado una cuenta, usa la eliminación de cuenta desde la app o el canal de contacto del titular
+      y se borrará de inmediato. Si detectamos una cuenta de un menor de 16 años, la eliminaremos.
+    </p>
+  </section>
+
+  <section id="derechos" class="legal-sec">
+    <h2>6. Tus derechos y eliminación de datos</h2>
+    <h3>6.1. Derechos</h3>
+    <p class="legal-body">
+      Puedes ejercer los derechos de acceso, rectificación, supresión, oposición, limitación del tratamiento, portabilidad y retirada del consentimiento.
+      La app está diseñada para que los ejerzas <b>sin esperar a nadie</b>:
+    </p>
+    <ul class="legal-list">
+      <li><b>Acceso y portabilidad:</b> menú de usuario → «Descargar mis datos (JSON)». Incluye cuenta, entrenamientos, historial, récords, pesos, foto, secciones ocultas y el consentimiento registrado.</li>
+      <li><b>Rectificación:</b> edita o borra cualquier entrenamiento, registro, récord o foto desde la app.</li>
+      <li><b>Supresión:</b> menú de usuario → «Eliminar mi cuenta y todos mis datos». Borra inmediatamente la cuenta y todos sus datos (nube y dispositivo).</li>
+      <li><b>Retirada del consentimiento:</b> borra la foto o los registros de peso; o elimina la cuenta completa.</li>
+    </ul>
+
+    <h3>6.2. Cómo se ejecuta la eliminación</h3>
+    <div class="legal-card">
+      <ol class="legal-list legal-list-num">
+        <li>Abres el menú de tu cuenta (arriba a la derecha) y eliges <b>«Eliminar mi cuenta y todos mis datos»</b>.</li>
+        <li>La app te muestra exactamente qué se borrará, te ofrece descargar antes una copia JSON y exige escribir <code>ELIMINAR</code> para confirmar.</li>
+        <li><b>Cuenta en la nube:</b> se borran el registro de acceso (correo y contraseña) y la fila de datos; la base de datos elimina en cascada el resto. No hay periodo de gracia ni papelera.</li>
+        <li><b>Cuenta local:</b> se borran el usuario, la contraseña cifrada y todos los datos de este dispositivo.</li>
+        <li>La sesión se cierra y no es posible restaurar la cuenta eliminada.</li>
+      </ol>
+      <p class="legal-body" style="margin-top:14px">
+        También puedes pedir la eliminación por el canal de contacto del titular si no puedes acceder a la app (por ejemplo, si perdiste el acceso al correo).
+        En ese caso se pedirá una verificación mínima de titularidad y se ejecutará en un plazo máximo de un mes (art. 12.3 RGPD).
+      </p>
+    </div>
+
+    <h3>6.3. Reclamaciones</h3>
+    <p class="legal-body">
+      Si consideras que no hemos atendido correctamente tus derechos, puedes reclamar ante la Agencia Española de Protección de Datos
+      (<a href="https://www.aepd.es" target="_blank" rel="noopener noreferrer">aepd.es</a>) o ante la autoridad de control de tu país de residencia.
+    </p>
+  </section>
+
+  <section id="terminos" class="legal-sec">
+    <h2>7. Términos del Servicio</h2>
+
+    <h3>7.1. Objeto</h3>
+    <p class="legal-body">
+      DrakoTrack es una herramienta de registro y seguimiento de entrenamiento: guarda tus entrenamientos, sesiones, récords, peso corporal y una foto de referencia,
+      y ofrece un catálogo de programas de terceros. El servicio se presta «tal cual», sin coste, y puede cambiar o desaparecer.
+    </p>
+
+    <h3>7.2. Tu cuenta</h3>
+    <ul class="legal-list">
+      <li>Debes tener al menos 16 años y aceptar estos términos y la Política de Privacidad para crear una cuenta.</li>
+      <li>La cuenta es personal. Eres responsable de custodiar tu contraseña y de la actividad de tu cuenta.</li>
+      <li>Usa un correo del que seas titular si creas una cuenta en la nube: es la vía de recuperación.</li>
+      <li>La cuenta local vive solo en este dispositivo: si borras los datos del navegador, la pierdes. Usa el recordatorio de copia y descarga tu JSON.</li>
+      <li>Puedes eliminar tu cuenta y tus datos en cualquier momento desde el menú de usuario.</li>
+    </ul>
+
+    <h3>7.3. Uso aceptable</h3>
+    <ul class="legal-list">
+      <li>No intentes acceder a cuentas o datos de otras personas, ni romper, saturar o eludir las medidas de seguridad.</li>
+      <li>No uses la app para automatizar ataques, scraping masivo, reventa del catálogo ni para publicar contenido ilícito.</li>
+      <li>No subas a la foto de progreso imágenes de terceros sin su permiso ni contenido ilegal.</li>
+    </ul>
+
+    <h3>7.4. Contenido y propiedad intelectual</h3>
+    <ul class="legal-list">
+      <li><b>Tus datos son tuyos.</b> Solo nos concedes la licencia técnica mínima para almacenarlos, sincronizarlos y mostrártelos. No los usamos para nada más.</li>
+      <li>El nombre DrakoTrack, el logo, los textos y el código de la app pertenecen al titular. No se concede licencia de reutilización.</li>
+      <li>Los programas de entrenamiento provienen del catálogo público de Boostcamp y pertenecen a Boostcamp y a sus autores. Se muestran con atribución para uso personal; no reclamamos su propiedad. Si un titular de derechos lo solicita, se retiran.</li>
+      <li>Las licencias de tipografía e imágenes se detallan en <a href="#licencias">Licencias</a>.</li>
+    </ul>
+
+    <h3>7.5. Aviso importante de salud</h3>
+    <p class="legal-body">
+      DrakoTrack <b>no es un servicio médico ni sustituye el consejo de un profesional</b>. No diagnostica, no prescribe ni garantiza resultados.
+      Los programas y porcentajes son referencias genéricas: elige cargas adecuadas a tu nivel, calienta, usa técnica correcta y consulta a un profesional
+      sanitario o entrenador cualificado antes de empezar, especialmente si tienes lesiones, patologías o embarazo. Entrenar conlleva riesgo de lesión; es tu responsabilidad.
+    </p>
+
+    <h3>7.6. Disponibilidad y garantías</h3>
+    <p class="legal-body">
+      El servicio se ofrece sin garantía de disponibilidad, continuidad ni ausencia de errores. Puede haber mantenimientos, caídas del proveedor o cambios de funcionalidad.
+      No garantizamos que un programa extraído de un catálogo público sea exacto, completo o adecuado para ti.
+      Recomendamos descargar periódicamente una copia JSON: es tu respaldo real.
+    </p>
+
+    <h3>7.7. Responsabilidad</h3>
+    <p class="legal-body">
+      En la medida permitida por la ley, el titular no responde de daños indirectos, pérdida de datos por borrado del navegador, pérdida de la contraseña sin copia,
+      lesiones derivadas del entrenamiento ni del uso de programas de terceros. Nada en estos términos limita los derechos que la normativa de consumo reconozca
+      a los consumidores ni la responsabilidad por dolo o negligencia grave.
+    </p>
+
+    <h3>7.8. Terminación</h3>
+    <p class="legal-body">
+      Puedes dejar de usar el servicio y eliminar tu cuenta cuando quieras. Podemos suspender cuentas que incumplan estos términos o que comprometan la seguridad del servicio.
+    </p>
+
+    <h3>7.9. Ley aplicable</h3>
+    <p class="legal-body">
+      Estos términos se rigen por la legislación española. Para consumidores, la competencia judicial corresponde a los juzgados de su domicilio.
+      Antes de acudir a los tribunales, escríbenos: la mayoría de las incidencias se resuelven hablando.
+    </p>
+  </section>
+
+  <section id="licencias" class="legal-sec">
+    <h2>8. Licencias de tipografías, imágenes y contenidos</h2>
+    <div class="legal-table-wrap">
+      <table class="legal-table">
+        <thead><tr><th scope="col">Elemento</th><th scope="col">Titularidad</th><th scope="col">Licencia</th></tr></thead>
+        <tbody>
+          <tr>
+            <td>Tipografía «Outfit»</td>
+            <td>© The Outfit Project Authors</td>
+            <td>SIL Open Font License 1.1 (uso libre, incluida la web; se sirve vía Google Fonts, que la distribuye bajo la misma licencia).</td>
+          </tr>
+          <tr>
+            <td>Logo de DrakoTrack</td>
+            <td>© DrakoTrack</td>
+            <td>Obra propia. Todos los derechos reservados; no se autoriza su reutilización ni modificación.</td>
+          </tr>
+          <tr>
+            <td>Iconos (mancuerna, sol, luna) y gráficas</td>
+            <td>© DrakoTrack</td>
+            <td>SVG dibujados en el propio proyecto con el API Canvas/SVG nativo. Sin librerías de terceros.</td>
+          </tr>
+          <tr>
+            <td>Programas de entrenamiento</td>
+            <td>© Boostcamp y cada autor (p. ej. Jim Wendler, Jon Candito, Cody Lefever)</td>
+            <td>Contenido del catálogo público de boostcamp.app, mostrado con atribución y para uso personal. No se reclama propiedad ni se sublicencia.</td>
+          </tr>
+          <tr>
+            <td>Código de la app</td>
+            <td>© DrakoTrack</td>
+            <td>JavaScript propio sin dependencias en el navegador. No es software libre; no se concede licencia de redistribución.</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+    <p class="legal-body">
+      Las capturas o imágenes JPG que genera la app para compartir se crean en tu dispositivo con tu propio contenido: son tuyas y puedes compartirlas libremente.
+      La foto de progreso es tuya; la app solo la almacena para mostrártela.
+    </p>
+  </section>
+
+  <section id="accesibilidad" class="legal-sec">
+    <h2>9. Accesibilidad</h2>
+    <p class="legal-body">
+      El objetivo es cumplir WCAG 2.1 nivel AA. Medidas aplicadas en esta versión:
+    </p>
+    <ul class="legal-list">
+      <li>Contraste mínimo de 4,5:1 en texto normal y 3:1 en texto grande en ambos temas (claro y oscuro), verificado automáticamente.</li>
+      <li>Navegación completa por teclado: enlace «Saltar al contenido», foco visible, cierre de ventanas con <kbd>Esc</kbd>, foco atrapado dentro de los diálogos y devuelto al cerrarlos.</li>
+      <li>Etiquetas accesibles en todos los campos, botones de icono y gráficas (resumen textual de los datos).</li>
+      <li>Textos alternativos en imágenes informativas y decorativas ocultas a lectores de pantalla.</li>
+      <li>Respeto de <code>prefers-reduced-motion</code> y contraste independiente del color para estados.</li>
+      <li>Avisos y errores anunciados por lectores de pantalla (<code>role="status"</code> / <code>role="alert"</code>).</li>
+    </ul>
+    <p class="legal-body">
+      Limitaciones conocidas: la imagen JPG que se comparte por WhatsApp se genera en un canvas y no tiene una versión textual alternativa; su contenido
+      (título, fechas y valores) sí está disponible en la propia pantalla. Si encuentras una barrera, comunícala por el canal de contacto del titular.
+    </p>
+  </section>
+
+  <section id="cambios" class="legal-sec">
+    <h2>10. Cambios en esta información</h2>
+    <p class="legal-body">
+      Cuando cambien los datos tratados, los terceros o tus derechos, publicaremos una versión nueva con su fecha y pediremos de nuevo el consentimiento
+      en el siguiente inicio de sesión si el cambio es sustancial. La versión aceptada queda registrada en tu cuenta con su fecha.
+    </p>
+    <p class="legal-body">
+      Versión 1.0 · 27 de octubre de 2026 · <a href="index.html">Volver a la app</a>
+    </p>
+  </section>
+</main>
+
+<footer class="legal-footer">
+  <nav class="footer-links" aria-label="Enlaces legales">
+    <a href="#privacidad">Privacidad</a>
+    <a href="#terminos">Términos</a>
+    <a href="#terceros">Terceros</a>
+    <a href="#licencias">Licencias</a>
+    <a href="#derechos">Eliminar mis datos</a>
+  </nav>
+  <p>© 2026 DrakoTrack · Entrena con cabeza.</p>
+</footer>
+
+<script src="legal.js?v=1"></script>
+</body>
+</html>

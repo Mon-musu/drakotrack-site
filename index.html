@@ -10,16 +10,17 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="styles.css?v=7">
+<link rel="stylesheet" href="styles.css?v=8">
 </head>
 <body>
+<a class="skip-link" href="#main">Saltar al contenido</a>
 <div class="bg-glow" aria-hidden="true"></div>
 
 <!-- ============ PANTALLA DE ACCESO ============ -->
 <div id="auth-screen" class="screen">
   <div class="auth-wrap">
     <div class="auth-brand">
-      <div class="brand-mark"><img src="logo.png?v=5" alt="DrakoTrack"></div>
+      <div class="brand-mark"><img src="logo.png?v=5" alt=""></div>
       <h1>Drako<span class="accent">Track</span></h1>
       <p>Tu compañero de gimnasio. Entrenamientos, récords y peso corporal — en este dispositivo y, si quieres, en la nube para recuperarlos.</p>
       <ul class="auth-points">
@@ -29,13 +30,13 @@
       </ul>
     </div>
     <div class="auth-card">
-      <div class="auth-tabs">
-        <button type="button" class="auth-tab active" data-auth="login">Iniciar sesión</button>
-        <button type="button" class="auth-tab" data-auth="signup">Crear cuenta</button>
-        <button type="button" class="auth-tab" data-auth="cloud">Nube</button>
+      <div class="auth-tabs" role="group" aria-label="Tipo de acceso">
+        <button type="button" class="auth-tab active" data-auth="login" aria-pressed="true">Iniciar sesión</button>
+        <button type="button" class="auth-tab" data-auth="signup" aria-pressed="false">Crear cuenta</button>
+        <button type="button" class="auth-tab" data-auth="cloud" aria-pressed="false">Nube</button>
       </div>
       <form id="auth-form" novalidate>
-        <div id="auth-err" class="auth-err hidden"></div>
+        <div id="auth-err" class="auth-err hidden" role="alert"></div>
         <label class="field">
           <span id="auth-user-label">Usuario</span>
           <input id="auth-user" autocomplete="username" placeholder="p. ej. entrenador_marco" spellcheck="false">
@@ -46,14 +47,36 @@
         </label>
         <div id="cloud-extra" class="cloud-extra hidden">
           <button type="button" class="linklike hidden" id="cloud-toggle" data-auth-alt="cloud-signup">¿No tienes cuenta en la nube? Crear cuenta</button>
-          <button type="button" class="linklike hidden" id="local-signup-link" data-auth-alt="local-signup">¿Prefieres una cuenta local solo en este dispositivo?</button>
-          <button type="button" class="linklike hidden" id="cloud-mode-link" data-auth-alt="cloud-mode">Crea en cambio una cuenta en la nube (recomendado)</button>
+          <button type="button" class="linklike hidden" id="local-signup-link" data-auth-alt="local-signup">Prefiero una cuenta local, solo en este dispositivo</button>
+          <button type="button" class="linklike hidden" id="cloud-mode-link" data-auth-alt="cloud-mode">Crear la cuenta en la nube (recomendado)</button>
           <button type="button" class="linklike" data-auth-alt="forgot">¿Olvidaste tu contraseña?</button>
+        </div>
+        <div id="consent-box" class="consent-box hidden">
+          <label class="consent-row" for="consent-terms">
+            <input type="checkbox" id="consent-terms">
+            <span>Acepto los <a href="legal.html#terminos" target="_blank" rel="noopener noreferrer">Términos del Servicio</a> y la <a href="legal.html#privacidad" target="_blank" rel="noopener noreferrer">Política de Privacidad</a>, incluido el tratamiento de mi peso y mi foto de progreso como datos de salud (opcionales).</span>
+          </label>
+          <label class="consent-row" for="consent-age">
+            <input type="checkbox" id="consent-age">
+            <span>Confirmo que tengo <b>16 años o más</b>.</span>
+          </label>
+          <p class="consent-note">Puedes borrar el peso, la foto o toda tu cuenta cuando quieras desde el menú de usuario. <a href="legal.html#derechos" target="_blank" rel="noopener noreferrer">Cómo se eliminan tus datos</a>.</p>
         </div>
         <button type="submit" class="btn btn-primary btn-block btn-lg" id="auth-submit">Iniciar sesión</button>
         <p class="auth-note" id="auth-note">Las cuentas locales viven solo en este dispositivo. Con <b>Nube</b> tus datos se guardan en Supabase y puedes restaurarlos desde cualquier dispositivo o si olvidas tu contraseña.</p>
       </form>
       <a class="btn btn-ghost btn-block" href="https://rxamdcgcpjzfeygxeukj.supabase.co/storage/v1/object/public/drakotrack-assets/drakotrack.apk" style="margin-top:14px">Descargar app Android (APK)</a>
+
+      <footer class="site-footer">
+        <nav class="footer-links" aria-label="Información legal y privacidad">
+          <a href="legal.html#privacidad">Privacidad</a>
+          <a href="legal.html#terminos">Términos</a>
+          <a href="legal.html#terceros">Terceros</a>
+          <a href="legal.html#licencias">Licencias</a>
+          <a href="legal.html#titular">Titular y contacto</a>
+        </nav>
+        <p class="footer-copy">© 2026 DrakoTrack · Sin anuncios, sin analítica, sin venta de datos. <a href="legal.html#accesibilidad">Accesibilidad</a></p>
+      </footer>
     </div>
   </div>
 </div>
@@ -68,44 +91,46 @@
     <div class="top-date" id="top-date"></div>
     <button class="theme-btn" id="theme-btn" type="button" data-action="toggle-theme" aria-label="Cambiar a tema claro" title="Cambiar a tema claro"></button>
     <div class="user-menu-wrap">
-      <button class="user-chip" id="user-chip" data-action="toggle-menu" type="button"></button>
-      <div class="user-menu" id="user-menu">
+      <button class="user-chip" id="user-chip" data-action="toggle-menu" type="button" aria-haspopup="true" aria-expanded="false" aria-controls="user-menu" aria-label="Tu cuenta"></button>
+      <div class="user-menu" id="user-menu" aria-label="Opciones de la cuenta">
         <div class="user-menu-head" id="user-menu-head"></div>
-        <div class="sb-status hidden" id="sb-status"></div>
+        <div class="sb-status hidden" id="sb-status" role="status"></div>
         <button type="button" class="hidden" id="sb-push" data-action="sb-push">Subir copia a la nube</button>
         <button type="button" class="hidden" id="sb-restore" data-action="sb-pull">Restaurar copia de la nube</button>
         <button type="button" class="hidden" id="sb-export" data-action="sb-export">Descargar mis datos (JSON)</button>
         <button type="button" data-action="open-change-pass">Cambiar contraseña</button>
+        <a href="legal.html" target="_blank" rel="noopener noreferrer">Información legal y privacidad</a>
+        <button type="button" data-action="reset-data">Borrar mis datos de entrenamiento</button>
+        <button type="button" data-action="open-delete-account">Eliminar mi cuenta y todos mis datos</button>
         <button type="button" data-action="logout">Cerrar sesión</button>
-        <button type="button" data-action="reset-data">Borrar todos mis datos</button>
       </div>
     </div>
   </header>
 
-  <nav class="sidebar" id="sidebar">
-    <button class="nav-btn active" data-action="tab" data-route="workouts"><span>Entrenamientos</span></button>
+  <nav class="sidebar" id="sidebar" aria-label="Secciones principales">
+    <button class="nav-btn active" data-action="tab" data-route="workouts" aria-current="page"><span>Entrenamientos</span></button>
     <button class="nav-btn" data-action="tab" data-route="history"><span>Historial</span></button>
     <button class="nav-btn" data-action="tab" data-route="prs"><span>Récords</span></button>
     <button class="nav-btn" data-action="tab" data-route="weight"><span>Peso</span></button>
     <div class="sidebar-foot">Entrena como un dragón.</div>
   </nav>
 
-  <nav class="bottomnav" id="bottomnav">
-    <button class="nav-btn active" data-action="tab" data-route="workouts"><span>Entrenamientos</span></button>
+  <nav class="bottomnav" id="bottomnav" aria-label="Secciones principales (móvil)">
+    <button class="nav-btn active" data-action="tab" data-route="workouts" aria-current="page"><span>Entrenamientos</span></button>
     <button class="nav-btn" data-action="tab" data-route="history"><span>Historial</span></button>
     <button class="nav-btn" data-action="tab" data-route="prs"><span>Récords</span></button>
     <button class="nav-btn" data-action="tab" data-route="weight"><span>Peso</span></button>
   </nav>
 
-  <main id="main" class="main"></main>
+  <main id="main" class="main" tabindex="-1"></main>
 </div>
 
 <div id="modal-root"></div>
 <div id="toast-root"></div>
 
-<script src="supabase.js?v=1"></script>
+<script src="supabase.js?v=2"></script>
 <script src="boostcamp.js?v=3"></script>
 <script src="share.js?v=4"></script>
-<script src="app.js?v=12"></script>
+<script src="app.js?v=13"></script>
 </body>
 </html>

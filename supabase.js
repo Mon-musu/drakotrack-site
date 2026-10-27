@@ -203,9 +203,28 @@ window.DrakoSB = (function () {
     return true;
   }
 
+  /* Elimina la cuenta y TODOS sus datos (derecho de supresión).
+     Lo hace una función SQL `delete_my_account()` que solo puede borrar al
+     usuario autenticado que la llama (auth.uid()); la fila de datos se borra
+     en cascada. Si la función no estuviera disponible, borra al menos la
+     copia de datos y avisa de que el acceso no se pudo eliminar. */
+  async function deleteAccount() {
+    if (!hasSession()) return 'No hay sesión activa en la nube.';
+    try {
+      const res = await api('/rest/v1/rpc/delete_my_account', { method: 'POST', body: {} });
+      if (res.ok) { setSession(null); return null; }
+      const dataRes = await api('/rest/v1/app_data?user_id=eq.' + encodeURIComponent(userId()), { method: 'DELETE' });
+      if (dataRes.ok) {
+        setSession(null);
+        return 'Se borraron tus datos, pero el registro de acceso no se pudo eliminar automáticamente. Vuelve a intentarlo más tarde o usa el canal de contacto de la información legal.';
+      }
+      return await readError(res);
+    } catch (e) { return 'Sin conexión con el servidor.'; }
+  }
+
   return {
     signIn, signUp, recover, updatePasswordFromToken, changePassword, signOut,
-    loadData, saveData, refresh,
+    loadData, saveData, deleteAccount, refresh,
     session: () => session,
     email, userId, hasSession, loadSession, setSession,
   };

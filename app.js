@@ -9,8 +9,12 @@
 const DB_KEY = 'draktrack_v1';
 const SESSION_KEY = 'draktrack_session_v1';
 
+/* Información legal: versión del consentimiento que se registra en la cuenta */
+const LEGAL_VERSION = '2026-10-27';
+const LEGAL_PAGE = 'legal.html';
+
 /* Icono de mancuerna (SVG) para las tarjetas de entrenamiento */
-const DUMBBELL = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M7 7v10"/><path d="M17 7v10"/><path d="M4.5 9.5v5"/><path d="M19.5 9.5v5"/><path d="M7 12h10"/></svg>';
+const DUMBBELL = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" aria-hidden="true" focusable="false"><path d="M7 7v10"/><path d="M17 7v10"/><path d="M4.5 9.5v5"/><path d="M19.5 9.5v5"/><path d="M7 12h10"/></svg>';
 
 /* Biblioteca de sesiones del entrenador */
 const LIBRARY = [
@@ -256,7 +260,7 @@ async function enterCloud(mail){
       if(sa.length && (sa[sa.length-1].date >= (sb2.length ? sb2[sb2.length-1].date : ''))) best = k;
     }
     confirmModal('¿Subir tus datos locales a la nube?',
-      `Se encontraron datos guardados en este dispositivo con la cuenta «${esc(best)}». ¿Subirlos a tu cuenta de la nube para poder restaurarlos desde cualquier dispositivo o si pierdes el acceso?`,
+      `Se encontraron datos guardados en este dispositivo con la cuenta «${esc(maskAccount(best))}». ¿Subirlos a tu cuenta de la nube para poder restaurarlos desde cualquier dispositivo o si pierdes el acceso?`,
       'Subir datos', () => {
         closeModal();
         db.data[mail] = db.data[best];
@@ -287,7 +291,7 @@ async function saveRecoveredPassword(){
   function openChangePass(){
     const cloud = isCloud();
     const intro = cloud
-      ? 'Cambiarás la contraseña de tu cuenta en la nube (' + esc(currentUser) + ').'
+      ? 'Cambiarás la contraseña de tu cuenta en la nube (' + esc(maskAccount(currentUser)) + ').'
       : 'Cambiarás la contraseña de tu cuenta local de este dispositivo.';
     openModal(`
       <h3>Cambiar la contraseña</h3>
@@ -354,10 +358,63 @@ async function saveRecoveredPassword(){
 
 function dataFor(user){
   if(!db.data[user]){
-    db.data[user] = { workouts:[], sessions:[], prs:[], weights:[], photo:null, hiddenLib:[] };
+    db.data[user] = { workouts:[], sessions:[], prs:[], weights:[], photo:null, hiddenLib:[], consent:null };
   }
   if(!Array.isArray(db.data[user].hiddenLib)) db.data[user].hiddenLib = [];
+  if(!('consent' in db.data[user])) db.data[user].consent = null;
   return db.data[user];
+}
+
+/* ---- Eliminación de cuenta y datos (derecho de supresión) ---- */
+function openDeleteAccount(){
+  if(!currentUser) return;
+  const cloud = isCloud();
+  openModal(`
+    <h3>Eliminar mi cuenta y todos mis datos</h3>
+    <p class="modal-body">Cuenta: <b>${esc(maskAccount(currentUser))}</b> · ${cloud ? 'cuenta en la nube' : 'cuenta local de este dispositivo'}.</p>
+    <ul class="modal-body danger-list">
+      <li>${cloud ? 'Se borran tu registro de acceso (correo y contraseña) y tu copia en la nube.' : 'Se borran tu usuario, tu contraseña cifrada y todos tus datos de este dispositivo.'}</li>
+      <li>Se borran entrenamientos, historial, récords, pesos y la foto de progreso.</li>
+      <li>Es inmediato e irreversible: no hay papelera ni forma de recuperar la cuenta.</li>
+    </ul>
+    <p class="modal-body">Si quieres conservar una copia, descárgala antes:</p>
+    <button type="button" class="btn btn-ghost btn-block" data-action="sb-export">Descargar mis datos (JSON)</button>
+    <label class="field" style="margin-top:16px"><span>Escribe ELIMINAR para confirmar</span>
+      <input id="del-confirm" autocomplete="off" autocapitalize="characters" spellcheck="false" aria-describedby="del-help">
+    </label>
+    <p id="del-help" class="consent-note">El botón se activa solo al escribir la palabra completa.</p>
+    <div id="del-err" class="auth-err hidden" role="alert"></div>
+    <div class="modal-actions">
+      <button class="btn btn-ghost" data-action="close-modal" type="button">Cancelar</button>
+      <button class="btn btn-danger" id="del-go" data-action="confirm-delete-account" type="button" disabled>Eliminar definitivamente</button>
+    </div>`);
+}
+async function confirmDeleteAccount(){
+  const box = $('#del-err');
+  const fail = m => { if(box){ box.textContent = m; box.classList.remove('hidden'); } };
+  const typed = $('#del-confirm') ? $('#del-confirm').value.trim().toUpperCase() : '';
+  if(typed !== 'ELIMINAR') return fail('Escribe ELIMINAR para confirmar.');
+  const btn = $('#del-go');
+  if(btn) btn.disabled = true;
+  const cloud = isCloud();
+  const account = currentUser;
+  if(cloud){
+    const err = await DrakoSB.deleteAccount();
+    if(err){ if(btn) btn.disabled = false; return fail(err); }
+  } else {
+    delete db.users[String(account).trim().toLowerCase()];
+  }
+  delete db.data[account];
+  try{ localStorage.removeItem(BACKUP_REMINDER_KEY); }catch(e){}
+  try{ localStorage.removeItem(SESSION_KEY); }catch(e){}
+  if(window.DrakoSB && DrakoSB.hasSession && DrakoSB.hasSession()) DrakoSB.signOut();
+  currentUser = null;
+  state.sessionId = null;
+  state.editor = null;
+  saveDB();  /* persiste el borrado local; sin sesión de nube no se re-sube nada */
+  closeModal();
+  toast(cloud ? 'Cuenta y datos eliminados de la nube.' : 'Cuenta local y datos eliminados de este dispositivo.', 'info');
+  render();
 }
 
 /* Límites para validar entradas del usuario (import, editor, sesiones, PR) */
@@ -375,6 +432,48 @@ const $$ = (s, el=document) => [...el.querySelectorAll(s)];
 const uid = () => Math.random().toString(36).slice(2,9) + Date.now().toString(36).slice(-4);
 const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;' }[c]));
 const escapeHtmlNum = v => esc(String(v ?? ''));
+
+/* ---- Privacidad: identidad enmascarada y consentimiento ---- */
+/* La app no necesita el identificador completo de la cuenta para funcionar:
+   en la cabecera y en el menú se muestra enmascarado (minimización de datos). */
+function maskAccount(u){
+  const s = String(u ?? '');
+  const at = s.indexOf('@');
+  if(at > 0){
+    const local = s.slice(0, at);
+    const domain = s.slice(at + 1);
+    return local.slice(0, Math.min(2, local.length)) + '•••@' + domain;
+  }
+  return s.length > 2 ? s.slice(0, 2) + '•••' : s;
+}
+function readConsent(){
+  const terms = $('#consent-terms');
+  const age = $('#consent-age');
+  return { terms: !!(terms && terms.checked), age: !!(age && age.checked) };
+}
+/* Casillas vacías por defecto: el consentimiento siempre es una acción positiva. */
+function requireConsent(){
+  const c = readConsent();
+  if(!c.terms){
+    showAuthError('Para crear la cuenta debes aceptar los Términos del Servicio y la Política de Privacidad.');
+    return null;
+  }
+  if(!c.age){
+    showAuthError('Debes confirmar que tienes 16 años o más para crear una cuenta.');
+    return null;
+  }
+  return { version: LEGAL_VERSION, at: new Date().toISOString(), terms: true, age16: true, health: true };
+}
+function saveConsent(rec){
+  if(!currentUser || !rec) return;
+  const d = dataFor(currentUser);
+  d.consent = rec;
+  if(!isCloud()){
+    const u = db.users[String(currentUser).trim().toLowerCase()];
+    if(u) u.consent = rec;
+  }
+  saveDB();
+}
 
 function todayISO(){
   const d = new Date();
@@ -518,6 +617,7 @@ function logout(){
 function toast(msg, type='success'){
   const t = document.createElement('div');
   t.className = 'toast ' + type;
+  t.setAttribute('role', type === 'error' ? 'alert' : 'status');
   t.textContent = msg;
   $('#toast-root').appendChild(t);
   requestAnimationFrame(() => t.classList.add('show'));
@@ -526,10 +626,21 @@ function toast(msg, type='success'){
     setTimeout(() => t.remove(), 400);
   }, 2800);
 }
+/* Accesibilidad: el diálogo se anuncia, atrapa el foco y lo devuelve al cerrar. */
+let _lastFocus = null;
 function openModal(html){
-  $('#modal-root').innerHTML = `<div class="modal-backdrop" data-action="close-modal"><div class="modal">${html}</div></div>`;
+  _lastFocus = document.activeElement;
+  const labelled = String(html).replace('<h3>', '<h3 id="modal-title">');
+  $('#modal-root').innerHTML = `<div class="modal-backdrop" data-action="close-modal"><div class="modal" role="dialog" aria-modal="true" aria-labelledby="modal-title" tabindex="-1">${labelled}</div></div>`;
+  const modal = $('.modal');
+  const first = modal && modal.querySelector('input:not([type=hidden]), select, textarea, button, a[href]');
+  setTimeout(() => { if(first && document.contains(first)) first.focus(); else if(modal) modal.focus(); }, 40);
 }
-function closeModal(){ $('#modal-root').innerHTML = ''; }
+function closeModal(){
+  $('#modal-root').innerHTML = '';
+  if(_lastFocus && document.contains(_lastFocus)){ try{ _lastFocus.focus(); }catch(e){} }
+  _lastFocus = null;
+}
 function confirmModal(title, body, confirmLabel, cb){
   openModal(`
     <h3>${title}</h3>
@@ -584,9 +695,11 @@ function render(){
 
 function renderHeader(){
   const initials = currentUser.split(/[\s._-]+/).map(w => w[0] || '').join('').slice(0,2).toUpperCase();
-  $('#user-chip').innerHTML = `<span class="chip-avatar">${esc(initials)}</span><span class="chip-name">${esc(currentUser)}</span>`;
+  const shown = maskAccount(currentUser);
+  $('#user-chip').innerHTML = `<span class="chip-avatar" aria-hidden="true">${esc(initials)}</span><span class="chip-name">${esc(shown)}</span>`;
+  $('#user-chip').setAttribute('aria-label', 'Tu cuenta: ' + shown);
   const cloud = isCloud();
-  $('#user-menu-head').textContent = 'Sesión iniciada como ' + currentUser + (cloud ? ' (nube)' : ' (solo este dispositivo)');
+  $('#user-menu-head').textContent = 'Cuenta: ' + shown + (cloud ? ' (nube)' : ' (solo este dispositivo)');
   const sbStatus = $('#sb-status'), sbPush = $('#sb-push'), sbRestore = $('#sb-restore'), sbExport = $('#sb-export');
   if(sbStatus){
     if(cloud){
@@ -603,7 +716,12 @@ function renderHeader(){
   $('#top-date').textContent = new Date().toLocaleDateString('es', { weekday:'long', month:'long', day:'numeric' });
 }
 function setActiveTab(route){
-  $$('.nav-btn[data-route]').forEach(b => b.classList.toggle('active', b.dataset.route === route));
+  $$('.nav-btn[data-route]').forEach(b => {
+    const on = b.dataset.route === route;
+    b.classList.toggle('active', on);
+    if(on) b.setAttribute('aria-current', 'page');
+    else b.removeAttribute('aria-current');
+  });
 }
 
 /* ---------------- Inicio: entrenamientos ---------------- */
@@ -634,7 +752,7 @@ function workoutCard(w){
     <div class="wcard-actions">
       <button class="btn btn-primary" data-action="start-session" data-id="${esc(w.id)}" type="button">Comenzar</button>
       <button class="btn btn-ghost" data-action="edit-workout" data-id="${esc(w.id)}" type="button">Editar</button>
-      <button class="icon-btn danger" data-action="erase-lib" data-id="${esc(w.id)}" type="button" title="Borrar de la biblioteca (se conserva tu historial y puedes restaurarlo luego)">✕</button>
+      <button class="icon-btn danger" data-action="erase-lib" data-id="${esc(w.id)}" type="button" aria-label="Quitar «${esc(w.name)}» de la biblioteca" title="Borrar de la biblioteca (se conserva tu historial y puedes restaurarlo luego)">✕</button>
     </div>
   </article>`;
 }
@@ -653,7 +771,7 @@ function customCard(w){
     <div class="wcard-actions">
       <button class="btn btn-primary" data-action="start-session" data-id="${esc(w.id)}" type="button">Comenzar</button>
       <button class="btn btn-ghost" data-action="edit-workout" data-id="${esc(w.id)}" type="button">Editar</button>
-      <button class="icon-btn danger" data-action="delete-workout" data-id="${esc(w.id)}" type="button" title="Eliminar">✕</button>
+      <button class="icon-btn danger" data-action="delete-workout" data-id="${esc(w.id)}" type="button" aria-label="Eliminar el entrenamiento «${esc(w.name)}»" title="Eliminar">✕</button>
     </div>
     <div class="wcard-file">
       <button class="btn btn-ghost btn-sm" data-action="export-workout" data-id="${esc(w.id)}" type="button" title="Guardar este entrenamiento como archivo para compartirlo">Exportar</button>
@@ -704,7 +822,7 @@ function renderWorkouts(main){
         <span class="muted">Catálogo Boostcamp: elige un programa y carga cualquier día como sesión.</span>
       </div>
       <div id="bc-body"${sectionCollapsed('bc') ? ' class="hidden"' : ''}>
-        <div class="field bc-search-field"><input id="bc-search" placeholder="Buscar por nombre, coach o enfoque… p. ej. 5/3/1, PHUL, Wendler" autocomplete="off"></div>
+        <div class="field bc-search-field"><input id="bc-search" placeholder="Buscar por nombre, coach o enfoque… p. ej. 5/3/1, PHUL, Wendler" autocomplete="off" aria-label="Buscar programas de entrenamiento"></div>
         <div id="bc-cats" class="bc-cats" hidden></div>
         <div id="bc-result" class="workout-cards"><div class="empty-state">Cargando el catálogo de programas…</div></div>
       </div>
@@ -805,8 +923,8 @@ function exRow(s, e, i, last){
   return `
   <div class="ex-row ${e.done ? 'done' : ''}">
     <label class="check">
-      <input type="checkbox" data-action="toggle-ex" data-sid="${s.id}" data-ex="${e.id}" ${e.done ? 'checked' : ''} ${locked}>
-      <span class="checkmark"></span>
+      <input type="checkbox" data-action="toggle-ex" data-sid="${s.id}" data-ex="${e.id}" ${e.done ? 'checked' : ''} ${locked} aria-label="Marcar «${esc(e.name)}» como completado">
+      <span class="checkmark" aria-hidden="true"></span>
     </label>
     <div class="ex-info">
       <p class="ex-name">${i + 1}. ${esc(e.name)}</p>
@@ -816,12 +934,12 @@ function exRow(s, e, i, last){
     </div>
     <div class="ex-inputs">
       <label class="mini-field">
-        <input type="number" inputmode="decimal" min="0" placeholder="0" value="${e.weight ?? ''}"
-          data-session="${s.id}" data-ex="${e.id}" data-field="weight" ${locked}><span>kg</span>
+        <input type="number" inputmode="decimal" min="0" placeholder="0" value="${e.weight ?? ''}" aria-label="Peso en kg de «${esc(e.name)}»"
+          data-session="${s.id}" data-ex="${e.id}" data-field="weight" ${locked}><span aria-hidden="true">kg</span>
       </label>
       <label class="mini-field">
-        <input type="number" inputmode="numeric" min="0" placeholder="0" value="${e.reps ?? ''}"
-          data-session="${s.id}" data-ex="${e.id}" data-field="reps" ${locked}><span>rep</span>
+        <input type="number" inputmode="numeric" min="0" placeholder="0" value="${e.reps ?? ''}" aria-label="Repeticiones de «${esc(e.name)}»"
+          data-session="${s.id}" data-ex="${e.id}" data-field="reps" ${locked}><span aria-hidden="true">rep</span>
       </label>
     </div>
   </div>`;
@@ -927,10 +1045,10 @@ function renderEditorRows(){
   if(!ex.length){ wrap.innerHTML = '<div class="empty-state">Aún no hay ejercicios — añade el primero.</div>'; return; }
   wrap.innerHTML = ex.map((e, i) => `
     <div class="ex-row-edit">
-      <textarea rows="1" spellcheck="false" data-bind="row" data-idx="${i}" data-field="name" placeholder="Nombre del ejercicio">${esc(e.name)}</textarea>
-      <label class="mini-field"><input type="number" min="1" data-bind="row" data-idx="${i}" data-field="sets" value="${e.sets}"><span>series</span></label>
-      <label class="mini-field"><input type="number" min="1" data-bind="row" data-idx="${i}" data-field="reps" value="${e.reps}"><span>rep</span></label>
-      <button class="icon-btn danger" data-action="del-ex" data-idx="${i}" type="button" title="Eliminar">✕</button>
+      <textarea rows="1" spellcheck="false" data-bind="row" data-idx="${i}" data-field="name" placeholder="Nombre del ejercicio" aria-label="Nombre del ejercicio ${i + 1}">${esc(e.name)}</textarea>
+      <label class="mini-field"><input type="number" min="1" data-bind="row" data-idx="${i}" data-field="sets" value="${e.sets}" aria-label="Series del ejercicio ${i + 1}"><span aria-hidden="true">series</span></label>
+      <label class="mini-field"><input type="number" min="1" data-bind="row" data-idx="${i}" data-field="reps" value="${e.reps}" aria-label="Repeticiones del ejercicio ${i + 1}"><span aria-hidden="true">rep</span></label>
+      <button class="icon-btn danger" data-action="del-ex" data-idx="${i}" type="button" aria-label="Eliminar el ejercicio ${i + 1}" title="Eliminar">✕</button>
     </div>`).join('');
   $$('#editor-rows textarea').forEach(autoGrow);
 }
@@ -1001,7 +1119,7 @@ function renderPRs(main){
             <div class="pr-item">
               <span>${fmtDateLong(p.date)}</span>
               <span class="pr-val">${p.weight} kg${p.reps ? ` × ${p.reps} rep` : ''}</span>
-              <button class="icon-btn danger" data-action="delete-pr" data-id="${p.id}" type="button" title="Eliminar">✕</button>
+              <button class="icon-btn danger" data-action="delete-pr" data-id="${p.id}" type="button" aria-label="Eliminar el récord del ${fmtDateLong(p.date)}" title="Eliminar">✕</button>
             </div>`).join('')}</div>`
         : `<div class="empty-state">Aún no hay récords para este ejercicio. ¡Registra el primero!</div>`}
     </section>`;
@@ -1061,14 +1179,14 @@ function renderWeight(main){
       <div class="card">
         <h3>Registrar el peso de hoy</h3>
         <div class="form-row">
-          <input type="date" id="w-date" value="${todayISO()}">
-          <input type="number" id="w-weight" placeholder="kg" inputmode="decimal" min="0">
+          <input type="date" id="w-date" value="${todayISO()}" aria-label="Fecha del registro de peso">
+          <input type="number" id="w-weight" placeholder="kg" inputmode="decimal" min="0" aria-label="Peso en kg">
           <button class="btn btn-primary" data-action="add-weight" type="button">Añadir</button>
         </div>
         <div class="weight-list">
           ${[...sorted].reverse().slice(0,10).map(w => `
             <div class="pr-item"><span>${fmtDateLong(w.date)}</span><span class="pr-val">${w.weight} kg</span>
-              <button class="icon-btn danger" data-action="delete-weight" data-id="${w.id}" type="button" title="Eliminar registro">✕</button>
+              <button class="icon-btn danger" data-action="delete-weight" data-id="${w.id}" type="button" aria-label="Eliminar el registro de peso del ${fmtDateLong(w.date)}" title="Eliminar registro">✕</button>
             </div>`).join('') || '<div class="empty-state">Aún no hay registros. Añade tu primer peso arriba.</div>'}
         </div>
       </div>
@@ -1347,8 +1465,10 @@ function lineChart(el, data, emptyMsg){
   const dots = data.map((d, i) =>
     `<circle cx="${X(i)}" cy="${Y(d.value)}" r="3.6" class="dot"><title>${fmtDate(d.label)} — ${d.value} kg</title></circle>`).join('');
 
+  /* Texto alternativo útil: resumen de los datos que muestra la gráfica. */
+  const summary = `Gráfica de progreso: ${data.length} registros, de ${data[0].value} kg el ${fmtDate(data[0].label)} a ${data[data.length - 1].value} kg el ${fmtDate(data[data.length - 1].label)}.`;
   el.innerHTML = `
-  <svg viewBox="0 0 ${W} ${H}" class="linechart" role="img" aria-label="Gráfica de progreso">
+  <svg viewBox="0 0 ${W} ${H}" class="linechart" role="img" aria-label="${esc(summary)}">
     <defs><linearGradient id="chartFill" x1="0" y1="0" x2="0" y2="1">
       <stop offset="0%" stop-color="#ff7a00" stop-opacity=".32"/><stop offset="100%" stop-color="#ff7a00" stop-opacity="0"/>
     </linearGradient></defs>
@@ -1404,7 +1524,9 @@ document.addEventListener('click', e => {
   }
 
   if(a === 'toggle-menu'){
-    $('#user-menu').classList.toggle('open');
+    const menu = $('#user-menu');
+    const open = menu.classList.toggle('open');
+    el.setAttribute('aria-expanded', open ? 'true' : 'false');
     return;
   }
   if(a === 'toggle-theme'){
@@ -1415,13 +1537,23 @@ document.addEventListener('click', e => {
   }
   if(a === 'logout'){ logout(); render(); return; }
   if(a === 'reset-data'){
-    confirmModal('¿Borrar todos mis datos?', 'Esto elimina todos los entrenamientos, sesiones, récords y registros de peso de esta cuenta, en este dispositivo. No se puede deshacer.', 'Borrar todo', () => {
+    /* Texto exacto: la cuenta NO se elimina y, en cuentas de nube, la copia
+       remota también se vacía (antes el aviso decía solo «este dispositivo»). */
+    const cloud = isCloud();
+    confirmModal('¿Borrar mis datos de entrenamiento?',
+      (cloud
+        ? 'Se borrarán todos tus entrenamientos, sesiones, récords, registros de peso y la foto de esta cuenta. Tu copia de la nube también se vaciará. La cuenta seguirá existiendo y podrás empezar de cero.'
+        : 'Se borrarán todos tus entrenamientos, sesiones, récords, registros de peso y la foto de este dispositivo. Tu cuenta local seguirá existiendo y podrás empezar de cero.') +
+      ' Si quieres eliminar también la cuenta, usa «Eliminar mi cuenta y todos mis datos».', 'Borrar datos', () => {
       dataFor(currentUser); // asegura que exista
-      db.data[currentUser] = { workouts:[], sessions:[], prs:[], weights:[], photo:null };
-      saveDB(); closeModal(); toast('Todos tus datos fueron borrados.', 'info'); render();
+      const prev = db.data[currentUser] || {};
+      db.data[currentUser] = { workouts:[], sessions:[], prs:[], weights:[], photo:null, hiddenLib:[], consent: prev.consent || null };
+      saveDB(); closeModal(); toast('Tus datos de entrenamiento fueron borrados. La cuenta sigue activa.', 'info'); render();
     });
     return;
   }
+  if(a === 'open-delete-account'){ openDeleteAccount(); return; }
+  if(a === 'confirm-delete-account'){ confirmDeleteAccount(); return; }
 
   if(a === 'start-session'){
     const s = startOrGetSession(el.dataset.id);
@@ -1710,6 +1842,11 @@ document.addEventListener('click', e => {
   }
 });document.addEventListener('input', e => {
   const t = e.target;
+  if(t.id === 'del-confirm'){
+    const go = $('#del-go');
+    if(go) go.disabled = t.value.trim().toUpperCase() !== 'ELIMINAR';
+    return;
+  }
   if(t.id === 'bc-search'){
     bcFilter = t.value;
     renderBCList();
@@ -1811,6 +1948,11 @@ document.addEventListener('submit', async e => {
     const u = $('#auth-user').value;
     const p = $('#auth-pass').value;
 
+    /* Consentimiento (RGPD): solo al crear cuenta y nunca premarcado */
+    const needsConsent = mode === 'signup' || mode === 'signup-local';
+    const consent = needsConsent ? requireConsent() : null;
+    if(needsConsent && !consent) return;
+
     if(mode === 'signup'){
       /* Cuenta en la nube (por defecto): se crea directamente en Supabase */
       const mail = u.trim().toLowerCase();
@@ -1829,6 +1971,7 @@ document.addEventListener('submit', async e => {
       }
       toast('¡Cuenta en la nube creada! Tus datos se respaldan y puedes restaurarlos.');
       await enterCloud(mail);
+      saveConsent(consent);
       return;
     }
 
@@ -1843,7 +1986,7 @@ document.addEventListener('submit', async e => {
       if(err !== null && typeof err !== 'object'){ showAuthError('No se pudo iniciar sesión.'); return; }
       $('#auth-err').classList.add('hidden');
       form.reset();
-      toast('¡Hola de nuevo, ' + mail + '!');
+      toast('¡Hola de nuevo!');
       await enterCloud(mail);
       return;
     }
@@ -1866,7 +2009,8 @@ document.addEventListener('submit', async e => {
     if(err){ showAuthError(err); return; }
     $('#auth-err').classList.add('hidden');
     form.reset();
-    toast(mode === 'signup-local' ? '¡Cuenta local creada! (solo en este dispositivo)' : '¡Hola de nuevo, ' + currentUser + '!');
+    if(mode === 'signup-local') saveConsent(consent);
+    toast(mode === 'signup-local' ? '¡Cuenta local creada! (solo en este dispositivo)' : '¡Hola de nuevo!');
     render();
   }
 });
@@ -1874,7 +2018,11 @@ document.addEventListener('submit', async e => {
 /* Pestañas y modos de la pantalla de acceso (nube primero / local / recuperación) */
 function setAuthMode(mode){
   state.authMode = mode;
-  $$('.auth-tab').forEach(t => t.classList.toggle('active', t.dataset.auth === mode || (mode === 'signup-local' && t.dataset.auth === 'signup')));
+  $$('.auth-tab').forEach(t => {
+    const on = t.dataset.auth === mode || (mode === 'signup-local' && t.dataset.auth === 'signup');
+    t.classList.toggle('active', on);
+    t.setAttribute('aria-pressed', on ? 'true' : 'false');
+  });
   const errBox = $('#auth-err'); if(errBox) errBox.classList.add('hidden');
   const submit = $('#auth-submit'); if(!submit) return;
   const userLabel = $('#auth-user-label'), userInput = $('#auth-user');
@@ -1884,7 +2032,16 @@ function setAuthMode(mode){
   const forgotBtn = cloudExtra ? cloudExtra.querySelector('[data-auth-alt="forgot"]') : null;
   const note = $('#auth-note');
   const showLink = (el, on) => { if(el) el.classList.toggle('hidden', !on); };
-  passInput.autocomplete = (mode === 'signup' || mode === 'signup-local') ? 'new-password' : 'current-password';
+  /* Consentimiento: solo visible al crear cuenta y siempre sin premarcar */
+  const consentBox = $('#consent-box');
+  const isSignup = mode === 'signup' || mode === 'signup-local';
+  if(consentBox) consentBox.classList.toggle('hidden', !isSignup);
+  if(!isSignup){
+    const c1 = $('#consent-terms'), c2 = $('#consent-age');
+    if(c1) c1.checked = false;
+    if(c2) c2.checked = false;
+  }
+  passInput.autocomplete = isSignup ? 'new-password' : 'current-password';
   if(mode === 'signup'){
     submit.textContent = 'Crear cuenta en la nube';
     userLabel.textContent = 'Correo'; userInput.placeholder = 'tu@correo.com'; userInput.autocomplete = 'email';
@@ -1942,9 +2099,43 @@ function showAuthError(msg){
   box.classList.remove('hidden');
 }
 
+/* ---------------- Teclado: diálogos, menú y foco ---------------- */
+const FOCUSABLE = 'a[href], button:not([disabled]), input:not([disabled]):not([type=hidden]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])';
+document.addEventListener('keydown', e => {
+  const modal = $('.modal');
+  if(modal){
+    if(e.key === 'Escape'){ e.preventDefault(); closeModal(); return; }
+    if(e.key === 'Tab'){
+      const items = [...modal.querySelectorAll(FOCUSABLE)].filter(el => !el.closest('.hidden'));
+      if(!items.length){ e.preventDefault(); modal.focus(); return; }
+      const first = items[0], last = items[items.length - 1];
+      const active = document.activeElement;
+      if(e.shiftKey && (active === first || active === modal)){ e.preventDefault(); last.focus(); }
+      else if(!e.shiftKey && active === last){ e.preventDefault(); first.focus(); }
+    }
+    return;
+  }
+  if(e.key === 'Escape'){
+    const menu = $('#user-menu');
+    if(menu && menu.classList.contains('open')){
+      menu.classList.remove('open');
+      const chip = $('#user-chip');
+      if(chip){ chip.setAttribute('aria-expanded', 'false'); chip.focus(); }
+    }
+  }
+});
+
 /* ---------------- Inicialización ---------------- */
 applyTheme();
-window.addEventListener('hashchange', render);
+/* Al cambiar de vista el foco va al contenido: navegación por teclado y
+   lectores de pantalla anuncian la nueva página. */
+function focusMain(){
+  const m = $('#main');
+  if(m && !$('#app').classList.contains('hidden')){
+    try{ m.focus({ preventScroll: true }); }catch(e){ m.focus(); }
+  }
+}
+window.addEventListener('hashchange', () => { render(); focusMain(); });
 (async function boot(){
   /* ¿Volvió de un enlace de recuperación de contraseña? */
   const rec = parseRecoveryHash();
