@@ -18,6 +18,7 @@
   --accent-text:#ffa040;  /* naranja para TEXTO sobre fondo oscuro */
   --danger-text:#fca5a5;
   --focus:#ffb36b;
+  --control-border:rgba(255,255,255,.5);   /* bordes de campos: 3:1 (WCAG 1.4.11) */
   --orange-grad:linear-gradient(135deg,#ffa040 0%,#ff7a00 55%,#f05100 100%);
   --green:#34d399;
   --red:#f87171;
@@ -56,6 +57,7 @@
   --accent-text:#a83f00;  /* naranja oscuro: 6.2:1 sobre blanco */
   --danger-text:#b3261e;
   --focus:#a83f00;
+  --control-border:rgba(15,15,25,.48);
   --shadow:0 10px 30px rgba(20,20,35,.12);
   --color-scheme:light;
   --topbar-bg:rgba(255,255,255,.85);
@@ -134,7 +136,7 @@ img{max-width:100%;display:block}
 .btn-primary:active:not(:disabled){transform:translateY(0) scale(.98)}
 .btn-ghost{background:var(--panel-2);color:var(--text);border:1px solid var(--border-strong)}
 .btn-ghost:hover{background:var(--ghost-hover);border-color:var(--border-strong)}
-.btn-danger{background:linear-gradient(135deg,#f87171,#dc2626);color:#fff;box-shadow:0 6px 18px rgba(220,38,38,.3)}
+.btn-danger{background:linear-gradient(135deg,#dc2626,#b91c1c);color:#fff;box-shadow:0 6px 18px rgba(185,28,28,.35)}
 .btn-lg{padding:14px 22px;font-size:16px;border-radius:14px}
 .btn-sm{padding:8px 13px;font-size:13.5px;border-radius:10px}
 .btn-block{width:100%}
@@ -151,7 +153,7 @@ img{max-width:100%;display:block}
 .field{display:flex;flex-direction:column;gap:7px;margin-bottom:16px}
 .field span{font-size:13px;font-weight:600;color:var(--muted);letter-spacing:.02em}
 input,select,textarea{
-  width:100%;padding:12px 14px;border-radius:12px;border:1px solid var(--border-strong);
+  width:100%;padding:12px 14px;border-radius:12px;border:1px solid var(--control-border);
   background:var(--bg-2);color:var(--text);outline:none;transition:border .15s, box-shadow .15s;
 }
 input:focus,select:focus,textarea:focus{border-color:var(--orange);box-shadow:0 0 0 3px rgba(255,122,0,.18)}
@@ -384,7 +386,7 @@ input[type=number]{-moz-appearance:textfield;appearance:textfield}
 .ex-row.done .ex-name{color:var(--green);text-decoration:line-through;text-decoration-color:rgba(52,211,153,.6)}
 .ex-target{font-size:12.5px;color:var(--muted);font-weight:600}
 .ex-inputs{display:flex;gap:8px}
-.mini-field{display:flex;align-items:center;gap:6px;background:var(--bg-2);border:1px solid var(--border-strong);border-radius:10px;padding:0 10px}
+.mini-field{display:flex;align-items:center;gap:6px;background:var(--bg-2);border:1px solid var(--control-border);border-radius:10px;padding:0 10px}
 .mini-field input{width:52px;padding:9px 2px;border:none;background:none;text-align:center;font-weight:800;font-size:15px}
 .mini-field input:focus{box-shadow:none}
 .mini-field span{font-size:11px;color:var(--muted);font-weight:700}
@@ -392,7 +394,7 @@ input[type=number]{-moz-appearance:textfield;appearance:textfield}
 .check{position:relative;flex-shrink:0;cursor:pointer;display:inline-flex}
 .check input{position:absolute;opacity:0;width:0;height:0}
 .checkmark{
-  width:26px;height:26px;border-radius:9px;border:2px solid var(--border-strong);background:var(--bg-2);
+  width:26px;height:26px;border-radius:9px;border:2px solid var(--control-border);background:var(--bg-2);
   display:inline-flex;align-items:center;justify-content:center;transition:.16s;font-size:13px;color:transparent;
 }
 .check:hover .checkmark{border-color:var(--orange)}
@@ -611,7 +613,7 @@ input[type=number]{-moz-appearance:textfield;appearance:textfield}
 /* ============================================================ */
 .cloud-extra{display:flex;flex-direction:column;gap:8px;margin:0 0 14px;text-align:center}
 .linklike{background:none;border:none;color:var(--accent-text);font-size:13.5px;font-weight:600;text-decoration:underline;cursor:pointer;padding:2px}
-.linklike:hover{color:var(--accent-text);filter:brightness(1.15)}
+.linklike:hover{color:var(--accent-text);text-decoration-thickness:2px}
 .sb-status{padding:9px 12px;border-radius:9px;background:var(--panel-2);border:1px solid var(--border);font-size:13px;color:var(--muted);margin-bottom:4px}
 
 /* ============================================================ */
