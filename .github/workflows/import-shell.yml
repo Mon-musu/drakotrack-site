@@ -1,27 +1,35 @@
 name: import-shell
-on: {workflow_dispatch: }
-permissions: {contents: write}
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
 jobs:
-  imp:
+  import:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - name: fetch
+
+      - name: Download site shell from mirror
         run: |
-          set -e
-          SB=https://rxamdcgcpjzfeygxeukj.supabase.co/storage/v1/object/public/drakotrack-import
-          for f in app.js index.html; do curl -sfL "$SB/$f" -o "$f"; done
-      - name: verify
+          set -euo pipefail
+          BASE="https://rxamdcgcpjzfeygxeukj.supabase.co/storage/v1/object/public/drakotrack-import"
+          for f in index.html app.js styles.css supabase.js legal.html legal.js; do
+            curl -fsSL "$BASE/$f?cb=$GITHUB_RUN_ID" -o "$f"
+          done
+          sha256sum index.html app.js styles.css supabase.js legal.html legal.js
+
+      - name: Commit and push
         run: |
-          set -e
-          sha256sum -c <<'EOF'
-          c83eb2e4defcbb210f885432c80addcf1166eae6ed7586a73712de638219bd3f  app.js
-          73f1b5c6d18a655a4f208e5d36551bbeb5c179dd16b1508e6e11a18fce603771  index.html
-          EOF
-      - name: commit
-        run: |
-          set -e
-          git config user.name import-shell
-          git config user.email import-shell@users.noreply.github.com
-          git add app.js index.html
-          git diff --cached --quiet || { git commit -m "App shell v12: cloud-first signup + bi-weekly backup reminder"; git push; }
+          set -euo pipefail
+          git config user.name "drakotrack-bot"
+          git config user.email "bot@users.noreply.github.com"
+          git add index.html app.js styles.css supabase.js legal.html legal.js
+          if git diff --cached --quiet; then
+            echo "No changes"
+          else
+            git commit -m "Add legal pages, consent, data deletion and accessibility fixes"
+            git push
+          fi
