@@ -45,7 +45,9 @@
           <input id="auth-pass" type="password" autocomplete="current-password" placeholder="••••••••">
         </label>
         <div id="cloud-extra" class="cloud-extra hidden">
-          <button type="button" class="linklike" id="cloud-toggle" data-auth-alt="cloud-signup">¿No tienes cuenta en la nube? Crear cuenta</button>
+          <button type="button" class="linklike hidden" id="cloud-toggle" data-auth-alt="cloud-signup">¿No tienes cuenta en la nube? Crear cuenta</button>
+          <button type="button" class="linklike hidden" id="local-signup-link" data-auth-alt="local-signup">¿Prefieres una cuenta local solo en este dispositivo?</button>
+          <button type="button" class="linklike hidden" id="cloud-mode-link" data-auth-alt="cloud-mode">Crea en cambio una cuenta en la nube (recomendado)</button>
           <button type="button" class="linklike" data-auth-alt="forgot">¿Olvidaste tu contraseña?</button>
         </div>
         <button type="submit" class="btn btn-primary btn-block btn-lg" id="auth-submit">Iniciar sesión</button>
@@ -104,6 +106,6 @@
 <script src="supabase.js?v=1"></script>
 <script src="boostcamp.js?v=3"></script>
 <script src="share.js?v=4"></script>
-<script src="app.js?v=11"></script>
+<script src="app.js?v=12"></script>
 </body>
 </html>

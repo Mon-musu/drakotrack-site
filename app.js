@@ -96,7 +96,7 @@ function applyTheme(){
 /* ---------------- Estado y almacenamiento ---------------- */
 let db = loadDB();
 let currentUser = localStorage.getItem(SESSION_KEY) || null;
-const state = { sessionId:null, editor:null, prExercise:null, authMode:'login', cloudSignup:false, sb:{ status:'idle', last:null, timer:null } };
+const state = { sessionId:null, editor:null, prExercise:null, authMode:'login', sb:{ status:'idle', last:null, timer:null } };
 
 function loadDB(){
   try{
@@ -136,6 +136,7 @@ async function pushNow(notify){
     await DrakoSB.saveData(db.data[currentUser]);
     state.sb.status = 'ok';
     state.sb.last = Date.now();
+    noteBackupDone();
     if(notify) toast('Copia subida a la nube.');
     renderHeader();
     return true;
@@ -166,16 +167,36 @@ async function pullRemote(notify){
     return false;
   }
 }
+/* ------- Recordatorio quincenal de copia de seguridad ------- */
+const BACKUP_REMINDER_KEY = 'draktrack_backup_due';
+const BACKUP_REMINDER_DAYS = 14;
+function noteBackupDone(){
+  try{ localStorage.setItem(BACKUP_REMINDER_KEY, String(Date.now() + BACKUP_REMINDER_DAYS * 864e5)); }catch(e){}
+}
+function maybeBackupReminder(){
+  if(!currentUser) return;
+  let due = 0;
+  try{ due = parseInt(localStorage.getItem(BACKUP_REMINDER_KEY) || '0', 10) || 0; }catch(e){}
+  if(!due){ noteBackupDone(); return; }          /* primera visita: fecha base, sin avisar */
+  if(Date.now() < due) return;
+  noteBackupDone();                                /* se pospone 14 días, no en cada render */
+  toast(isCloud()
+    ? 'Recordatorio: haz copia de tu perfil — «Subir copia a la nube» o descarga tu JSON desde el menú de usuario.'
+    : 'Recordatorio: tu cuenta es local (solo este dispositivo). Descarga tu JSON desde el menú de usuario como respaldo.', 'info');
+}
+
 /* Descarga un JSON con toda la copia de la nube de la cuenta conectada.
    Si el servidor no responde, exporta la copia local de esa misma cuenta. */
 async function exportCloudJSON(){
-  if(!isCloud()){ toast('Inicia sesión con tu cuenta de la nube para exportar tus datos.', 'error'); return; }
+  if(!currentUser){ toast('Inicia sesión para exportar tus datos.', 'error'); return; }
   toast('Preparando el archivo…');
   let payload = null, fromCloud = false;
-  try{
-    const row = await DrakoSB.loadData();
-    if(row && row.data && typeof row.data === 'object' && Object.keys(row.data).length){ payload = row.data; fromCloud = true; }
-  }catch(e){ /* sin conexión: se usa la copia local de la misma cuenta */ }
+  if(isCloud()){
+    try{
+      const row = await DrakoSB.loadData();
+      if(row && row.data && typeof row.data === 'object' && Object.keys(row.data).length){ payload = row.data; fromCloud = true; }
+    }catch(e){ /* sin conexión: se usa la copia local de la misma cuenta */ }
+  }
   if(!payload) payload = db.data[currentUser] || dataFor(currentUser);
   if(!Array.isArray(payload.hiddenLib)) payload.hiddenLib = [];
   const out = {
@@ -193,9 +214,10 @@ async function exportCloudJSON(){
   try{
     if(window.DrakoShare && DrakoShare.shareFile){
       const res = await DrakoShare.shareFile(filename, json, 'application/json');
+      noteBackupDone();
       if(res === 'shared') toast('Archivo compartido — elige dónde guardarlo.');
       else if(fromCloud) toast('Copia de la nube descargada.');
-      else toast('Sin conexión con la nube — se descargó la copia local de esta cuenta.', 'info');
+      else toast(isCloud() ? 'Sin conexión con la nube — se descargó la copia local de esta cuenta.' : 'Copia local descargada.', 'info');
     } else {
       const blob = new Blob([json], { type: 'application/json' });
       const url = URL.createObjectURL(blob);
@@ -203,8 +225,9 @@ async function exportCloudJSON(){
       aEl.href = url; aEl.download = filename;
       document.body.appendChild(aEl); aEl.click(); aEl.remove();
       setTimeout(() => URL.revokeObjectURL(url), 5000);
+      noteBackupDone();
       if(fromCloud) toast('Copia de la nube descargada.');
-      else toast('Sin conexión con la nube — se descargó la copia local de esta cuenta.', 'info');
+      else toast(isCloud() ? 'Sin conexión con la nube — se descargó la copia local de esta cuenta.' : 'Copia local descargada.', 'info');
     }
   }catch(e){ toast('No se pudo generar el archivo.', 'error'); }
 }
@@ -556,6 +579,7 @@ function render(){
   else if(route === 'history') renderHistory(main);
   else if(route === 'program') renderProgram(main, rest[0]);
   else                         renderWorkouts(main);
+  maybeBackupReminder();
 }
 
 function renderHeader(){
@@ -575,7 +599,7 @@ function renderHeader(){
   }
   if(sbPush) sbPush.classList.toggle('hidden', !cloud);
   if(sbRestore) sbRestore.classList.toggle('hidden', !cloud);
-  if(sbExport) sbExport.classList.toggle('hidden', !cloud);
+  if(sbExport) sbExport.classList.remove('hidden');
   $('#top-date').textContent = new Date().toLocaleDateString('es', { weekday:'long', month:'long', day:'numeric' });
 }
 function setActiveTab(route){
@@ -1787,26 +1811,39 @@ document.addEventListener('submit', async e => {
     const u = $('#auth-user').value;
     const p = $('#auth-pass').value;
 
+    if(mode === 'signup'){
+      /* Cuenta en la nube (por defecto): se crea directamente en Supabase */
+      const mail = u.trim().toLowerCase();
+      if(!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(mail)){ showAuthError('Introduce un correo válido.'); return; }
+      if(p.length < 6){ showAuthError('La contraseña debe tener al menos 6 caracteres.'); return; }
+      const btn = $('#auth-submit'); btn.disabled = true;
+      const err = await DrakoSB.signUp(mail, p);
+      btn.disabled = false;
+      if(typeof err === 'string' && err){ showAuthError(err); return; }
+      $('#auth-err').classList.add('hidden');
+      form.reset();
+      if(err && err.needsConfirm){
+        setAuthMode('cloud');
+        toast('Cuenta creada. Revisa tu correo para confirmarla y después inicia sesión.', 'info');
+        return;
+      }
+      toast('¡Cuenta en la nube creada! Tus datos se respaldan y puedes restaurarlos.');
+      await enterCloud(mail);
+      return;
+    }
+
     if(mode === 'cloud'){
       const mail = u.trim().toLowerCase();
       if(!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(mail)){ showAuthError('Introduce un correo válido.'); return; }
       if(p.length < 6){ showAuthError('La contraseña debe tener al menos 6 caracteres.'); return; }
       const btn = $('#auth-submit'); btn.disabled = true;
-      const err = state.cloudSignup ? await DrakoSB.signUp(mail, p) : await DrakoSB.signIn(mail, p);
+      const err = await DrakoSB.signIn(mail, p);
       btn.disabled = false;
       if(typeof err === 'string' && err){ showAuthError(err); return; }
-      if(state.cloudSignup && err && err.needsConfirm){
-        state.cloudSignup = false;
-        setAuthMode('cloud');
-        form.reset();
-        toast('Cuenta creada. Revisa tu correo para confirmarla y después inicia sesión.', 'info');
-        return;
-      }
       if(err !== null && typeof err !== 'object'){ showAuthError('No se pudo iniciar sesión.'); return; }
       $('#auth-err').classList.add('hidden');
       form.reset();
-      if(state.cloudSignup){ state.cloudSignup = false; setAuthMode('cloud'); toast('¡Cuenta en la nube creada!'); }
-      else toast('¡Hola de nuevo, ' + mail + '!');
+      toast('¡Hola de nuevo, ' + mail + '!');
       await enterCloud(mail);
       return;
     }
@@ -1821,54 +1858,69 @@ document.addEventListener('submit', async e => {
       $('#auth-err').classList.add('hidden');
       form.reset();
       toast('Si ese correo existe, recibirás un enlace para restablecer tu contraseña.', 'info');
-      state.cloudSignup = false;
       setAuthMode('cloud');
       return;
     }
 
-    const err = mode === 'signup' ? await signup(u, p) : await login(u, p);
+    const err = mode === 'signup-local' ? await signup(u, p) : await login(u, p);
     if(err){ showAuthError(err); return; }
     $('#auth-err').classList.add('hidden');
     form.reset();
-    toast(mode === 'signup' ? '¡Cuenta creada! Bienvenido, ' + currentUser + '.' : '¡Hola de nuevo, ' + currentUser + '!');
+    toast(mode === 'signup-local' ? '¡Cuenta local creada! (solo en este dispositivo)' : '¡Hola de nuevo, ' + currentUser + '!');
     render();
   }
 });
 
-/* Pestañas y modos de la pantalla de acceso (local / nube / recuperación) */
+/* Pestañas y modos de la pantalla de acceso (nube primero / local / recuperación) */
 function setAuthMode(mode){
   state.authMode = mode;
-  $$('.auth-tab').forEach(t => t.classList.toggle('active', t.dataset.auth === mode));
+  $$('.auth-tab').forEach(t => t.classList.toggle('active', t.dataset.auth === mode || (mode === 'signup-local' && t.dataset.auth === 'signup')));
   const errBox = $('#auth-err'); if(errBox) errBox.classList.add('hidden');
   const submit = $('#auth-submit'); if(!submit) return;
   const userLabel = $('#auth-user-label'), userInput = $('#auth-user');
   const passField = $('#auth-pass-field'), passInput = $('#auth-pass');
   const cloudExtra = $('#cloud-extra');
+  const toggle = $('#cloud-toggle'), localLink = $('#local-signup-link'), cloudLink = $('#cloud-mode-link');
   const forgotBtn = cloudExtra ? cloudExtra.querySelector('[data-auth-alt="forgot"]') : null;
-  if(forgotBtn) forgotBtn.classList.remove('hidden');
+  const note = $('#auth-note');
+  const showLink = (el, on) => { if(el) el.classList.toggle('hidden', !on); };
+  passInput.autocomplete = (mode === 'signup' || mode === 'signup-local') ? 'new-password' : 'current-password';
   if(mode === 'signup'){
-    submit.textContent = 'Crear cuenta';
+    submit.textContent = 'Crear cuenta en la nube';
+    userLabel.textContent = 'Correo'; userInput.placeholder = 'tu@correo.com'; userInput.autocomplete = 'email';
+    passField.classList.remove('hidden');
+    cloudExtra.classList.remove('hidden');
+    showLink(toggle, false); showLink(localLink, true); showLink(cloudLink, false);
+    if(forgotBtn) forgotBtn.classList.add('hidden');
+    if(note) note.innerHTML = 'Tu cuenta nueva vive en la nube (Supabase): puedes restaurarla desde cualquier dispositivo o si olvidas tu contraseña.';
+  } else if(mode === 'signup-local'){
+    submit.textContent = 'Crear cuenta local';
     userLabel.textContent = 'Usuario'; userInput.placeholder = 'p. ej. entrenador_marco'; userInput.autocomplete = 'username';
-    passInput.autocomplete = 'new-password';
-    passField.classList.remove('hidden'); cloudExtra.classList.add('hidden');
+    passField.classList.remove('hidden');
+    cloudExtra.classList.remove('hidden');
+    showLink(toggle, false); showLink(localLink, false); showLink(cloudLink, true);
+    if(forgotBtn) forgotBtn.classList.add('hidden');
+    if(note) note.innerHTML = 'La cuenta local vive <b>solo en este dispositivo</b>: si pierdes el navegador pierdes los datos. Te avisaremos cada dos semanas para hacer una copia.';
   } else if(mode === 'login'){
     submit.textContent = 'Iniciar sesión';
     userLabel.textContent = 'Usuario'; userInput.placeholder = 'p. ej. entrenador_marco'; userInput.autocomplete = 'username';
-    passInput.autocomplete = 'current-password';
     passField.classList.remove('hidden'); cloudExtra.classList.add('hidden');
+    if(note) note.innerHTML = 'Las cuentas locales viven solo en este dispositivo. Con <b>Nube</b> tus datos se guardan en Supabase y puedes restaurarlos desde cualquier dispositivo o si olvidas tu contraseña.';
   } else if(mode === 'cloud'){
-    submit.textContent = state.cloudSignup ? 'Crear cuenta en la nube' : 'Entrar con la nube';
+    submit.textContent = 'Entrar con la nube';
     userLabel.textContent = 'Correo'; userInput.placeholder = 'tu@correo.com'; userInput.autocomplete = 'email';
-    passInput.autocomplete = state.cloudSignup ? 'new-password' : 'current-password';
     passField.classList.remove('hidden');
     cloudExtra.classList.remove('hidden');
-    const toggle = $('#cloud-toggle');
-    if(toggle) toggle.textContent = state.cloudSignup ? 'Ya tengo cuenta en la nube' : '¿No tienes cuenta en la nube? Crear cuenta';
+    showLink(toggle, true); showLink(localLink, false); showLink(cloudLink, false);
+    if(forgotBtn) forgotBtn.classList.remove('hidden');
+    if(toggle) toggle.textContent = '¿No tienes cuenta en la nube? Crear cuenta';
+    if(note) note.innerHTML = 'Entra con tu correo de DrakoTrack para sincronizar tus datos y poder restaurarlos.';
   } else if(mode === 'forgot'){
     submit.textContent = 'Enviar enlace de recuperación';
     userLabel.textContent = 'Correo'; userInput.placeholder = 'tu@correo.com'; userInput.autocomplete = 'email';
     passField.classList.add('hidden');
     cloudExtra.classList.remove('hidden');
+    showLink(toggle, false); showLink(localLink, false); showLink(cloudLink, false);
     if(forgotBtn) forgotBtn.classList.add('hidden');
   }
 }
@@ -1876,12 +1928,13 @@ document.addEventListener('click', e => {
   const alt = e.target.closest('[data-auth-alt]');
   if(alt){
     const kind = alt.dataset.authAlt;
-    if(kind === 'cloud-signup'){ state.cloudSignup = !state.cloudSignup; setAuthMode('cloud'); }
-    else if(kind === 'forgot'){ state.cloudSignup = false; setAuthMode('forgot'); }
+    if(kind === 'cloud-signup' || kind === 'cloud-mode') setAuthMode('signup');
+    else if(kind === 'local-signup') setAuthMode('signup-local');
+    else if(kind === 'forgot') setAuthMode('forgot');
     return;
   }
   const tab = e.target.closest('.auth-tab');
-  if(tab){ state.cloudSignup = false; setAuthMode(tab.dataset.auth); }
+  if(tab) setAuthMode(tab.dataset.auth);
 });
 function showAuthError(msg){
   const box = $('#auth-err');
