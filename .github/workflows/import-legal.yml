@@ -1,0 +1,24 @@
+name: import-legal
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  import:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Fetch legal.html from the verified mirror
+        run: |
+          curl -fsSL "https://rxamdcgcpjzfeygxeukj.supabase.co/storage/v1/object/public/drakotrack-import/legal.html" -o legal.html
+          echo "55ef51551879b79fb078e3da850eaefce9d59c6fdabbabb415c56bc1a36e4721  legal.html" | sha256sum -c -
+      - name: Commit
+        run: |
+          git config user.name "drakotrack-import"
+          git config user.email "import@drakotrack.local"
+          git add legal.html
+          git diff --cached --quiet || git commit -m "Legal page: owner details, jurisdiction Canelones Uruguay (Ley 18.331)"
+          git push origin HEAD:main
