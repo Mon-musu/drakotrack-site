@@ -1,0 +1,16 @@
+node_modules/
+.env
+.env.*
+!.env.example
+*.log
+test-users.json
+drakotrack-deploy.zip
+
+# APK build tree: keys and scratch output stay local, but CI needs the base
+# shell and the manifest patcher, so those two are tracked.
+apk-build/*
+!apk-build/bump-version.py
+!apk-build/shell-base.apk
+
+# APK binaries are published as GitHub release assets; the repo keeps only the feed
+apk/*.apk
