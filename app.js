@@ -158,6 +158,7 @@ async function pullRemote(notify){
     if(row && row.data && typeof row.data === 'object' && Object.keys(row.data).length){
       if(!Array.isArray(row.data.hiddenLib)) row.data.hiddenLib = [];
       db.data[currentUser] = row.data;
+      migrateAllData();
       saveDB();
       state.sb.status = 'ok';
       state.sb.last = Date.now();
@@ -418,12 +419,291 @@ async function confirmDeleteAccount(){
 }
 
 /* Límites para validar entradas del usuario (import, editor, sesiones, PR) */
-const LIMITS = { name:120, exercises:100, workouts:300, sets:50, reps:2000, kg:1000 };
+const LIMITS = { name:120, exercises:100, workouts:300, sets:50, reps:2000, kg:1000, setNotes:300, sessionNotes:600 };
+/* Tipos de serie del modelo v2: el calentamiento no cuenta como serie
+   efectiva en volumen, repeticiones ni récords. */
+const SET_TYPES = ['working','warmup','failure','drop','rest-pause','descending','technique'];
+const SET_TYPE_LABELS = {
+  working:'Efectiva', warmup:'Calentamiento', failure:'Fallo',
+  drop:'Drop set', 'rest-pause':'Rest-pause', descending:'Descendente', technique:'Técnica',
+};
+const SESSION_STATUS_LABELS = { in_progress:'En curso', paused:'Pausada', completed:'Completada', cancelled:'Cancelada' };
 function clampInt(v, max, fallback){
   const n = Number(v);
   if(n === null || n === undefined || n === '' || Number.isNaN(n) || v === '') return fallback;
   if(!isFinite(n)) return fallback;
   return Math.min(Math.round(Math.abs(n)), max);
+}
+/* Números con decimales (kg): 62,5 debe seguir siendo 62,5. */
+function clampNum(v, max, fallback){
+  if(v === '' || v === null || v === undefined) return fallback;
+  const n = Number(v);
+  if(!isFinite(n)) return fallback;
+  return Math.min(Math.max(n, 0), max);
+}
+
+/* ============================================================
+   MODELO DE SERIES INDIVIDUALES (v2)
+   Cada ejercicio de una sesión guarda sus series. Las sesiones
+   anteriores conservan su peso/repeticiones globales (setModel 1)
+   y NO se les inventan series.
+   ============================================================ */
+function nowIso(){ return new Date().toISOString(); }
+function fmtDuration(sec){
+  if(sec == null || !isFinite(sec)) return '—';
+  const s = Math.max(0, Math.round(sec));
+  const h = Math.floor(s / 3600), m = Math.floor((s % 3600) / 60), r = s % 60;
+  return (h ? h + ' h ' : '') + (h || m ? m + ' min ' : '') + r + ' s';
+}
+function hasSets(e){ return !!(e && Array.isArray(e.sets)); }
+function makeSet(number, seed){
+  const src = seed || {};
+  return {
+    id: uid(), number,
+    weight: src.weight === '' || src.weight == null ? '' : clampNum(src.weight, LIMITS.kg, ''),
+    reps: src.reps === '' || src.reps == null ? '' : clampInt(src.reps, LIMITS.reps, ''),
+    completed: false,
+    type: SET_TYPES.includes(src.type) ? src.type : 'working',
+    rir: null, rpe: null, restSeconds: null, notes: '',
+  };
+}
+/* Series planificadas de una plantilla: peso de referencia del entrenamiento
+   (nunca repeticiones inventadas) y todas sin completar. */
+function plannedSetsFor(ex){
+  const count = clampInt(ex && ex.sets, LIMITS.sets, 3);
+  const w = ex && Number(ex.weight) > 0 ? clampNum(ex.weight, LIMITS.kg, '') : '';
+  return Array.from({ length: count }, (_, i) => makeSet(i + 1, { weight: w }));
+}
+function normalizeSet(st, i){
+  if(!st || typeof st !== 'object') st = {};
+  if(!st.id) st.id = uid();
+  st.number = clampInt(st.number, LIMITS.sets, i + 1) || (i + 1);
+  st.type = SET_TYPES.includes(st.type) ? st.type : 'working';
+  st.weight = st.weight === '' || st.weight == null ? '' : clampNum(st.weight, LIMITS.kg, '');
+  st.reps = st.reps === '' || st.reps == null ? '' : clampInt(st.reps, LIMITS.reps, '');
+  st.completed = !!st.completed;
+  st.rir = st.rir === '' || st.rir == null ? null : clampInt(st.rir, 5, null);
+  st.rpe = st.rpe === '' || st.rpe == null ? null : clampInt(st.rpe, 10, null);
+  st.restSeconds = st.restSeconds === '' || st.restSeconds == null ? null : clampInt(st.restSeconds, 600, null);
+  st.notes = typeof st.notes === 'string' ? st.notes.slice(0, LIMITS.setNotes) : '';
+  return st;
+}
+function renumberSets(ex){
+  if(!hasSets(ex)) return;
+  ex.sets.forEach((st, i) => { st.number = i + 1; });
+}
+/* Migración compatible: no reescribe los resultados antiguos. */
+function migrateSessionData(s){
+  if(!s || typeof s !== 'object') return false;
+  let changed = false;
+  if(typeof s.date !== 'string'){ s.date = todayISO(); changed = true; }
+  if(!s.status){ s.status = s.finished ? 'completed' : 'in_progress'; changed = true; }
+  if(s.status === 'completed' && !s.finished){ s.finished = true; changed = true; }
+  if(s.status !== 'completed' && s.status !== 'cancelled' && s.finished){ s.finished = false; changed = true; }
+  if(typeof s.notes !== 'string'){ s.notes = ''; changed = true; }
+  if(!Array.isArray(s.exercises)){ s.exercises = []; changed = true; }
+  s.exercises.forEach(e => {
+    if(!e || typeof e !== 'object') return;
+    if(!e.id){ e.id = uid(); changed = true; }
+    if(hasSets(e)){
+      e.sets.forEach((st, i) => { normalizeSet(st, i); });
+      e.setModel = 2;
+      e.done = e.sets.length > 0 && e.sets.every(st => st.completed);
+    } else if(e.setModel !== 1){
+      /* Registro heredado: se conserva el valor global, sin desglose. */
+      e.setModel = 1;
+      changed = true;
+    }
+  });
+  return changed;
+}
+function migrateAllData(){
+  let changed = false;
+  Object.keys(db.data || {}).forEach(u => {
+    const d = db.data[u];
+    if(!d || !Array.isArray(d.sessions)) return;
+    d.sessions.forEach(s => { if(migrateSessionData(s)) changed = true; });
+  });
+  if(changed) saveDB();
+  return changed;
+}
+/* Totales reales de una sesión. Las series de calentamiento se cuentan
+   aparte y nunca suman volumen, repeticiones efectivas ni récords. */
+function sessionTotals(s){
+  let setsTotal = 0, setsDone = 0, warmupDone = 0, reps = 0, volume = 0;
+  let exercisesDone = 0, exercisesTotal = 0, legacy = 0;
+  const exercises = (s && Array.isArray(s.exercises)) ? s.exercises : [];
+  exercises.forEach(e => {
+    if(!hasSets(e)){
+      legacy++;
+      if(e && e.done) exercisesDone++;
+      return;
+    }
+    exercisesTotal++;
+    let all = e.sets.length > 0, any = false;
+    e.sets.forEach(st => {
+      setsTotal++;
+      if(st.completed){
+        setsDone++; any = true;
+        if(st.type === 'warmup'){ warmupDone++; return; }
+        const r = Number(st.reps) || 0;
+        reps += r;
+        const w = Number(st.weight);
+        if(st.weight !== '' && isFinite(w)) volume += w * r;
+      }
+      if(!st.completed) all = false;
+    });
+    if(any && all) exercisesDone++;
+  });
+  return { setsTotal, setsDone, warmupDone, reps, volume: Math.round(volume * 10) / 10, exercisesDone, exercisesTotal, legacy };
+}
+function elapsedSec(s, now){
+  if(!s || !s.startedAt) return null;
+  const start = Date.parse(s.startedAt);
+  if(!isFinite(start)) return null;
+  const ref = now || Date.now();
+  const end = s.finishedAt ? Date.parse(s.finishedAt) : ref;
+  if(!isFinite(end)) return null;
+  const paused = (Number(s.pausedMs) || 0) + (s.pausedAt ? Math.max(0, ref - Date.parse(s.pausedAt)) : 0);
+  return Math.max(0, Math.round((end - start - paused) / 1000));
+}
+/* Mejor serie efectiva de un ejercicio (peso y repeticiones reales). */
+function bestSetOfExercise(ex){
+  if(!hasSets(ex)) return null;
+  let best = null;
+  ex.sets.forEach(st => {
+    if(!st.completed || st.type === 'warmup') return;
+    const w = Number(st.weight), r = Number(st.reps) || 0;
+    if(!(w > 0)) return;
+    if(!best || w > best.weight || (w === best.weight && r > best.reps)) best = { weight: w, reps: r };
+  });
+  return best;
+}
+/* Récords nuevos comparando con sesiones anteriores CON series. Los
+   registros heredados no se usan como marca previa (no hay desglose real). */
+function detectNewRecords(s){
+  const d = dataFor(currentUser);
+  if(!d) return [];
+  const prev = {};
+  d.sessions.forEach(x => {
+    if(!x || x.id === s.id || !x.finished || x.status === 'cancelled') return;
+    (x.exercises || []).forEach(e => {
+      const b = bestSetOfExercise(e);
+      if(!b) return;
+      const cur = prev[e.name];
+      if(!cur || b.weight > cur.weight || (b.weight === cur.weight && b.reps > cur.reps)) prev[e.name] = b;
+    });
+  });
+  const out = [];
+  (s.exercises || []).forEach(e => {
+    const b = bestSetOfExercise(e);
+    const old = prev[e.name];
+    if(!b || !old) return;
+    if(b.weight > old.weight || (b.weight === old.weight && b.reps > old.reps)){
+      out.push({ exercise: e.name, weight: b.weight, reps: b.reps, previous: old });
+    }
+  });
+  return out;
+}
+function buildSummary(s){
+  const t = sessionTotals(s);
+  return {
+    durationSec: elapsedSec(s),
+    exercisesDone: t.exercisesDone,
+    exercisesTotal: t.exercisesTotal + t.legacy,
+    setsDone: t.setsDone,
+    setsEffective: Math.max(0, t.setsDone - t.warmupDone),
+    warmupSets: t.warmupDone,
+    setsTotal: t.setsTotal,
+    reps: t.reps,
+    volume: t.volume,
+    records: detectNewRecords(s),
+    at: nowIso(),
+  };
+}
+function summaryHTML(s){
+  const m = s.summary || buildSummary(s);
+  const recs = m.records || [];
+  return `
+    <div class="summary-grid">
+      <div class="summary-cell"><span class="summary-value">${fmtDuration(m.durationSec)}</span><span class="summary-label">Duración</span></div>
+      <div class="summary-cell"><span class="summary-value">${m.exercisesDone}/${m.exercisesTotal}</span><span class="summary-label">Ejercicios</span></div>
+      <div class="summary-cell"><span class="summary-value">${m.setsEffective}</span><span class="summary-label">Series efectivas${m.warmupSets ? ' (+' + m.warmupSets + ' calent.)' : ''}</span></div>
+      <div class="summary-cell"><span class="summary-value">${m.reps}</span><span class="summary-label">Repeticiones</span></div>
+      <div class="summary-cell"><span class="summary-value">${m.volume ? m.volume + ' kg' : '—'}</span><span class="summary-label">Volumen</span></div>
+    </div>
+    ${recs.length ? `<div class="summary-records"><p class="summary-records-title">¡Nuevos récords!</p>
+      ${recs.map(r => `<p>${esc(r.exercise)}: <b>${esc(r.weight)} kg × ${esc(r.reps)}</b> <span class="muted">(antes ${esc(r.previous.weight)} kg × ${esc(r.previous.reps)})</span></p>`).join('')}
+    </div>` : ''}`;
+}
+function showSummaryModal(s){
+  openModal(`
+    <h3>Entrenamiento completado</h3>
+    <p class="modal-body">${esc(s.workoutName)} · ${fmtDateLong(s.date)}</p>
+    ${summaryHTML(s)}
+    <p class="muted small" style="margin-top:14px">El resumen queda guardado en el historial. Los récords comparan solo sesiones con series registradas.</p>
+    <div class="modal-actions">
+      <button class="btn btn-primary" data-action="summary-close" type="button">Ver sesión</button>
+    </div>`);
+}
+function finalizeSession(s){
+  if(!s) return;
+  if(s.pausedAt){
+    s.pausedMs = (Number(s.pausedMs) || 0) + Math.max(0, Date.now() - Date.parse(s.pausedAt));
+    s.pausedAt = null;
+  }
+  s.finishedAt = nowIso();
+  s.status = 'completed';
+  s.finished = true;
+  s.durationSec = elapsedSec(s);
+  s.lastSavedAt = s.finishedAt;
+  s.summary = buildSummary(s);
+  saveDB();
+  showSummaryModal(s);
+}
+/* Series realizadas en la última sesión completada del mismo entrenamiento
+   y ejercicio, para usarlas como referencia (nunca como completadas). */
+function lastSetsFor(s, ex){
+  const d = dataFor(currentUser);
+  const prev = d.sessions
+    .filter(x => x.id !== s.id && x.finished && x.status !== 'cancelled' && x.workoutId === s.workoutId)
+    .sort((a,b) => String(b.date).localeCompare(String(a.date)));
+  for(const x of prev){
+    const e = (x.exercises || []).find(y => y.name === ex.name);
+    if(!e) continue;
+    if(hasSets(e)){
+      const done = e.sets.filter(st => st.completed && st.type !== 'warmup' && (st.weight !== '' || st.reps !== ''));
+      if(done.length) return done.map(st => ({ weight: st.weight, reps: st.reps }));
+    } else if((e.weight != null && e.weight !== '') || e.reps){
+      return [{ weight: e.weight, reps: e.reps }];
+    }
+  }
+  return [];
+}
+function seedFromSession(old){
+  const out = {};
+  if(!old || !Array.isArray(old.exercises)) return out;
+  old.exercises.forEach(e => {
+    if(!hasSets(e)) return;
+    const done = e.sets.filter(st => st.completed && st.type !== 'warmup')
+      .map(st => ({ weight: st.weight, reps: st.reps }));
+    if(done.length) out[e.name] = done;
+  });
+  return out;
+}
+/* Reloj de sesión: se calcula con marcas de tiempo reales, no restando
+   segundos, para sobrevivir a pestañas suspendidas. */
+let _clockTimer = null;
+function stopSessionClock(){ if(_clockTimer){ clearInterval(_clockTimer); _clockTimer = null; } }
+function startSessionClock(s){
+  stopSessionClock();
+  const tick = () => {
+    const el = $('#session-clock');
+    if(!el || !s) return;
+    el.textContent = (s.status === 'paused' ? 'Pausada · ' : '') + fmtDuration(elapsedSec(s));
+  };
+  tick();
+  if(s && s.status === 'in_progress') _clockTimer = setInterval(tick, 1000);
 }
 
 /* ---------------- Utilidades ---------------- */
@@ -665,6 +945,7 @@ function nav(hash){
 
 /* ---------------- Render principal ---------------- */
 function render(){
+  stopSessionClock();
   const authScreen = $('#auth-screen');
   const app = $('#app');
 
@@ -676,6 +957,7 @@ function render(){
   }
   authScreen.classList.add('hidden');
   app.classList.remove('hidden');
+  if(!window.__dtMigrated){ window.__dtMigrated = true; try{ migrateAllData(); }catch(err){} }
   document.title = 'DrakoTrack — Seguimiento de entrenamiento';
 
   const { route, rest } = parseHash();
@@ -779,6 +1061,44 @@ function customCard(w){
     </div>
   </article>`;
 }
+/* Convierte un ejercicio heredado en su primera serie real usando solo los
+   valores ya guardados: nunca inventa series adicionales. */
+function legacyToSets(ex){
+  if(!ex || hasSets(ex)) return;
+  const w = ex.weight === '' || ex.weight == null ? '' : Number(ex.weight);
+  const r = ex.reps === '' || ex.reps == null ? '' : Number(ex.reps);
+  const hasData = w !== '' || r !== '';
+  ex.sets = [{
+    id: uid(), number: 1,
+    weight: isFinite(w) ? w : '',
+    reps: isFinite(r) ? r : 0,
+    completed: !!ex.done && hasData,
+    type: 'working', rir: null, rpe: null, restSeconds: null, notes: ''
+  }];
+  ex.targetSets = clampInt(ex.targetSets, LIMITS.sets, 1);
+  ex.targetReps = clampInt(ex.targetReps, LIMITS.reps, isFinite(r) && r > 0 ? r : 10);
+  ex.setModel = 2;
+  ex.legacyNote = 'Convertido desde un registro anterior: una sola serie con los valores guardados.';
+  ex.done = ex.sets[0].completed;
+}
+/* Tarjeta para retomar desde Entrenamientos una sesión sin terminar. */
+function resumeCard(d){
+  const open = ((d && d.sessions) || []).filter(s => !s.finished && s.status !== 'cancelled' && s.status !== 'completed');
+  if(!open.length) return '';
+  open.sort((a,b) => String(a.date).localeCompare(String(b.date)) || String(a.id).localeCompare(String(b.id)));
+  const s = open[0];
+  const t = sessionTotals(s);
+  const more = open.length > 1 ? ` · ${open.length - 1} más sin terminar` : '';
+  return `
+  <section class="resume-card">
+    <div>
+      <h2>${s.status === 'paused' ? 'Sesión pausada' : 'Sesión sin terminar'}</h2>
+      <p class="muted small">${esc(s.workoutName)} · ${t.setsDone}/${t.setsTotal || 0} series · ${fmtDuration(elapsedSec(s))}${more}</p>
+    </div>
+    <button class="btn btn-primary" data-action="resume-session" data-id="${esc(s.id)}" type="button">Continuar</button>
+  </section>`;
+}
+
 function renderWorkouts(main){
   const d = dataFor(currentUser);
   const st = workoutStats();
@@ -793,6 +1113,8 @@ function renderWorkouts(main){
         <p class="hero-sub">Carga una sesión de la biblioteca del entrenador o crea tu propio entrenamiento.</p>
       </div>
     </section>
+
+    ${resumeCard(d)}
 
     <section class="stats-grid">
       <div class="stat-card"><p class="stat-value">${st.done}</p><p class="stat-label">Entrenos completados</p></div>
@@ -858,18 +1180,34 @@ function getWorkout(id){
   return d.workouts.find(w => w.id === id) || LIBRARY.find(w => w.id === id);
 }
 function getSession(id){ return dataFor(currentUser).sessions.find(s => s.id === id); }
-function newSessionFor(workout){
+function newSessionFor(workout, seedByName){
   const d = dataFor(currentUser);
   const s = {
-    id: uid(), workoutId: workout.id, workoutName: workout.name, date: todayISO(), finished: false,
-    exercises: workout.exercises.map(e => ({
-      id: e.id || uid(), name: e.name,
-      targetSets: clampInt(e.sets, LIMITS.sets, 1),
-      targetReps: clampInt(e.reps, LIMITS.reps, 10),
-      target: e.target || null,
-      weight: '', reps: '', done: false,
-    })),
+    id: uid(), workoutId: workout.id, workoutName: workout.name, date: todayISO(),
+    startedAt: nowIso(), lastSavedAt: nowIso(), finishedAt: null, durationSec: null,
+    finished: false, status: 'in_progress', pausedMs: 0, pausedAt: null,
+    notes: '', setModel: 2,
+    exercises: workout.exercises.map(e => {
+      const sets = plannedSetsFor(e);
+      const seed = seedByName && seedByName[e.name];
+      if(seed && seed.length){
+        sets.forEach((st, i) => {
+          const p = seed[i];
+          if(p){ st.weight = p.weight; st.reps = p.reps; }
+        });
+      }
+      return {
+        id: e.id || uid(), name: e.name,
+        targetSets: clampInt(e.sets, LIMITS.sets, sets.length || 1),
+        targetReps: clampInt(e.reps, LIMITS.reps, 10),
+        target: e.target || null,
+        done: false,
+        setModel: 2,
+        sets,
+      };
+    }),
   };
+  s.currentExerciseId = s.exercises[0] ? s.exercises[0].id : null;
   d.sessions.push(s);
   saveDB();
   return s;
@@ -893,14 +1231,16 @@ function startSessionFromPrevious(old){
   if(!old) return null;
   const w = {
     id: old.workoutId, name: old.workoutName,
-    exercises: old.exercises.map(e => ({ id: uid(), name: e.name, sets: e.targetSets, reps: e.targetReps, target: e.target || null })),
+    exercises: old.exercises.map(e => ({ id: uid(), name: e.name, sets: hasSets(e) ? e.sets.length : e.targetSets, reps: e.targetReps, target: e.target || null })),
   };
-  const s = newSessionFor(w);
+  const s = newSessionFor(w, seedFromSession(old));
   state.sessionId = s.id;
   return s;
 }
 function sessionPct(s){
-  if(!s.exercises.length) return 0;
+  const t = sessionTotals(s);
+  if(t.setsTotal) return Math.round(t.setsDone / t.setsTotal * 100);
+  if(!s || !s.exercises || !s.exercises.length) return 0;
   return Math.round(s.exercises.filter(e => e.done).length / s.exercises.length * 100);
 }
 function ringSVG(pct){
@@ -915,48 +1255,108 @@ function ringSVG(pct){
     </linearGradient></defs>
   </svg>`;
 }
-function exRow(s, e, i, last){
-  const locked = s.finished ? 'disabled' : '';
-  const lastTxt = last && (('weight' in last) || ('reps' in last))
-    ? `${last.weight != null && last.weight !== '' ? escapeHtmlNum(last.weight) + ' kg' : ''}${last.reps ? ' × ' + escapeHtmlNum(last.reps) : ''}`
-    : null;
+function setRow(s, e, st, locked){
+  const dis = locked ? 'disabled' : '';
   return `
-  <div class="ex-row ${e.done ? 'done' : ''}">
-    <label class="check">
-      <input type="checkbox" data-action="toggle-ex" data-sid="${s.id}" data-ex="${e.id}" ${e.done ? 'checked' : ''} ${locked} aria-label="Marcar «${esc(e.name)}» como completado">
-      <span class="checkmark" aria-hidden="true"></span>
-    </label>
-    <div class="ex-info">
-      <p class="ex-name">${i + 1}. ${esc(e.name)}</p>
-      <p class="ex-target ${e.target ? 'ex-target-row' : ''}">${e.target ? e.targetSets + ' × ' + esc(e.target) : e.targetSets + ' series × ' + e.targetReps + ' rep'}</p>
-      ${lastTxt && !s.finished ? `<button class="last-used" data-action="fill-last" data-sid="${esc(s.id)}" data-ex="${esc(e.id)}" type="button" title="Rellenar con el último registro">↺ Anterior ${lastTxt} · ${fmtDate(last == null ? '' : last.date)}</button>` : ''}
-      ${lastTxt && s.finished ? `<span class="last-used" style="cursor:default">Último: ${lastTxt}</span>` : ''}
+  <div class="set-item ${st.completed ? 'done' : ''}" data-set-item="${esc(st.id)}">
+    <div class="set-row">
+      <span class="set-n">${st.number}</span>
+      <label class="set-field"><span class="sr-only">Peso de la serie ${st.number}</span>
+        <input type="number" inputmode="decimal" min="0" step="0.5" placeholder="kg" value="${esc(st.weight)}"
+          data-session="${esc(s.id)}" data-ex="${esc(e.id)}" data-set="${esc(st.id)}" data-field="weight" ${dis}></label>
+      <label class="set-field"><span class="sr-only">Repeticiones de la serie ${st.number}</span>
+        <input type="number" inputmode="numeric" min="0" placeholder="rep" value="${esc(st.reps)}"
+          data-session="${esc(s.id)}" data-ex="${esc(e.id)}" data-set="${esc(st.id)}" data-field="reps" ${dis}></label>
+      <button type="button" class="set-check ${st.completed ? 'on' : ''}" data-action="toggle-set"
+        data-sid="${esc(s.id)}" data-ex="${esc(e.id)}" data-set="${esc(st.id)}"
+        aria-pressed="${st.completed ? 'true' : 'false'}" aria-label="Serie ${st.number}: ${st.completed ? 'completada' : 'pendiente'}" ${dis}>${st.completed ? '✓' : '○'}</button>
+      <span class="set-tools">
+        <button type="button" class="icon-btn" data-action="duplicate-set" data-sid="${esc(s.id)}" data-ex="${esc(e.id)}" data-set="${esc(st.id)}" aria-label="Duplicar serie ${st.number}" title="Duplicar" ${dis}>⧉</button>
+        <button type="button" class="icon-btn danger" data-action="delete-set" data-sid="${esc(s.id)}" data-ex="${esc(e.id)}" data-set="${esc(st.id)}" aria-label="Eliminar serie ${st.number}" title="Eliminar" ${dis}>✕</button>
+      </span>
     </div>
-    <div class="ex-inputs">
-      <label class="mini-field">
-        <input type="number" inputmode="decimal" min="0" placeholder="0" value="${e.weight ?? ''}" aria-label="Peso en kg de «${esc(e.name)}»"
-          data-session="${s.id}" data-ex="${e.id}" data-field="weight" ${locked}><span aria-hidden="true">kg</span>
-      </label>
-      <label class="mini-field">
-        <input type="number" inputmode="numeric" min="0" placeholder="0" value="${e.reps ?? ''}" aria-label="Repeticiones de «${esc(e.name)}»"
-          data-session="${s.id}" data-ex="${e.id}" data-field="reps" ${locked}><span aria-hidden="true">rep</span>
-      </label>
-    </div>
+    <details class="set-extra">
+      <summary>Tipo, RIR/RPE y nota${st.type !== 'working' ? ' · ' + SET_TYPE_LABELS[st.type] : ''}</summary>
+      <div class="set-extra-grid">
+        <label class="mini-select"><span>Tipo</span>
+          <select data-session="${esc(s.id)}" data-ex="${esc(e.id)}" data-set="${esc(st.id)}" data-field="type" ${dis}>
+            ${SET_TYPES.map(t => `<option value="${t}" ${st.type === t ? 'selected' : ''}>${SET_TYPE_LABELS[t]}</option>`).join('')}
+          </select></label>
+        <label class="mini-select"><span>RIR</span>
+          <select data-session="${esc(s.id)}" data-ex="${esc(e.id)}" data-set="${esc(st.id)}" data-field="rir" ${dis}>
+            <option value="">—</option>${[0,1,2,3,4,5].map(n => `<option value="${n}" ${st.rir === n ? 'selected' : ''}>${n}${n === 5 ? '+' : ''}</option>`).join('')}
+          </select></label>
+        <label class="mini-select"><span>RPE</span>
+          <select data-session="${esc(s.id)}" data-ex="${esc(e.id)}" data-set="${esc(st.id)}" data-field="rpe" ${dis}>
+            <option value="">—</option>${[1,2,3,4,5,6,7,8,9,10].map(n => `<option value="${n}" ${st.rpe === n ? 'selected' : ''}>${n}</option>`).join('')}
+          </select></label>
+        <label class="mini-select"><span>Descanso (s)</span>
+          <input type="number" min="0" max="600" placeholder="—" value="${st.restSeconds == null ? '' : esc(st.restSeconds)}"
+            data-session="${esc(s.id)}" data-ex="${esc(e.id)}" data-set="${esc(st.id)}" data-field="restSeconds" ${dis}></label>
+      </div>
+      <label class="set-note"><span>Nota de la serie</span>
+        <input type="text" maxlength="300" placeholder="p. ej. mejor técnica, bajar más…" value="${esc(st.notes)}"
+          data-session="${esc(s.id)}" data-ex="${esc(e.id)}" data-set="${esc(st.id)}" data-field="notes" ${dis}></label>
+    </details>
   </div>`;
+}
+function exRow(s, e, i, last){
+  const locked = !!s.finished || s.status === 'completed' || s.status === 'cancelled';
+  if(!hasSets(e)){
+    return `
+  <article class="set-block legacy ${e.done ? 'done' : ''}">
+    <div class="set-head">
+      <div class="set-title"><span class="set-order">${i + 1}.</span><h3>${esc(e.name)}</h3>
+        <span class="set-target">${e.targetSets}${e.target ? ' × ' + esc(e.target) : ' × ' + e.targetReps + ' rep'}</span></div>
+      <span class="badge-legacy">Sin desglose</span>
+    </div>
+    <p class="legacy-note">Registro anterior al sistema de series: se conserva el valor global, sin inventar series.</p>
+    <div class="legacy-row">
+      <label class="check"><input type="checkbox" data-action="toggle-ex" data-sid="${esc(s.id)}" data-ex="${esc(e.id)}" ${e.done ? 'checked' : ''} ${locked ? 'disabled' : ''} aria-label="Marcar «${esc(e.name)}» como completado"><span class="checkmark" aria-hidden="true"></span></label>
+      <label class="mini-field"><input type="number" inputmode="decimal" min="0" placeholder="0" value="${e.weight ?? ''}" aria-label="Peso de «${esc(e.name)}»" data-session="${esc(s.id)}" data-ex="${esc(e.id)}" data-field="weight" ${locked ? 'disabled' : ''}><span>kg</span></label>
+      <label class="mini-field"><input type="number" inputmode="numeric" min="0" placeholder="0" value="${e.reps ?? ''}" aria-label="Repeticiones de «${esc(e.name)}»" data-session="${esc(s.id)}" data-ex="${esc(e.id)}" data-field="reps" ${locked ? 'disabled' : ''}><span>rep</span></label>
+    </div>
+    ${locked ? '' : `<button class="btn btn-ghost btn-sm" data-action="convert-legacy" data-sid="${esc(s.id)}" data-ex="${esc(e.id)}" type="button">Convertir a series</button>`}
+  </article>`;
+  }
+  const doneSets = e.sets.filter(st => st.completed && st.type !== 'warmup').length;
+  const lastTxt = last && last.length
+    ? last.map(x => (x.weight !== '' && x.weight != null ? x.weight + ' kg' : '') + (x.reps ? ' × ' + x.reps : '')).join(' · ')
+    : '';
+  return `
+  <article class="set-block ${e.done ? 'done' : ''}" data-ex-block="${esc(e.id)}">
+    <div class="set-head">
+      <div class="set-title"><span class="set-order">${i + 1}.</span><h3>${esc(e.name)}</h3>
+        <span class="set-target">${e.targetSets}${e.target ? ' × ' + esc(e.target) : ' × ' + e.targetReps + ' rep'}</span></div>
+      <span class="set-count">${doneSets}/${e.sets.length}</span>
+    </div>
+    ${e.legacyNote ? `<p class="legacy-note">${esc(e.legacyNote)}</p>` : ''}
+    ${lastTxt && !locked ? `<button class="last-used" data-action="fill-last-sets" data-sid="${esc(s.id)}" data-ex="${esc(e.id)}" type="button" title="Copiar los valores de la última sesión (no marca las series)">↺ Anterior ${esc(lastTxt)}</button>` : ''}
+    <div class="set-legend"><span>Serie</span><span>kg</span><span>rep</span><span>Hecha</span><span></span></div>
+    <div class="set-list">${e.sets.map(st => setRow(s, e, st, locked)).join('')}</div>
+    ${locked ? '' : `<button class="btn btn-ghost btn-sm set-add" data-action="add-set" data-sid="${esc(s.id)}" data-ex="${esc(e.id)}" type="button">+ Añadir serie</button>`}
+  </article>`;
 }
 function renderSession(main, sid){
   const s = getSession(sid);
   if(!s){ nav('#/workouts'); return; }
   const pct = sessionPct(s);
   const d = dataFor(currentUser);
+  const locked = !!s.finished || s.status === 'completed' || s.status === 'cancelled';
+  const statusLabel = SESSION_STATUS_LABELS[s.status] || 'En curso';
   const histAll = d.sessions
-    .filter(x => x.workoutId === s.workoutId && x.id !== s.id && x.finished)
-    .sort((a,b) => b.date.localeCompare(a.date));
-  /* Último peso/repeticiones por ejercicio (de sesiones completadas del mismo entrenamiento) */
+    .filter(x => x.workoutId === s.workoutId && x.id !== s.id && x.finished && x.status !== 'cancelled')
+    .sort((a,b) => String(b.date).localeCompare(String(a.date)));
+  /* Series de la última sesión por ejercicio: solo como referencia (nunca marcadas) */
   const lastBy = {};
-  histAll.forEach(x => x.exercises.forEach(e => {
-    if(!lastBy[e.name] && ((e.weight != null && e.weight !== '') || e.reps))
-      lastBy[e.name] = { weight: e.weight, reps: e.reps, date: x.date };
+  histAll.forEach(x => (x.exercises || []).forEach(e => {
+    if(lastBy[e.name]) return;
+    if(hasSets(e)){
+      const done = e.sets.filter(st => st.completed && st.type !== 'warmup' && (st.weight !== '' || st.reps !== ''));
+      if(done.length) lastBy[e.name] = done.map(st => ({ weight: st.weight, reps: st.reps }));
+    } else if((e.weight != null && e.weight !== '') || e.reps){
+      lastBy[e.name] = [{ weight: e.weight, reps: e.reps }];
+    }
   }));
   const hist = histAll.slice(0,5);
 
@@ -967,7 +1367,8 @@ function renderSession(main, sid){
         <span class="wcard-emoji big">${DUMBBELL}</span>
         <div>
           <h1>${esc(s.workoutName)}</h1>
-          <p class="muted">${fmtDateLong(s.date)} · ${s.exercises.length} ejercicios</p>
+          <p class="muted">${fmtDateLong(s.date)} · ${s.exercises.length} ejercicios<span class="status-pill">${esc(statusLabel)}</span></p>
+          <p class="session-clock" id="session-clock">—</p>
         </div>
       </div>
       <div class="ring-wrap">
@@ -978,18 +1379,29 @@ function renderSession(main, sid){
 
     <div class="progress-bar"><div class="progress-fill" id="pfill" style="width:${pct}%"></div></div>
 
+    ${locked && s.summary ? `<section class="summary-card">${summaryHTML(s)}</section>` : ''}
+
     <section class="section">
       <div class="section-head">
-        <h2>${s.finished ? 'Sesión completada' : 'Ejercicios'}</h2>
-        <span class="muted">${s.finished ? '¡Gran trabajo! Registrada el ' + fmtDate(s.date) : 'Marca cada ejercicio al terminarlo y anota tu peso y repeticiones.'}</span>
+        <h2>${locked ? 'Sesión registrada' : 'Ejercicios'}</h2>
+        <span class="muted">${locked ? 'Registro histórico: no cambia aunque edites la rutina.' : 'Anota cada serie, márcala al terminarla y ajusta RIR/RPE si quieres.'}</span>
       </div>
       <div class="ex-list">${s.exercises.map((e,i) => exRow(s, e, i, lastBy[e.name])).join('')}</div>
+      ${locked ? '' : `<div class="session-add-ex"><button class="btn btn-ghost" data-action="add-session-ex" data-sid="${esc(s.id)}" type="button">+ Añadir ejercicio a esta sesión</button></div>`}
     </section>
 
+    <div class="session-notes-wrap">
+      <label class="field"><span>Notas de la sesión</span>
+        <textarea id="session-notes" data-session-note="${esc(s.id)}" rows="2" maxlength="${LIMITS.sessionNotes}" ${locked ? 'disabled' : ''} placeholder="Sensaciones, incidencias, técnica…">${esc(s.notes || '')}</textarea>
+      </label>
+    </div>
+
     <div class="session-actions">
-      ${s.finished
-        ? `<button class="btn btn-primary" data-action="restart-session" data-id="${s.id}" type="button">Entrenar de nuevo</button>`
-        : `<button class="btn btn-primary btn-lg" data-action="finish-session" data-id="${s.id}" type="button" ${pct === 100 ? '' : 'disabled'}>Terminar sesión</button>`}
+      ${locked
+        ? `<button class="btn btn-primary" data-action="restart-session" data-id="${esc(s.id)}" type="button">Entrenar de nuevo</button>`
+        : `<button class="btn btn-ghost" data-action="${s.status === 'paused' ? 'resume-session-status' : 'pause-session'}" data-id="${esc(s.id)}" type="button">${s.status === 'paused' ? 'Reanudar' : 'Pausar'}</button>
+           <button class="btn btn-primary btn-lg" data-action="finish-session" data-id="${esc(s.id)}" type="button">Terminar sesión</button>
+           <button class="btn btn-ghost" data-action="cancel-session" data-id="${esc(s.id)}" type="button">Cancelar</button>`}
     </div>
 
     ${hist.length ? `
@@ -1004,6 +1416,7 @@ function renderSession(main, sid){
           </div>`).join('')}
       </div>
     </section>` : ''}`;
+  startSessionClock(s);
 }
 function refreshSessionProgress(sid){
   const s = getSession(sid);
@@ -1011,8 +1424,7 @@ function refreshSessionProgress(sid){
   const pct = sessionPct(s);
   const p = $('#ring-pct'); if(p) p.textContent = pct;
   const fill = $('#pfill'); if(fill) fill.style.width = pct + '%';
-  const fin = $('[data-action="finish-session"]');
-  if(fin) fin.disabled = pct !== 100;
+  const ring = $('#ring'); if(ring) ring.innerHTML = ringSVG(pct);
 }
 
 /* ---------------- Editor de entrenamientos propios ---------------- */
@@ -1240,25 +1652,51 @@ function renderHistory(main){
       : `<section class="section">${finished.map(histCard).join('')}</section>`}`;
 }
 function histCard(s){
-  const doneCount = s.exercises.filter(e => e.done).length;
+  const t = sessionTotals(s);
+  const cancelled = s.status === 'cancelled';
   return `
-  <article class="hist-card">
+  <article class="hist-card${cancelled ? ' cancelled' : ''}">
     <div class="hist-top">
       <span class="wcard-emoji">${DUMBBELL}</span>
       <div class="hist-head">
         <h3>${esc(s.workoutName)}</h3>
-        <span class="muted small">${fmtDateLong(s.date)} · ${doneCount}/${s.exercises.length} ejercicios</span>
+        <span class="muted small">${fmtDateLong(s.date)} · ${t.exercisesDone}/${t.exercisesTotal + t.legacy} ejercicios${cancelled ? ' · cancelada' : ''}</span>
       </div>
       <button class="btn btn-ghost btn-sm" data-action="open-session" data-id="${esc(s.id)}" type="button">Ver sesión</button>
     </div>
-    <div class="hist-ex">
-      ${s.exercises.map(e => `
-        <div class="hist-exrow">
-          <span class="hn">${e.done ? '✓' : '✗'} ${esc(e.name)}</span>
-          <span class="hv">${e.weight != null && e.weight !== '' ? escapeHtmlNum(e.weight) + ' kg' : ''}${e.reps ? ' × ' + escapeHtmlNum(e.reps) : ''}</span>
-          <span class="ht muted">${e.targetSets}${e.target ? ' × ' + esc(e.target) : ' × ' + e.targetReps + ' rep'}</span>
-        </div>`).join('')}
+    <div class="hist-metrics">
+      <span><b>${t.setsDone}</b> series${t.warmupDone ? ' <span class="muted">(+' + t.warmupDone + ' calent.)</span>' : ''}</span>
+      <span><b>${t.reps}</b> reps</span>
+      <span><b>${t.volume ? t.volume + ' kg' : '—'}</b> volumen</span>
+      ${s.durationSec != null ? `<span><b>${fmtDuration(s.durationSec)}</b></span>` : ''}
     </div>
+    <div class="hist-ex">
+      ${s.exercises.map(e => {
+        if(hasSets(e)){
+          const done = e.sets.filter(st => st.completed);
+          const shown = done.length ? done : e.sets;
+          const all = e.sets.length > 0 && done.length === e.sets.length;
+          return `<div class="hist-exrow hist-exsets">
+            <span class="hn">${all ? '✓' : '·'} ${esc(e.name)}</span>
+            <span class="hv">${shown.map(st => {
+              const w = st.weight !== '' && st.weight != null ? escapeHtmlNum(st.weight) + ' kg' : '';
+              const r = st.reps ? ' × ' + escapeHtmlNum(st.reps) : '';
+              const tag = st.type && st.type !== 'working' ? `<em class="set-type-tag">${esc(SET_TYPE_LABELS[st.type] || st.type)}</em>` : '';
+              return `<span class="hist-set">${w}${r}${tag}</span>`;
+            }).join('<span class="sep">·</span>')}</span>
+            <span class="ht muted">${e.sets.length} serie${e.sets.length === 1 ? '' : 's'}</span>
+          </div>`;
+        }
+        const w = e.weight != null && e.weight !== '' ? escapeHtmlNum(e.weight) + ' kg' : '';
+        const r = e.reps ? ' × ' + escapeHtmlNum(e.reps) : '';
+        return `<div class="hist-exrow">
+          <span class="hn">${e.done ? '✓' : '✗'} ${esc(e.name)}</span>
+          <span class="hv">${w || r ? w + r : '<span class="muted">sin datos</span>'}</span>
+          <span class="ht muted"><span class="badge-legacy">heredado</span>${e.targetSets ? ' · ' + e.targetSets + ' series' : ''}</span>
+        </div>`;
+      }).join('')}
+    </div>
+    ${s.notes ? `<p class="hist-note">${esc(s.notes)}</p>` : ''}
   </article>`;
 }
 
@@ -1710,11 +2148,198 @@ document.addEventListener('click', e => {
   }
   if(a === 'finish-session'){
     const s = getSession(el.dataset.id);
-    if(!s || sessionPct(s) !== 100) return;
-    s.finished = true;
+    if(!s || s.finished) return;
+    const pending = (s.exercises || []).some(e => hasSets(e) ? e.sets.some(st => !st.completed) : !e.done);
+    if(pending){
+      confirmModal('¿Terminar el entrenamiento?', 'Hay series o ejercicios sin marcar. Se guardará la sesión con lo realizado; lo no marcado no cuenta como hecho.', 'Terminar', () => finalizeSession(s));
+    } else {
+      finalizeSession(s);
+    }
+    return;
+  }
+  if(a === 'pause-session' || a === 'resume-session-status'){
+    const s = getSession(el.dataset.id);
+    if(!s || s.finished) return;
+    if(a === 'pause-session'){
+      s.status = 'paused';
+      s.pausedAt = nowIso();
+    } else {
+      if(s.pausedAt){
+        s.pausedMs = (Number(s.pausedMs) || 0) + Math.max(0, Date.now() - Date.parse(s.pausedAt));
+        s.pausedAt = null;
+      }
+      s.status = 'in_progress';
+    }
+    s.lastSavedAt = nowIso();
     saveDB();
-    toast('¡Sesión registrada! Sigue con esa energía.');
     render();
+    toast(a === 'pause-session' ? 'Sesión pausada.' : 'Sesión reanudada.', 'info');
+    return;
+  }
+  if(a === 'cancel-session'){
+    const s = getSession(el.dataset.id);
+    if(!s) return;
+    confirmModal('¿Cancelar esta sesión?', 'Se guardará en el historial como cancelada y no contará para estadísticas ni récords.', 'Cancelar sesión', () => {
+      if(s.pausedAt){
+        s.pausedMs = (Number(s.pausedMs) || 0) + Math.max(0, Date.now() - Date.parse(s.pausedAt));
+        s.pausedAt = null;
+      }
+      s.status = 'cancelled';
+      s.finished = true;
+      s.finishedAt = nowIso();
+      s.durationSec = elapsedSec(s);
+      s.lastSavedAt = s.finishedAt;
+      saveDB();
+      closeModal();
+      toast('Sesión cancelada.', 'info');
+      nav('#/workouts');
+    });
+    return;
+  }
+  if(a === 'resume-session'){
+    const s = getSession(el.dataset.id);
+    if(s) nav('#/session/' + s.id);
+    return;
+  }
+  if(a === 'summary-close'){ closeModal(); render(); return; }
+  if(a === 'toggle-set'){
+    const s = getSession(el.dataset.sid);
+    if(!s || s.finished) return;
+    const ex = s.exercises.find(x => x.id === el.dataset.ex);
+    const st = ex && hasSets(ex) ? ex.sets.find(x => x.id === el.dataset.set) : null;
+    if(!st) return;
+    st.completed = !st.completed;
+    ex.done = ex.sets.length > 0 && ex.sets.every(x => x.completed);
+    s.currentExerciseId = ex.id;
+    s.lastSavedAt = nowIso();
+    saveDB();
+    render();
+    return;
+  }
+  if(a === 'add-set'){
+    const s = getSession(el.dataset.sid);
+    if(!s || s.finished) return;
+    const ex = s.exercises.find(x => x.id === el.dataset.ex);
+    if(!ex) return;
+    if(!hasSets(ex)){ legacyToSets(ex); saveDB(); render(); return; }
+    if(ex.sets.length >= LIMITS.sets){ toast('Máximo de series por ejercicio alcanzado.', 'error'); return; }
+    const prev = ex.sets[ex.sets.length - 1];
+    ex.sets.push({
+      id: uid(), number: ex.sets.length + 1,
+      weight: prev ? prev.weight : '', reps: prev ? prev.reps : '',
+      completed: false, type: prev ? prev.type : 'working',
+      rir: null, rpe: null, restSeconds: prev ? prev.restSeconds : null, notes: ''
+    });
+    renumberSets(ex);
+    saveDB();
+    render();
+    return;
+  }
+  if(a === 'duplicate-set'){
+    const s = getSession(el.dataset.sid);
+    if(!s || s.finished) return;
+    const ex = s.exercises.find(x => x.id === el.dataset.ex);
+    if(!ex || !hasSets(ex)) return;
+    const idx = ex.sets.findIndex(x => x.id === el.dataset.set);
+    if(idx < 0) return;
+    if(ex.sets.length >= LIMITS.sets){ toast('Máximo de series por ejercicio alcanzado.', 'error'); return; }
+    const src = ex.sets[idx];
+    ex.sets.splice(idx + 1, 0, {
+      id: uid(), number: src.number, weight: src.weight, reps: src.reps,
+      completed: false, type: src.type, rir: src.rir, rpe: src.rpe,
+      restSeconds: src.restSeconds, notes: ''
+    });
+    renumberSets(ex);
+    saveDB();
+    render();
+    return;
+  }
+  if(a === 'delete-set'){
+    const s = getSession(el.dataset.sid);
+    if(!s || s.finished) return;
+    const ex = s.exercises.find(x => x.id === el.dataset.ex);
+    if(!ex || !hasSets(ex)) return;
+    if(ex.sets.length <= 1){ toast('Cada ejercicio necesita al menos una serie.', 'error'); return; }
+    ex.sets = ex.sets.filter(x => x.id !== el.dataset.set);
+    renumberSets(ex);
+    ex.done = ex.sets.length > 0 && ex.sets.every(x => x.completed);
+    saveDB();
+    render();
+    return;
+  }
+  if(a === 'fill-last-sets'){
+    const s = getSession(el.dataset.sid);
+    if(!s || s.finished) return;
+    const ex = s.exercises.find(x => x.id === el.dataset.ex);
+    if(!ex) return;
+    const prev = lastSetsFor(s, ex);
+    if(!prev.length){ toast('No hay sesiones anteriores de este ejercicio.', 'info'); return; }
+    if(!hasSets(ex)) legacyToSets(ex);
+    ex.sets.forEach((st, i) => {
+      const p = prev[i];
+      if(!p) return;
+      st.weight = p.weight === undefined || p.weight === null ? '' : p.weight;
+      st.reps = p.reps === undefined || p.reps === null ? '' : p.reps;
+      st.completed = false;
+    });
+    saveDB();
+    render();
+    toast('Valores anteriores copiados: marca las series al terminarlas.', 'info');
+    return;
+  }
+  if(a === 'convert-legacy'){
+    const s = getSession(el.dataset.sid);
+    if(!s || s.finished) return;
+    const ex = s.exercises.find(x => x.id === el.dataset.ex);
+    if(!ex) return;
+    legacyToSets(ex);
+    saveDB();
+    render();
+    toast('Convertido a series: revisa peso y repeticiones de cada una.', 'info');
+    return;
+  }
+  if(a === 'add-session-ex'){
+    const s = getSession(el.dataset.sid);
+    if(!s || s.finished) return;
+    openModal(`
+      <h3>Añadir ejercicio</h3>
+      <div class="form">
+        <label class="field"><span>Nombre del ejercicio</span><input id="ex-name" maxlength="80" placeholder="p. ej. Press inclinado con mancuernas"></label>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
+          <label class="field"><span>Series</span><input id="ex-sets" type="number" min="1" max="${LIMITS.sets}" value="3"></label>
+          <label class="field"><span>Repeticiones</span><input id="ex-reps" type="number" min="1" max="${LIMITS.reps}" value="10"></label>
+        </div>
+      </div>
+      <div class="modal-actions">
+        <button class="btn btn-ghost" data-action="close-modal" type="button">Cancelar</button>
+        <button class="btn btn-primary" data-action="save-session-ex" data-sid="${esc(s.id)}" type="button">Añadir</button>
+      </div>`);
+    return;
+  }
+  if(a === 'save-session-ex'){
+    const s = getSession(el.dataset.sid);
+    if(!s || s.finished) return;
+    const nameEl = $('#ex-name');
+    const name = nameEl ? nameEl.value.trim().slice(0, LIMITS.name) : '';
+    if(!name){ toast('Ponle un nombre al ejercicio.', 'error'); return; }
+    if(s.exercises.some(e => String(e.name).toLowerCase() === name.toLowerCase())){
+      toast('Ese ejercicio ya está en la sesión.', 'error'); return;
+    }
+    const setsEl = $('#ex-sets'), repsEl = $('#ex-reps');
+    const nSets = clampInt(setsEl && setsEl.value !== '' ? Number(setsEl.value) : 3, LIMITS.sets, 3);
+    const nReps = clampInt(repsEl && repsEl.value !== '' ? Number(repsEl.value) : 10, LIMITS.reps, 10);
+    s.exercises.push({
+      id: uid(), name, targetSets: nSets, targetReps: nReps, done: false,
+      sets: Array.from({ length: nSets }, (_, i) => ({
+        id: uid(), number: i + 1, weight: '', reps: nReps, completed: false,
+        type: 'working', rir: null, rpe: null, restSeconds: null, notes: ''
+      }))
+    });
+    s.lastSavedAt = nowIso();
+    saveDB();
+    closeModal();
+    render();
+    toast('Ejercicio añadido a la sesión.');
     return;
   }
   if(a === 'restart-session'){
@@ -1842,6 +2467,35 @@ document.addEventListener('click', e => {
   }
 });document.addEventListener('input', e => {
   const t = e.target;
+  if(t.dataset && t.dataset.set && t.dataset.session){
+    const s = getSession(t.dataset.session);
+    if(s && !s.finished){
+      const ex = s.exercises.find(x => x.id === t.dataset.ex);
+      const st = ex && hasSets(ex) ? ex.sets.find(x => x.id === t.dataset.set) : null;
+      if(st){
+        const f = t.dataset.field;
+        if(f === 'notes'){
+          st.notes = String(t.value).slice(0, LIMITS.setNotes);
+          saveDB();
+        } else if(f === 'weight' || f === 'reps' || f === 'restSeconds'){
+          const cap = f === 'weight' ? LIMITS.kg : f === 'reps' ? LIMITS.reps : 600;
+          const n = Number(t.value);
+          st[f] = t.value === '' ? '' : (isFinite(n) && n >= 0 ? Math.min(cap, n) : '');
+          saveDB();
+        }
+      }
+    }
+    return;
+  }
+  if(t.id === 'session-notes'){
+    const s = getSession(t.dataset.sessionNote);
+    if(s && !s.finished){
+      s.notes = String(t.value).slice(0, LIMITS.sessionNotes);
+      s.lastSavedAt = nowIso();
+      saveDB();
+    }
+    return;
+  }
   if(t.id === 'del-confirm'){
     const go = $('#del-go');
     if(go) go.disabled = t.value.trim().toUpperCase() !== 'ELIMINAR';
@@ -1884,6 +2538,24 @@ document.addEventListener('click', e => {
 
 document.addEventListener('change', e => {
   const t = e.target;
+  if(t.dataset && t.dataset.set && (t.dataset.field === 'type' || t.dataset.field === 'rir' || t.dataset.field === 'rpe')){
+    const s = getSession(t.dataset.session);
+    if(s && !s.finished){
+      const ex = s.exercises.find(x => x.id === t.dataset.ex);
+      const st = ex && hasSets(ex) ? ex.sets.find(x => x.id === t.dataset.set) : null;
+      if(st){
+        const f = t.dataset.field;
+        st[f] = f === 'type' ? t.value : (t.value === '' ? null : Number(t.value));
+        saveDB();
+        if(f === 'type'){
+          const det = t.closest('details');
+          const sum = det ? det.querySelector('summary') : null;
+          if(sum) sum.textContent = 'Tipo, RIR/RPE y nota' + (st.type !== 'working' ? ' · ' + (SET_TYPE_LABELS[st.type] || st.type) : '');
+        }
+      }
+    }
+    return;
+  }
   if(t.id === 'pr-select'){
     state.prExercise = t.value;
     render();
@@ -2137,6 +2809,7 @@ function focusMain(){
 }
 window.addEventListener('hashchange', () => { render(); focusMain(); });
 (async function boot(){
+  try{ migrateAllData(); }catch(err){}
   /* ¿Volvió de un enlace de recuperación de contraseña? */
   const rec = parseRecoveryHash();
   if(rec){
