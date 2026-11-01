@@ -104,6 +104,9 @@ const tick = ms => new Promise(r => setTimeout(r, ms));
   await tick(600);
   check('signup logs in', g('currentUser') === 'tester_01');
   check('app shown after login', window.document.querySelector('#app').classList.contains('hidden') === false);
+  check('a brand-new account lands on the three-step plan', !!window.document.querySelector('.onb-card') && g('state.onb.step') === 1);
+  g("nav('#/workouts')");
+  await tick(80);
   check('password stored as PBKDF2 hash', (() => {
     const users = g('JSON.stringify(Object.keys(db.users))');
     const u = g('db.users["tester_01"]');
@@ -1513,6 +1516,154 @@ const tick = ms => new Promise(r => setTimeout(r, ms));
   g("nav('#/settings')"); await tick(60);
   check('settings offers the three CSV exports', g(`document.querySelectorAll('[data-action^="csv-"]').length`) === 3);
 
+  // ===== v2 Lote B: plan en tres pasos, volumen por grupo y mes a mes =====
+  const planErr = await g("signup('lote-b','local-pass-2026')");
+  check('plan block starts with a fresh account', planErr === null && g('currentUser') === 'lote-b');
+  check('no plan is assumed before answering', g('profileDone(dataFor(currentUser))') === false);
+  check('a malformed profile is ignored', g("userProfile({ profile:{ goal:'fuerza', days:4, level:'raro' } })") === null
+    && g("userProfile({ profile:{ goal:'fuerza', days:9, level:'intermedio' } })") === null);
+
+  g("nav('#/start')");
+  await tick(80);
+  check('wizard starts at step 1 with the goal question', g('state.onb.step') === 1 && /¿Qué buscas\?/.test(mainHtml()));
+  check('step 1 offers four goals', g(`document.querySelectorAll('[data-action="onb-goal"]').length`) === 4);
+  check('step 1 can be skipped', !!window.document.querySelector('[data-action="onb-skip"]'));
+  window.document.querySelector('[data-action="onb-goal"][data-id="fuerza"]').click();
+  await tick(60);
+  check('choosing a goal moves to the days step', g('state.onb.goal') === 'fuerza' && g('state.onb.step') === 2);
+  check('days step offers 2 to 6 days a week',
+    g(`Array.from(document.querySelectorAll('[data-action="onb-days"]')).map(b => b.dataset.id).join(',')`) === '2,3,4,5,6');
+  window.document.querySelector('[data-action="onb-days"][data-id="4"]').click();
+  await tick(60);
+  check('choosing days moves to the experience step', g('state.onb.step') === 3 && g('state.onb.days') === 4);
+  check('saving is blocked until all three answers exist',
+    window.document.querySelector('[data-action="onb-save"]').disabled === true);
+  window.document.querySelector('[data-action="onb-level"][data-id="intermedio"]').click();
+  await tick(400);
+  check('saving unlocks once experience is chosen',
+    window.document.querySelector('[data-action="onb-save"]').disabled === false);
+  check('experience step sums up the answers',
+    /Fuerza · 4 días · Intermedio/.test(window.document.querySelector('.onb-summary').textContent || ''));
+  check('catalog recommendations are listed', g(`document.querySelectorAll('#onb-recs .onb-rec').length`) === 3);
+  window.document.querySelector('[data-action="onb-save"]').click();
+  await tick(120);
+  check('plan is stored in the account data', g("JSON.stringify(userProfile(dataFor(currentUser)))").includes('"goal":"fuerza"')
+    && g('userProfile(dataFor(currentUser)).days') === 4 && g('userProfile(dataFor(currentUser)).level') === 'intermedio');
+  check('plan survives a reload of the profile reader', g("profileDone({ profile: dataFor(currentUser).profile })") === true);
+  check('plan sets series, reps and rest defaults',
+    g('planDefaults(dataFor(currentUser)).sets') === 4 && g('planDefaults(dataFor(currentUser)).reps') === 8
+    && g('planDefaults(dataFor(currentUser)).rest') === 120);
+  check('no plan means no invented defaults', g("planDefaults({ profile:{ skipped:true } })") === null);
+
+  g("nav('#/editor/new')");
+  await tick(80);
+  check('new workouts start with the plan defaults', g('state.editor.exercises[0].sets') === 4 && g('state.editor.exercises[0].reps') === 8);
+
+  g("nav('#/workouts')");
+  await tick(80);
+  check('home no longer asks for the plan', !mainHtml().includes('data-action="open-onboarding"'));
+  g("nav('#/settings')");
+  await tick(80);
+  check('settings shows the saved plan', /Fuerza · 4 días por semana · Intermedio/.test(mainHtml())
+    && mainHtml().includes('data-action="open-onboarding"'));
+
+  check('programs are ranked by goal, level and days',
+    g(`rankPrograms({ goal:'fuerza', days:4, level:'intermedio' }, [
+        { t:'B', slug:'b', c:['hyper'], diff:['Beginner'], dpw:3 },
+        { t:'A', slug:'a', c:['strength'], diff:['Intermediate'], dpw:4 },
+        { t:'C', slug:'c', c:['strength'], diff:['Advanced'], dpw:6 }
+      ]).map(p => p.slug).join(',')`) === 'a,c,b');
+  check('ranking ignores programs without data', g("rankPrograms({ goal:'fuerza', days:4, level:'intermedio' }, [{ t:'X', slug:'x', ok:false }]).length") === 0);
+
+  // Semana en curso: series efectivas por grupo, sin calentamientos ni series a medias
+  g(`(function(){
+    const d = dataFor(currentUser);
+    const w = weekStartISO(todayISO());
+    d.sessions = [{
+      id: 'lb-s1', date: w, finished: true, workoutName: 'Pecho', exercises: [
+        { id:'lb-e1', name:'Press de banca', exId:'press-de-banca', sets:[
+          { id:'lb-x1', weight:100, reps:5, completed:true, type:'working' },
+          { id:'lb-x2', weight:40, reps:10, completed:true, type:'warmup' },
+          { id:'lb-x3', weight:90, reps:8, completed:false, type:'working' }
+        ]},
+        { id:'lb-e2', name:'Ejercicio propio raro', exId:'custom:propio-raro', sets:[
+          { id:'lb-x4', weight:20, reps:10, completed:true, type:'working' }
+        ]},
+        { id:'lb-e3', name:'Remo con barra', exId:'remo-con-barra', done:true, weight:60, reps:5 }
+      ]
+    }, {
+      id: 'lb-s0', date: shiftISO(w, -7), finished: true, workoutName: 'Empuje', exercises: [
+        { id:'lb-e4', name:'Press de banca', exId:'press-de-banca', sets:[
+          { id:'lb-x5', weight:95, reps:5, completed:true, type:'working' },
+          { id:'lb-x6', weight:92, reps:5, completed:true, type:'working' }
+        ]}
+      ]
+    }];
+    d.records = [{ id:'lb-r1', date: todayISO(), exId:'press-de-banca', exercise:'Press de banca', weight:100, reps:5 }];
+  })()`);
+  check('warmups and unfinished sets do not count', g('effectiveSets({ sets:[{weight:100,reps:5,completed:true,type:"working"},{weight:40,reps:10,completed:true,type:"warmup"},{weight:90,reps:8,completed:false,type:"working"}] }).sets') === 1);
+  check('legacy exercises count as one set when done', g("effectiveSets({ done:true, weight:60, reps:5 })").volume === 300);
+  check('weekly volume is grouped by muscle group',
+    g("weekMuscleVolume(dataFor(currentUser), weekStartISO(todayISO())).map(r => r.id + ':' + r.sets + ':' + r.volume).join('|')")
+    === 'pecho:1:500|espalda:1:300|sin-grupo:1:200');
+  check('unknown exercises fall back to a named group', g("groupName('sin-grupo')") === 'Sin grupo');
+
+  g("nav('#/progress')");
+  await tick(120);
+  const mvRows = window.document.querySelectorAll('.mv-row').length;
+  check('progress shows one bar per worked group', mvRows === 3);
+  check('bars compare against the previous week',
+    /-1/.test(window.document.querySelector('.mv-delta').textContent || ''));
+  check('weekly card adds up the week', /3 series efectivas/.test(mainHtml()));
+
+  // Comparación mes a mes
+  check('months shift backwards across the year',
+    g("shiftMonth('2026-01', -1)") === '2025-12' && g("shiftMonth('2026-12', 1)") === '2027-01');
+  check('month label is readable Spanish', /^[A-ZÁÉÍÓÚ]/.test(g("monthLabel('2026-11')")));
+  g(`(function(){
+    const d = dataFor(currentUser);
+    const prev = shiftMonth(monthKey(todayISO()), -1) + '-15';
+    d.sessions = [
+      { id:'lb-m1', date: todayISO(), finished: true, workoutName: 'Actual', exercises:[
+        { id:'lb-me1', name:'Sentadilla trasera', exId:'sentadilla-trasera', sets:[
+          { id:'lb-mx1', weight:100, reps:5, completed:true, type:'working' },
+          { id:'lb-mx2', weight:100, reps:5, completed:true, type:'working' },
+          { id:'lb-mx3', weight:80, reps:8, completed:true, type:'working' }
+        ]}
+      ]},
+      { id:'lb-m2', date: prev, finished: true, workoutName: 'Anterior', exercises:[
+        { id:'lb-me2', name:'Sentadilla trasera', exId:'sentadilla-trasera', sets:[
+          { id:'lb-mx4', weight:100, reps:5, completed:true, type:'working' },
+          { id:'lb-mx5', weight:100, reps:5, completed:true, type:'working' }
+        ]}
+      ]},
+      { id:'lb-m3', date: prev, finished: false, workoutName: 'Sin terminar', exercises: [] }
+    ];
+    d.records = [{ id:'lb-mr1', date: todayISO(), exId:'sentadilla-trasera', exercise:'Sentadilla trasera', weight:100, reps:5 }];
+  })()`);
+  const nowMonth = g('monthStats(dataFor(currentUser), monthKey(todayISO()))');
+  const prevMonth = g("monthStats(dataFor(currentUser), shiftMonth(monthKey(todayISO()), -1))");
+  check('current month counts its finished sessions and effective sets',
+    nowMonth.sessions === 1 && nowMonth.sets === 3 && nowMonth.volume === 1640);
+  check('previous month is measured on its own, without unfinished sessions',
+    prevMonth.sessions === 1 && prevMonth.sets === 2 && prevMonth.volume === 1000 && prevMonth.records === 0);
+  check('records are counted per month', nowMonth.records === 1);
+  check('month comparison renders both months', g('monthCompareHTML(dataFor(currentUser))').includes('Este mes frente al anterior'));
+  check('month comparison hides itself without sessions', g("monthCompareHTML({ sessions: [] })") === '');
+
+  // Omitir el plan no vuelve a preguntar y deja la puerta abierta en Ajustes
+  g("nav('#/start')");
+  await tick(80);
+  g("state.onb = onboardingState(dataFor(currentUser))");
+  g('skipOnboarding()');
+  await tick(80);
+  check('skipping the wizard is remembered', g('dataFor(currentUser).profile.skipped') === true && g('profileDone(dataFor(currentUser))') === false);
+  check('a skipped plan does not nag on home', g('planCardHTML(dataFor(currentUser))') === '');
+  check('home asks for the plan only when never answered', g('planCardHTML({})').includes('data-action="open-onboarding"'));
+  g("nav('#/settings')");
+  await tick(80);
+  check('settings still offers the plan after skipping', /Configurar plan/.test(mainHtml()));
+
   // PWA: manifiesto, iconos y service worker
   const indexHtml = fs.readFileSync(path.join(__dirname, 'index.html'), 'utf8');
   check('index links the web manifest', /rel="manifest" href="manifest\.webmanifest"/.test(indexHtml));
@@ -1524,7 +1675,7 @@ const tick = ms => new Promise(r => setTimeout(r, ms));
     check('icon present: ' + icon, fs.existsSync(path.join(__dirname, icon)));
   }
   const swSource = fs.readFileSync(path.join(__dirname, 'sw.js'), 'utf8');
-  check('service worker precaches the shell', /const VERSION = /.test(swSource) && swSource.includes("'./index.html'") && swSource.includes("'./app.js?v=30'"));
+  check('service worker precaches the shell', /const VERSION = /.test(swSource) && swSource.includes("'./index.html'") && swSource.includes('./app.js?v='));
   check('service worker leaves the API uncached', /startsWith\('\/api\/'\)/.test(swSource));
   check('service worker revalidates in the background', /cache\.put\(request, response\.clone\(\)\)/.test(swSource));
   check('app registers the service worker', /serviceWorker\.register\('sw\.js'\)/.test(fs.readFileSync(path.join(__dirname, 'app.js'), 'utf8')));

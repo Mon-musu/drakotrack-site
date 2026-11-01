@@ -334,7 +334,7 @@ function setTheme(v){
 /* ---------------- Estado y almacenamiento ---------------- */
 let db = loadDB();
 let currentUser = localStorage.getItem(SESSION_KEY) || null;
-const state = { sessionId:null, editor:null, prExercise:null, authMode:'login', sb:{ status:'idle', last:null, timer:null } };
+const state = { sessionId:null, editor:null, prExercise:null, onb:null, authMode:'login', sb:{ status:'idle', last:null, timer:null } };
 
 function loadDB(){
   try{
@@ -1323,6 +1323,7 @@ function render(){
 
   if(route === 'session')      renderSession(main, rest[0]);
   else if(route === 'editor')  renderEditor(main, rest[0]);
+  else if(route === 'start')   renderStart(main);
   else if(route === 'progress') renderProgress(main);
   else if(route === 'settings') renderSettings(main);
   else  if(route === 'prs')     renderPRs(main);
@@ -1557,6 +1558,8 @@ function renderWorkouts(main){
     </section>
 
     ${lastProgramSection()}
+
+    ${planCardHTML(d)}
 
     ${resumeCard(d)}
 
@@ -2271,7 +2274,7 @@ function renderEditor(main, id){
   const existing = id !== 'new' ? d.workouts.find(w => w.id === id) : null;
   state.editor = existing
     ? JSON.parse(JSON.stringify(existing))
-    : { id: uid(), name: '', exercises: [{ id: uid(), name: '', sets: 3, reps: 10, weight: '', superset: false }] };
+    : { id: uid(), name: '', exercises: [{ id: uid(), name: '', sets: (planDefaults(d) || {}).sets || 3, reps: (planDefaults(d) || {}).reps || 10, weight: '', superset: false }] };
   main.innerHTML = `
     <div class="page-head">
       <h1>${existing ? 'Editar entrenamiento' : 'Crear entrenamiento'}</h1>
@@ -2616,10 +2619,14 @@ function renderProgress(main){
   main.innerHTML = `
     <div class="page-head">
       <h1>Progreso por ejercicio</h1>
-      <p class="muted">Peso, repeticiones y volumen sesión a sesión, agrupados por ejercicio.</p>
+      <p class="muted">Tu semana, tu mes y cada ejercicio, sesión a sesión.</p>
     </div>
 
     ${streakCardHTML(d)}
+
+    ${muscleVolumeCardHTML(d)}
+
+    ${monthCompareHTML(d)}
 
     <div class="pr-top">
       <div class="pr-select">
@@ -2869,6 +2876,319 @@ async function exportCSV(kind){
   }catch(e){ toast('No se pudo generar el CSV.', 'error'); }
 }
 
+/* ============================================================
+   v2 · Plan en tres pasos, volumen por grupo y mes a mes
+   El plan se guarda en d.profile, dentro del mismo jsonb que ya
+   usa la cuenta: no hay tablas nuevas ni migraciones.
+   ============================================================ */
+const GOALS = [
+  { id:'fuerza',      label:'Fuerza',       hint:'Levantar más en los básicos',   cat:'strength' },
+  { id:'hipertrofia', label:'Músculo',      hint:'Ganar tamaño y volumen',        cat:'hyper' },
+  { id:'grasa',       label:'Perder grasa', hint:'Moverte más y cuidar el peso',  cat:'fitness' },
+  { id:'resistencia', label:'Resistencia',  hint:'Aguantar más series y trabajo', cat:'endurance' },
+];
+const LEVELS = [
+  { id:'principiante', label:'Principiante', hint:'Menos de 6 meses entrenando',  sets:3, reps:10, rest:90,  match:['Beginner', 'Intermediate'] },
+  { id:'intermedio',   label:'Intermedio',   hint:'Entre 6 meses y 2 años',       sets:4, reps:8,  rest:120, match:['Intermediate'] },
+  { id:'avanzado',     label:'Avanzado',     hint:'Más de 2 años con constancia', sets:4, reps:6,  rest:150, match:['Advanced', 'Intermediate'] },
+];
+const DAYS_CHOICES = [2, 3, 4, 5, 6];
+function goalById(id){ return GOALS.find(g => g.id === id) || null; }
+function levelById(id){ return LEVELS.find(l => l.id === id) || null; }
+/* Perfil válido o null: nunca se da por elegido algo que el usuario no marcó. */
+function userProfile(d){
+  const p = d && d.profile;
+  if(!p || typeof p !== 'object') return null;
+  const goal = goalById(p.goal), level = levelById(p.level);
+  const days = Number(p.days);
+  if(!goal || !level || !DAYS_CHOICES.includes(days)) return null;
+  return { goal: goal.id, level: level.id, days, at: p.at || null };
+}
+function profileDone(d){ return !!userProfile(d); }
+function saveProfile(patch){
+  const d = currentUser ? dataFor(currentUser) : null;
+  if(!d) return null;
+  const next = Object.assign({}, userProfile(d) || {}, patch || {});
+  if(!next.at) next.at = todayISO();
+  d.profile = next;
+  saveDB();
+  return userProfile(d);
+}
+/* Series, repeticiones y descanso por defecto según la experiencia elegida.
+   Sin plan no hay suposiciones: quien no lo configura mantiene lo de antes. */
+function planDefaults(d){
+  const p = userProfile(d);
+  const lvl = levelById(p && p.level);
+  return lvl ? { sets: lvl.sets, reps: lvl.reps, rest: lvl.rest } : null;
+}
+/* Programas que encajan con el plan. Solo ordena el catálogo que ya existe. */
+function rankPrograms(profile, catalog){
+  if(!profile || !Array.isArray(catalog)) return [];
+  const goal = goalById(profile.goal);
+  const level = levelById(profile.level);
+  const days = Number(profile.days) || 0;
+  return catalog
+    .filter(p => p && p.slug && p.t && p.ok !== false)
+    .map(p => {
+      const cats = Array.isArray(p.c) ? p.c : [];
+      const diffs = Array.isArray(p.diff) ? p.diff : [];
+      let score = 0;
+      if(goal && cats.includes(goal.cat)) score += 6;
+      if(level && diffs.some(x => level.match.includes(x))) score += 3;
+      const dpw = Number(p.dpw) || 0;
+      if(days && dpw) score += Math.max(0, 4 - Math.abs(dpw - days) * 2);
+      return { p, score };
+    })
+    .sort((a, b) => b.score - a.score || String(a.p.t).localeCompare(String(b.p.t), 'es'))
+    .slice(0, 3)
+    .map(x => x.p);
+}
+/* ---------------- Asistente de tres pasos ---------------- */
+function onboardingState(d){
+  const p = userProfile(d);
+  return { step: 1, goal: p ? p.goal : '', days: p ? p.days : '', level: p ? p.level : '' };
+}
+function openOnboarding(){
+  if(!currentUser) return;
+  state.onb = onboardingState(dataFor(currentUser));
+  nav('#/start');
+}
+function onboardPick(kind, value){
+  if(!state.onb) state.onb = onboardingState(currentUser ? dataFor(currentUser) : null);
+  if(kind === 'goal'){ state.onb.goal = value; state.onb.step = 2; }
+  else if(kind === 'days'){ state.onb.days = Number(value); state.onb.step = 3; }
+  else if(kind === 'level'){ state.onb.level = value; }
+  else if(kind === 'step'){ state.onb.step = Math.max(1, Math.min(3, Number(value) || 1)); }
+  render();
+}
+function finishOnboarding(){
+  const ob = state.onb || {};
+  if(!ob.goal || !ob.days || !ob.level){ toast('Elige objetivo, días y experiencia.', 'error'); return; }
+  const p = saveProfile({ goal: ob.goal, days: Number(ob.days), level: ob.level, skipped: false });
+  if(!p){ toast('No se pudo guardar el plan.', 'error'); return; }
+  state.onb = null;
+  const goal = goalById(p.goal), level = levelById(p.level);
+  toast('Plan guardado: ' + goal.label + ' · ' + p.days + ' días · ' + level.label);
+  nav('#/workouts');
+}
+/* Omitir no bloquea nada ni vuelve a preguntar: el plan queda a un toque en Ajustes. */
+function skipOnboarding(){
+  const d = currentUser ? dataFor(currentUser) : null;
+  if(d){ d.profile = { skipped: true, at: todayISO() }; saveDB(); }
+  state.onb = null;
+  toast('Puedes configurar tu plan cuando quieras desde Ajustes.', 'info');
+  nav('#/workouts');
+}
+function planCardHTML(d){
+  if(profileDone(d)) return '';
+  if(d && d.profile && d.profile.skipped) return '';
+  return `
+    <section class="plan-card">
+      <div>
+        <h2>Configura tu plan</h2>
+        <p class="muted small">Objetivo, días por semana y experiencia. Con eso te recomiendo programas del catálogo y ajusto las series por defecto.</p>
+      </div>
+      <button class="btn btn-primary" type="button" data-action="open-onboarding">Empezar</button>
+    </section>`;
+}
+function planSummaryHTML(d){
+  const p = userProfile(d);
+  if(!p){
+    return `<p class="muted small">Sin configurar. Son tres preguntas y sirve para recomendarte programas y ajustar las series por defecto.</p>
+      <div class="csv-row"><button class="btn btn-ghost" type="button" data-action="open-onboarding">Configurar plan</button></div>`;
+  }
+  const goal = goalById(p.goal), level = levelById(p.level);
+  return `<p class="muted small">${esc(goal.label)} · ${p.days} día${p.days === 1 ? '' : 's'} por semana · ${esc(level.label)}${p.at ? ' · desde el ' + esc(fmtDate(p.at)) : ''}</p>
+    <div class="csv-row"><button class="btn btn-ghost" type="button" data-action="open-onboarding">Cambiar plan</button></div>`;
+}
+function paintOnbRecs(){
+  const box = $('#onb-recs');
+  if(!box) return;
+  const ob = state.onb || {};
+  if(!ob.goal || !ob.days || !ob.level){
+    box.innerHTML = '<p class="muted small">Elige objetivo, días y experiencia para ver programas que encajan.</p>';
+    return;
+  }
+  box.innerHTML = '<p class="muted small">Buscando programas que encajan…</p>';
+  DrakoBC.catalog().then(cat => {
+    const target = $('#onb-recs');
+    if(!target) return;
+    const list = rankPrograms({ goal: ob.goal, days: Number(ob.days), level: ob.level }, cat);
+    target.innerHTML = list.length
+      ? `<div class="onb-rec-list">${list.map(p => `
+          <article class="onb-rec">
+            <span class="onb-rec-meta">${esc((Array.isArray(p.c) ? p.c : []).map(c => (BC_CATS.find(x => x.k === c) || {}).label || c).join(' · '))}${p.dpw ? ' · ' + p.dpw + ' d/sem' : ''}</span>
+            <h3>${esc(p.t)}</h3>
+            ${p.a ? `<p class="muted small">por ${esc(p.a)}</p>` : ''}
+            <button class="btn btn-ghost btn-sm" type="button" data-action="open-program" data-slug="${esc(p.slug)}">Ver programa</button>
+          </article>`).join('')}</div>`
+      : '<p class="muted small">El catálogo no está disponible ahora mismo. Guarda tu plan igualmente: puedes elegir programa en Entrenamientos.</p>';
+  }).catch(() => {
+    const target = $('#onb-recs');
+    if(target) target.innerHTML = '<p class="muted small">No se pudo cargar el catálogo. Guarda tu plan y elige programa cuando quieras.</p>';
+  });
+}
+function renderStart(main){
+  const d = dataFor(currentUser);
+  const ob = state.onb || (state.onb = onboardingState(d));
+  const step = ob.step;
+  const goal = goalById(ob.goal), level = levelById(ob.level);
+  const dot = n => `<span class="onb-dot${n === step ? ' on' : n < step ? ' done' : ''}" aria-hidden="true">${n < step ? '✓' : n}</span>`;
+  const opt = (kind, id, label, hint, on) => `<button type="button" class="onb-opt${on ? ' on' : ''}" data-action="onb-${kind}" data-id="${esc(String(id))}" aria-pressed="${on ? 'true' : 'false'}">
+      <span class="onb-opt-name">${esc(label)}</span><span class="onb-opt-hint">${esc(hint)}</span></button>`;
+  const body = step === 1
+    ? `<h2>¿Qué buscas?</h2><div class="onb-grid">${GOALS.map(g => opt('goal', g.id, g.label, g.hint, ob.goal === g.id)).join('')}</div>`
+    : step === 2
+    ? `<h2>¿Cuántos días por semana puedes entrenar?</h2><div class="onb-grid days">${DAYS_CHOICES.map(n => opt('days', n, n + ' días', n <= 3 ? 'Lo justo para progresar' : 'Buen margen para repartir grupos', Number(ob.days) === n)).join('')}</div>
+       <p class="muted small">Elige lo que puedas sostener cuatro semanas seguidas, no lo que te gustaría hacer en una semana buena.</p>`
+    : `<h2>¿Cuánta experiencia tienes?</h2><div class="onb-grid">${LEVELS.map(l => opt('level', l.id, l.label, l.hint, ob.level === l.id)).join('')}</div>
+       <div class="onb-summary">${goal ? esc(goal.label) : 'Sin objetivo'} · ${ob.days ? ob.days + ' días' : 'sin días'} · ${level ? esc(level.label) : 'sin experiencia'}</div>
+       <div id="onb-recs" class="onb-recs"></div>`;
+
+  main.innerHTML = `
+    <div class="page-head">
+      <h1>Tu plan en tres pasos</h1>
+      <p class="muted">Sirve para recomendarte programas y ajustar las series por defecto. Puedes cambiarlo cuando quieras en Ajustes.</p>
+    </div>
+    <section class="onb-card">
+      <div class="onb-progress">${dot(1)}${dot(2)}${dot(3)}<span class="muted small">Paso ${step} de 3</span></div>
+      ${body}
+      <div class="onb-actions">
+        ${step > 1 ? `<button class="btn btn-ghost" type="button" data-action="onb-step" data-id="${step - 1}">← Atrás</button>` : `<button class="btn btn-ghost" type="button" data-action="onb-skip">Ahora no</button>`}
+        ${step < 3
+          ? `<button class="btn btn-primary" type="button" data-action="onb-step" data-id="${step + 1}">Siguiente</button>`
+          : `<button class="btn btn-primary" type="button" data-action="onb-save" ${ob.goal && ob.days && ob.level ? '' : 'disabled'}>Guardar mi plan</button>`}
+      </div>
+    </section>`;
+  if(step === 3) paintOnbRecs();
+}
+/* ---------------- Volumen semanal por grupo muscular ---------------- */
+/* Series efectivas y volumen de un ejercicio: sin calentamientos, sin series
+   sin completar y sin sesiones canceladas. Un ejercicio heredado cuenta como
+   una serie si estaba marcado como hecho. */
+function effectiveSets(ex){
+  const out = { sets: 0, volume: 0 };
+  if(!ex) return out;
+  if(hasSets(ex)){
+    ex.sets.forEach(st => {
+      if(!st || !st.completed || st.type === 'warmup') return;
+      out.sets++;
+      out.volume += (Number(st.weight) || 0) * (Number(st.reps) || 0);
+    });
+  } else if(ex.done){
+    out.sets = 1;
+    out.volume = (Number(ex.weight) || 0) * (Number(ex.reps) || 0);
+  }
+  return out;
+}
+function groupOfExercise(ex, d){
+  const entry = exerciseEntryFor(ex, d);
+  return entry && entry.group ? entry.group : 'sin-grupo';
+}
+function weekMuscleVolume(d, weekISO){
+  const to = shiftISO(weekISO, 6);
+  const map = new Map();
+  finishedSessions(d).forEach(s => {
+    const day = String(s.date).slice(0, 10);
+    if(day < weekISO || day > to) return;
+    (s.exercises || []).forEach(ex => {
+      const t = effectiveSets(ex);
+      if(!t.sets) return;
+      const id = groupOfExercise(ex, d);
+      const cur = map.get(id) || { id, sets: 0, volume: 0 };
+      cur.sets += t.sets;
+      cur.volume += t.volume;
+      map.set(id, cur);
+    });
+  });
+  return [...map.values()]
+    .map(r => ({ id: r.id, sets: r.sets, volume: Math.round(r.volume) }))
+    .sort((a, b) => b.sets - a.sets || b.volume - a.volume);
+}
+function groupName(id){ return id === 'sin-grupo' ? 'Sin grupo' : (groupLabel(id) || id); }
+function muscleVolumeCardHTML(d){
+  const thisWeek = weekStartISO(todayISO());
+  if(!thisWeek) return '';
+  const rows = weekMuscleVolume(d, thisWeek);
+  const before = new Map(weekMuscleVolume(d, shiftISO(thisWeek, -7)).map(r => [r.id, r.sets]));
+  const total = rows.reduce((a, r) => a + r.sets, 0);
+  const totalVol = rows.reduce((a, r) => a + r.volume, 0);
+  const max = Math.max(6, ...rows.map(r => r.sets));
+  return `
+    <section class="mv-card">
+      <div class="section-head"><h2>Volumen por grupo muscular</h2><span class="muted">Semana del ${esc(fmtDate(thisWeek))} al ${esc(fmtDate(shiftISO(thisWeek, 6)))}</span></div>
+      ${rows.length
+        ? `<ul class="mv-list">${rows.map(r => {
+            const diff = r.sets - (before.get(r.id) || 0);
+            return `<li class="mv-row">
+            <span class="mv-name">${esc(groupName(r.id))}</span>
+            <span class="mv-track"><span class="mv-bar" style="width:${Math.round(r.sets / max * 100)}%"></span></span>
+            <span class="mv-val">${r.sets} serie${r.sets === 1 ? '' : 's'}</span>
+            <span class="mv-delta ${diff > 0 ? 'up' : diff < 0 ? 'down' : 'flat'}">${diff > 0 ? '+' + diff : diff < 0 ? String(diff) : '='}</span>
+          </li>`;
+          }).join('')}</ul>
+          <p class="muted small">${total} series efectivas y ${esc(fmtKg(Math.round(totalVol)))} kg de volumen esta semana. La columna de la derecha compara con la semana anterior.</p>`
+        : '<p class="muted small">Esta semana todavía no hay series registradas. Completa una sesión y aquí verás el reparto por grupo muscular.</p>'}
+    </section>`;
+}
+
+/* ---------------- Comparación mes a mes ---------------- */
+function monthKey(iso){ return String(iso || '').slice(0, 7); }
+function shiftMonth(ym, delta){
+  const m = /^(\d{4})-(\d{2})$/.exec(String(ym || ''));
+  if(!m) return '';
+  const d = new Date(Date.UTC(Number(m[1]), Number(m[2]) - 1 + delta, 1));
+  return d.toISOString().slice(0, 7);
+}
+function monthLabel(ym){
+  const m = /^(\d{4})-(\d{2})$/.exec(String(ym || ''));
+  if(!m) return '—';
+  const d = new Date(Number(m[1]), Number(m[2]) - 1, 1);
+  const label = d.toLocaleDateString('es', { month: 'long', year: 'numeric' });
+  return label.charAt(0).toUpperCase() + label.slice(1);
+}
+function monthStats(d, ym){
+  const rows = finishedSessions(d).filter(s => monthKey(s.date) === ym);
+  let sets = 0, volume = 0, sessionRecords = 0;
+  rows.forEach(s => {
+    const m = s.summary || buildSummary(s);
+    volume += Number(m.volume) || 0;
+    sessionRecords += Array.isArray(s.records) ? s.records.length : (Array.isArray(m.records) ? m.records.length : 0);
+    (s.exercises || []).forEach(ex => { sets += effectiveSets(ex).sets; });
+  });
+  /* Los récords automáticos llevan su propia fecha: es la fuente más fiable.
+     Si la cuenta aún no tiene esa lista se usan los guardados en cada sesión. */
+  const records = Array.isArray(d && d.records)
+    ? d.records.filter(r => monthKey(r && r.date) === ym).length
+    : sessionRecords;
+  return { sessions: rows.length, sets, volume: Math.round(volume), records };
+}
+function monthCompareHTML(d){
+  const nowYm = monthKey(todayISO());
+  const prevYm = shiftMonth(nowYm, -1);
+  const now = monthStats(d, nowYm), prev = monthStats(d, prevYm);
+  if(!now.sessions && !prev.sessions) return '';
+  const kg = v => v ? fmtKg(Math.round(v)) + ' kg' : '—';
+  const rows = [
+    { label: 'Sesiones', prev: prev.sessions || '—', now: now.sessions || '—', delta: cmpDelta(prev.sessions, now.sessions) },
+    { label: 'Series efectivas', prev: prev.sets || '—', now: now.sets || '—', delta: cmpDelta(prev.sets, now.sets) },
+    { label: 'Volumen', prev: kg(prev.volume), now: kg(now.volume), delta: cmpDelta(prev.volume, now.volume) },
+    { label: 'Récords', prev: prev.records || '—', now: now.records || '—', delta: cmpDelta(prev.records, now.records) },
+  ];
+  return `
+    <section class="cmp-card">
+      <div class="section-head"><h2>Este mes frente al anterior</h2><span class="muted">${esc(monthLabel(prevYm))} → ${esc(monthLabel(nowYm))}</span></div>
+      <div class="cmp-legend"><span>Métrica</span><span class="muted small">${esc(monthLabel(prevYm))}</span><span class="muted small">${esc(monthLabel(nowYm))}</span><span></span></div>
+      ${rows.map(m => `<div class="cmp-row">
+        <span>${m.label}</span>
+        <span class="cmp-val">${m.prev}</span>
+        <span class="cmp-val cmp-now">${m.now}</span>
+        <span class="cmp-delta ${m.delta.cls}">${m.delta.text}</span>
+      </div>`).join('')}
+      <p class="muted small">El mes en curso se mide contra el mes anterior completo: a principios de mes es normal ir por detrás. Cuentan solo sesiones terminadas.</p>
+    </section>`;
+}
+
 function renderSettings(main){
   const d = dataFor(currentUser);
   const light = theme === 'light';
@@ -2892,6 +3212,11 @@ function renderSettings(main){
         <button class="btn btn-ghost" type="button" data-action="csv-sessions">Sesiones</button>
         <button class="btn btn-ghost" type="button" data-action="csv-weights">Medidas</button>
       </div>
+    </section>
+
+    <section class="settings-card">
+      <h2>Tu plan</h2>
+      ${planSummaryHTML(d)}
     </section>
 
     <section class="settings-card">
@@ -3897,8 +4222,9 @@ document.addEventListener('click', e => {
       toast('Ese ejercicio ya está en la sesión.', 'error'); return;
     }
     const setsEl = $('#ex-sets'), repsEl = $('#ex-reps');
-    const nSets = clampInt(setsEl && setsEl.value !== '' ? Number(setsEl.value) : 3, LIMITS.sets, 3);
-    const nReps = clampInt(repsEl && repsEl.value !== '' ? Number(repsEl.value) : 10, LIMITS.reps, 10);
+    const def = planDefaults(dataFor(currentUser)) || { sets: 3, reps: 10, rest: 90 };
+    const nSets = clampInt(setsEl && setsEl.value !== '' ? Number(setsEl.value) : def.sets, LIMITS.sets, def.sets);
+    const nReps = clampInt(repsEl && repsEl.value !== '' ? Number(repsEl.value) : def.reps, LIMITS.reps, def.reps);
     s.exercises.push({
       id: uid(), name, targetSets: nSets, targetReps: nReps, done: false,
       sets: Array.from({ length: nSets }, (_, i) => ({
@@ -3946,11 +4272,19 @@ document.addEventListener('click', e => {
     return;
   }
 
+  if(a === 'open-onboarding'){ openOnboarding(); return; }
+  if(a === 'onb-goal'){ onboardPick('goal', el.dataset.id); return; }
+  if(a === 'onb-days'){ onboardPick('days', el.dataset.id); return; }
+  if(a === 'onb-level'){ onboardPick('level', el.dataset.id); return; }
+  if(a === 'onb-step'){ onboardPick('step', el.dataset.id); return; }
+  if(a === 'onb-save'){ finishOnboarding(); return; }
+  if(a === 'onb-skip'){ skipOnboarding(); return; }
   if(a === 'open-library'){ nav('#/library'); return; }
   if(a === 'add-ex'){ openExercisePicker(); return; }
   if(a === 'add-ex-blank'){
     if(state.editor.exercises.length >= LIMITS.exercises){ toast('Máximo de ejercicios alcanzado.', 'error'); return; }
-    state.editor.exercises.push({ id: uid(), exId:'', name:'', sets:3, reps:10, weight:'', rest:90, superset:false });
+    const def = planDefaults(dataFor(currentUser)) || { sets: 3, reps: 10, rest: 90 };
+    state.editor.exercises.push({ id: uid(), exId:'', name:'', sets:def.sets, reps:def.reps, weight:'', rest:def.rest, superset:false });
     renderEditorRows();
     return;
   }
@@ -3958,7 +4292,8 @@ document.addEventListener('click', e => {
     const entry = findExercise(el.dataset.id, dataFor(currentUser));
     if(!entry || !state.editor) return;
     if(state.editor.exercises.length >= LIMITS.exercises){ toast('Máximo de ejercicios alcanzado.', 'error'); return; }
-    const row = { id: uid(), exId: entry.id, name: entry.name, sets:3, reps:10, weight:'', rest:90, superset:false };
+    const def = planDefaults(dataFor(currentUser)) || { sets: 3, reps: 10, rest: 90 };
+    const row = { id: uid(), exId: entry.id, name: entry.name, sets:def.sets, reps:def.reps, weight:'', rest:def.rest, superset:false };
     const rows = state.editor.exercises;
     /* La fila vacía con la que arranca un entrenamiento nuevo se sustituye
        por el ejercicio elegido: no queda una fila en blanco suelta. */
@@ -4421,6 +4756,7 @@ document.addEventListener('submit', async e => {
       toast('¡Cuenta en la nube creada! Tus datos se respaldan y puedes restaurarlos.');
       await enterCloud(mail);
       saveConsent(consent);
+      openOnboarding();
       return;
     }
 
@@ -4461,6 +4797,7 @@ document.addEventListener('submit', async e => {
     if(mode === 'signup-local') saveConsent(consent);
     toast(mode === 'signup-local' ? '¡Cuenta local creada! (solo en este dispositivo)' : '¡Hola de nuevo!');
     render();
+    if(mode === 'signup-local') openOnboarding();
   }
 });
 
