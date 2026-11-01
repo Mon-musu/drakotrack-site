@@ -981,6 +981,7 @@ function finalizeSession(s){
   s.lastSavedAt = s.finishedAt;
   s.summary = buildSummary(s);
   persistSessionRecords(s);
+  unlockAchievements(dataFor(currentUser), true);
   s.rest = null;
   saveDB();
   showSummaryModal(s);
@@ -2618,6 +2619,8 @@ function renderProgress(main){
       <p class="muted">Peso, repeticiones y volumen sesión a sesión, agrupados por ejercicio.</p>
     </div>
 
+    ${streakCardHTML(d)}
+
     <div class="pr-top">
       <div class="pr-select">
         <label>Ejercicio</label>
@@ -2690,6 +2693,182 @@ function renderProgress(main){
    Tema, descanso y notificaciones en un solo sitio. Todo se guarda
    en d.prefs, así que cada cuenta tiene sus propios ajustes.
    ============================================================ */
+/* ============================================================
+   v2 · Rachas, logros y exportación CSV
+   Todo se calcula en el cliente desde los datos que ya existen.
+   ============================================================ */
+function weekStartISO(dateStr){
+  const d = new Date(String(dateStr).slice(0, 10) + 'T00:00:00Z');
+  if(isNaN(d)) return null;
+  const dow = (d.getUTCDay() + 6) % 7;          // lunes = 0
+  d.setUTCDate(d.getUTCDate() - dow);
+  return d.toISOString().slice(0, 10);
+}
+function shiftISO(iso, days){
+  const d = new Date(iso + 'T00:00:00Z');
+  d.setUTCDate(d.getUTCDate() + days);
+  return d.toISOString().slice(0, 10);
+}
+function finishedSessions(d){
+  return ((d && d.sessions) || []).filter(s => s && s.finished && s.date)
+    .slice().sort((a, b) => String(a.date).localeCompare(String(b.date)));
+}
+function weeksWithSessions(d){
+  const set = new Set();
+  finishedSessions(d).forEach(s => { const w = weekStartISO(s.date); if(w) set.add(w); });
+  return set;
+}
+/* Semanas consecutivas con al menos una sesión. La semana en curso solo cuenta
+   si ya tiene entrenamiento: una semana recién empezada no corta la racha. */
+function streakWeeks(d){
+  const weeks = weeksWithSessions(d);
+  const thisWeek = weekStartISO(todayISO());
+  if(!thisWeek) return { weeks: 0, activeThisWeek: false };
+  const activeThisWeek = weeks.has(thisWeek);
+  let cursor = activeThisWeek ? thisWeek : shiftISO(thisWeek, -7);
+  let weeksCount = 0;
+  while(weeks.has(cursor)){ weeksCount++; cursor = shiftISO(cursor, -7); }
+  return { weeks: weeksCount, activeThisWeek };
+}
+/* Meses con al menos una sesión en cada una de sus semanas. */
+function fullMonths(d){
+  const byMonth = new Map();
+  finishedSessions(d).forEach(s => {
+    const month = String(s.date).slice(0, 7);
+    const week = weekStartISO(s.date);
+    if(!month || !week) return;
+    if(!byMonth.has(month)) byMonth.set(month, new Set());
+    byMonth.get(month).add(week);
+  });
+  return [...byMonth.entries()].filter(([, weeks]) => weeks.size >= 4).map(([month]) => month);
+}
+const ACHIEVEMENTS = [
+  { id: 'first-record', name: 'Primer récord', hint: 'Tu primera mejor marca registrada.' },
+  { id: 'ten-sessions', name: '10 sesiones', hint: 'Diez entrenamientos completados.' },
+  { id: 'full-month', name: 'Mes completo', hint: 'Al menos una sesión cada semana de un mes.' },
+  { id: 'month-pr', name: 'PR del mes', hint: 'Un récord nuevo este mes.' }
+];
+function achievementList(d){
+  const sessions = finishedSessions(d);
+  const records = Array.isArray(d && d.records) ? d.records : [];
+  const thisMonth = todayISO().slice(0, 7);
+  const done = {
+    'first-record': records.length > 0,
+    'ten-sessions': sessions.length >= 10,
+    'full-month': fullMonths(d).length > 0,
+    'month-pr': records.some(r => String(r && r.date || '').slice(0, 7) === thisMonth)
+  };
+  return ACHIEVEMENTS.map(a => ({ ...a, unlocked: !!done[a.id] }));
+}
+/* Fija la fecha del primer desbloqueo (una sola vez) y avisa de los nuevos. */
+function unlockAchievements(d, announce){
+  if(!d) return [];
+  if(!d.achievements || typeof d.achievements !== 'object') d.achievements = {};
+  const fresh = [];
+  achievementList(d).forEach(a => {
+    if(a.unlocked && !d.achievements[a.id]){ d.achievements[a.id] = todayISO(); fresh.push(a); }
+  });
+  if(fresh.length && announce){
+    const names = fresh.map(a => a.name).join(', ');
+    toast('Logro desbloqueado: ' + names);
+  }
+  return fresh;
+}
+function streakCardHTML(d){
+  const st = streakWeeks(d);
+  const list = achievementList(d);
+  const weeks = st.weeks === 1 ? '1 semana' : st.weeks + ' semanas';
+  return `
+    <section class="streak-card">
+      <div class="streak-main">
+        <span class="streak-flame" aria-hidden="true">🔥</span>
+        <div>
+          <p class="streak-value">${st.weeks ? weeks : 'Sin racha'}</p>
+          <p class="streak-label">${st.activeThisWeek ? 'Semanas seguidas entrenando' : 'Entrena esta semana para mantenerla'}</p>
+        </div>
+      </div>
+      <ul class="ach-grid">
+        ${list.map(a => `<li class="ach-item ${a.unlocked ? 'on' : ''}" title="${esc(a.hint)}">
+          <span class="ach-dot" aria-hidden="true">${a.unlocked ? '✓' : '·'}</span>
+          <span class="ach-name">${esc(a.name)}</span>
+          <span class="ach-hint">${a.unlocked ? 'Desbloqueado' : esc(a.hint)}</span>
+        </li>`).join('')}
+      </ul>
+    </section>`;
+}
+
+/* ---------------- Exportación CSV ---------------- */
+function csvEscape(value){
+  const text = value == null ? '' : String(value);
+  return /[",\r\n]/.test(text) ? '"' + text.replace(/"/g, '""') + '"' : text;
+}
+/* BOM para que Excel abra el archivo en UTF-8 y CRLF como separador de línea. */
+function csvText(rows){
+  return '\uFEFF' + rows.map(r => r.map(csvEscape).join(',')).join('\r\n') + '\r\n';
+}
+function setRPE(st){
+  if(st && st.rpe != null && st.rpe !== '') return st.rpe;
+  if(st && st.rir != null && st.rir !== '') return String(10 - Number(st.rir));
+  return '';
+}
+function csvSetsRows(d){
+  const rows = [['fecha', 'ejercicio', 'serie', 'peso', 'repeticiones', 'rpe', 'notas']];
+  finishedSessions(d).forEach(s => {
+    (s.exercises || []).forEach(ex => {
+      (ex.sets || []).forEach((st, i) => {
+        if(!st || !st.completed) return;
+        rows.push([s.date, ex.name || '', st.number || i + 1, st.weight === '' ? '' : st.weight, st.reps === '' ? '' : st.reps, setRPE(st), st.note || '']);
+      });
+    });
+  });
+  return rows;
+}
+function csvSessionsRows(d){
+  const rows = [['fecha', 'entrenamiento', 'duracion_min', 'series', 'repeticiones', 'volumen_kg', 'records']];
+  finishedSessions(d).forEach(s => {
+    const m = s.summary || buildSummary(s);
+    const sets = (s.exercises || []).reduce((a, ex) => a + (ex.sets || []).filter(st => st && st.completed).length, 0);
+    const records = (s.records || []).length;
+    rows.push([s.date, s.workoutName || '', m.durationSec ? Math.round(m.durationSec / 60) : '', sets, m.reps || 0, Math.round(m.volume || 0), records]);
+  });
+  return rows;
+}
+function csvWeightsRows(d){
+  const rows = [['fecha', 'peso_kg']];
+  ((d && d.weights) || []).slice().sort((a, b) => String(a.date).localeCompare(String(b.date)))
+    .forEach(w => rows.push([w.date || '', w.weight == null ? '' : w.weight]));
+  return rows;
+}
+function accountSlug(){
+  return String(currentUser || 'cuenta').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '')
+    .replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '').slice(0, 40) || 'cuenta';
+}
+async function exportCSV(kind){
+  if(!currentUser){ toast('Inicia sesión para exportar tus datos.', 'error'); return; }
+  const d = dataFor(currentUser);
+  const builders = { sets: csvSetsRows, sessions: csvSessionsRows, weights: csvWeightsRows };
+  const build = builders[kind];
+  if(!build) return;
+  const rows = build(d);
+  if(rows.length < 2){ toast('Todavía no hay datos para ese CSV.', 'info'); return; }
+  const text = csvText(rows);
+  const filename = 'drakotrack-' + accountSlug() + '-' + kind + '-' + todayISO() + '.csv';
+  try{
+    if(window.DrakoShare && DrakoShare.shareFile){
+      const res = await DrakoShare.shareFile(filename, text, 'text/csv');
+      toast(res === 'shared' ? 'CSV compartido — elige dónde guardarlo.' : 'CSV descargado.');
+    } else {
+      const blob = new Blob([text], { type: 'text/csv;charset=utf-8' });
+      const url = URL.createObjectURL(blob);
+      const aEl = document.createElement('a');
+      aEl.href = url; aEl.download = filename;
+      document.body.appendChild(aEl); aEl.click(); aEl.remove();
+      setTimeout(() => URL.revokeObjectURL(url), 5000);
+      toast('CSV descargado.');
+    }
+  }catch(e){ toast('No se pudo generar el CSV.', 'error'); }
+}
+
 function renderSettings(main){
   const d = dataFor(currentUser);
   const light = theme === 'light';
@@ -2704,6 +2883,16 @@ function renderSettings(main){
       <h1>Ajustes de la cuenta</h1>
       <p class="muted">Tema, descanso y avisos de ${esc(maskAccount(currentUser))}. Se guardan en tu cuenta y te siguen en cualquier dispositivo.</p>
     </div>
+
+    <section class="settings-card">
+      <h2>Exportar a CSV</h2>
+      <p class="muted small">Archivos UTF-8 con BOM, listos para abrir en Excel o en Hojas de cálculo. Solo se generan en tu dispositivo.</p>
+      <div class="csv-row">
+        <button class="btn btn-ghost" type="button" data-action="csv-sets">Series</button>
+        <button class="btn btn-ghost" type="button" data-action="csv-sessions">Sesiones</button>
+        <button class="btn btn-ghost" type="button" data-action="csv-weights">Medidas</button>
+      </div>
+    </section>
 
     <section class="settings-card">
       <h2>Apariencia</h2>
@@ -3301,6 +3490,9 @@ document.addEventListener('click', e => {
   }
   if(a === 'toggle-theme'){ setTheme(theme === 'light' ? 'dark' : 'light'); return; }
   if(a === 'set-theme'){ setTheme(el.dataset.theme); return; }
+  if(a === 'csv-sets'){ exportCSV('sets'); return; }
+  if(a === 'csv-sessions'){ exportCSV('sessions'); return; }
+  if(a === 'csv-weights'){ exportCSV('weights'); return; }
   if(a === 'open-settings'){
     const menu = $('#user-menu'), chip = $('#user-chip');
     if(menu) menu.classList.remove('open');
@@ -4432,4 +4624,15 @@ window.addEventListener('hashchange', () => { render(); focusMain(); });
   } else {
     render();
   }
+})();
+
+/* ---------------- PWA: registro del service worker ---------------- */
+/* Solo en contextos seguros (https o localhost): la app sigue funcionando
+   igual si el navegador no lo soporta o el registro falla. */
+(function registerServiceWorker(){
+  if(typeof navigator === 'undefined' || !('serviceWorker' in navigator)) return;
+  if(location.protocol !== 'https:' && location.hostname !== 'localhost' && location.hostname !== '127.0.0.1') return;
+  window.addEventListener('load', () => {
+    navigator.serviceWorker.register('sw.js').catch(() => {});
+  });
 })();

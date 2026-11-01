@@ -40,6 +40,7 @@ BRANCH="$(git rev-parse --abbrev-ref HEAD)"
 DEPLOY_FILES=(
   index.html app.js styles.css share.js supabase.js boostcamp.js
   legal.html legal.js logo.png altcha.js altcha-setup.js update-check.js
+  manifest.webmanifest sw.js icons
   vercel.json package.json package-lock.json api lib programs apk/version.json
 )
 

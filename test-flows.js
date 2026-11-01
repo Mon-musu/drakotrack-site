@@ -1464,6 +1464,71 @@ const tick = ms => new Promise(r => setTimeout(r, ms));
   check('sharing keeps the WhatsApp-friendly caption', g(`window.__shared.text`).indexOf('DrakoTrack') >= 0);
   g(`window.DrakoShare = window.__shareOrig`);
 
+  // ===== v2: racha, logros, CSV y PWA =====
+  const monday = g('weekStartISO(todayISO())');
+  g(`(function(){
+    const d = dataFor(currentUser);
+    d.sessions = []; d.records = []; d.achievements = {}; d.weights = [];
+    window.__mk = (date, name) => ({ id: 'sid-' + date + '-' + name + Math.random(), date, finished: true,
+      workoutName: name, durationSec: 3600,
+      exercises: [{ name: 'Press, "banca"', exId: 'press-banca',
+        sets: [{ number: 1, type: 'working', weight: 80, reps: 5, completed: true, rir: 2 }] }],
+      records: [] });
+    d.sessions.push(window.__mk(shiftISO('${monday}', -14), 'A'));
+    d.sessions.push(window.__mk(shiftISO('${monday}', -7), 'A'));
+  })()`);
+  check('streak counts past weeks when the current one is empty', g('streakWeeks(dataFor(currentUser)).weeks') === 2);
+  check('an empty current week does not break the streak', g('streakWeeks(dataFor(currentUser)).activeThisWeek') === false);
+  g(`dataFor(currentUser).sessions.push(window.__mk('${monday}', 'A'))`);
+  check('training this week extends the streak', g('streakWeeks(dataFor(currentUser)).weeks') === 3 && g('streakWeeks(dataFor(currentUser)).activeThisWeek') === true);
+  check('ten sessions stays locked at three', g(`achievementList(dataFor(currentUser)).find(a => a.id === 'ten-sessions').unlocked`) === false);
+  check('a half month does not count as a full month', g(`achievementList(dataFor(currentUser)).find(a => a.id === 'full-month').unlocked`) === false);
+
+  g(`(function(){
+    const d = dataFor(currentUser);
+    for(let i = 0; i < 7; i++){ const s = window.__mk(shiftISO('${monday}', -21), 'B'); s.id = 'bulk-' + i; d.sessions.push(s); }
+    d.records.push({ id: 'r1', date: todayISO(), exercise: 'Press, "banca"', weight: 80, reps: 5 });
+  })()`);
+  check('ten sessions unlocks', g(`achievementList(dataFor(currentUser)).find(a => a.id === 'ten-sessions').unlocked`) === true);
+  check('first record unlocks', g(`achievementList(dataFor(currentUser)).find(a => a.id === 'first-record').unlocked`) === true);
+  check('PR of the month unlocks', g(`achievementList(dataFor(currentUser)).find(a => a.id === 'month-pr').unlocked`) === true);
+  g('unlockAchievements(dataFor(currentUser), false)');
+  check('achievements remember their unlock date', g(`!!dataFor(currentUser).achievements['ten-sessions']`));
+  check('unlocking again reports nothing new', g('unlockAchievements(dataFor(currentUser), false).length') === 0);
+  g(`nav('#/progress')`); await tick(60);
+  check('the progress view shows the streak card', !!g(`document.querySelector('.streak-card .streak-value')`));
+  check('the progress view lists the four achievements', g(`document.querySelectorAll('.streak-card .ach-item').length`) === 4);
+
+  const setsCsv = g('csvText(csvSetsRows(dataFor(currentUser)))');
+  check('CSV starts with a UTF-8 BOM', setsCsv.charCodeAt(0) === 0xFEFF);
+  const csvHeader = setsCsv.replace(/^\uFEFF/, '').split('\r\n')[0];
+  check('series CSV header is Spanish', csvHeader === 'fecha,ejercicio,serie,peso,repeticiones,rpe,notas');
+  check('CSV quotes commas and quotes', setsCsv.includes('"Press, ""banca"""'));
+  check('CSV derives RPE from RIR', setsCsv.includes(',8,'));
+  check('CSV lines end with CRLF', setsCsv.includes('\r\n'));
+  const sessionsCsv = g('csvText(csvSessionsRows(dataFor(currentUser)))');
+  check('sessions CSV has one row per finished session', sessionsCsv.trim().split('\r\n').length === g('finishedSessions(dataFor(currentUser)).length') + 1);
+  g("dataFor(currentUser).weights = [{ id:'w1', date:'2026-10-01', weight: 78.4 }]");
+  check('weights CSV carries date and kilograms', /2026-10-01,78\.4/.test(g('csvText(csvWeightsRows(dataFor(currentUser)))')));
+  g("nav('#/settings')"); await tick(60);
+  check('settings offers the three CSV exports', g(`document.querySelectorAll('[data-action^="csv-"]').length`) === 3);
+
+  // PWA: manifiesto, iconos y service worker
+  const indexHtml = fs.readFileSync(path.join(__dirname, 'index.html'), 'utf8');
+  check('index links the web manifest', /rel="manifest" href="manifest\.webmanifest"/.test(indexHtml));
+  check('index declares an iOS icon', /rel="apple-touch-icon"/.test(indexHtml));
+  const manifest = JSON.parse(fs.readFileSync(path.join(__dirname, 'manifest.webmanifest'), 'utf8'));
+  check('manifest is installable', manifest.display === 'standalone' && manifest.start_url === './' && manifest.icons.length >= 3);
+  check('manifest has a maskable icon', manifest.icons.some(i => i.purpose === 'maskable' && i.sizes === '512x512'));
+  for (const icon of ['icons/icon-192.png', 'icons/icon-512.png', 'icons/icon-maskable-512.png']) {
+    check('icon present: ' + icon, fs.existsSync(path.join(__dirname, icon)));
+  }
+  const swSource = fs.readFileSync(path.join(__dirname, 'sw.js'), 'utf8');
+  check('service worker precaches the shell', /const VERSION = /.test(swSource) && swSource.includes("'./index.html'") && swSource.includes("'./app.js?v=30'"));
+  check('service worker leaves the API uncached', /startsWith\('\/api\/'\)/.test(swSource));
+  check('service worker revalidates in the background', /cache\.put\(request, response\.clone\(\)\)/.test(swSource));
+  check('app registers the service worker', /serviceWorker\.register\('sw\.js'\)/.test(fs.readFileSync(path.join(__dirname, 'app.js'), 'utf8')));
+
   console.log(`\nRESULT: ${pass} passed, ${fail} failed`);
   process.exit(fail ? 1 : 0);
 })().catch(e => { console.error('CRASH', e); process.exit(2); });
