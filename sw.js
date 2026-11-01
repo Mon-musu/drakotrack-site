@@ -14,7 +14,7 @@ const SHELL = [
   './',
   './index.html',
   './styles.css?v=23',
-  './app.js?v=31',
+  './app.js?v=32',
   './supabase.js?v=2',
   './boostcamp.js?v=3',
   './share.js?v=4',
