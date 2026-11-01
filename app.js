@@ -10,7 +10,7 @@ const DB_KEY = 'draktrack_v1';
 const SESSION_KEY = 'draktrack_session_v1';
 
 /* Información legal: versión del consentimiento que se registra en la cuenta */
-const LEGAL_VERSION = '2026-10-28';
+const LEGAL_VERSION = '2026-11-01';
 const LEGAL_PAGE = 'legal.html';
 
 /* Icono de mancuerna (SVG) para las tarjetas de entrenamiento */

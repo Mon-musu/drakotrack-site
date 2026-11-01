@@ -628,6 +628,8 @@ const tick = ms => new Promise(r => setTimeout(r, ms));
     && /logo/i.test(legalHtml) && /Iconos/.test(legalHtml));
   check('legal page has no inline scripts (CSP-safe)', !/<script(?![^>]*\bsrc=)/i.test(legalHtml));
   check('index links to privacy and terms', /legal\.html#privacidad/.test(html) && /legal\.html#terminos/.test(html));
+  check('contact email is published and linked', /mailto:mn\.manzur@protonmail\.com/.test(legalHtml) && /mailto:mn\.manzur@protonmail\.com/.test(html)
+    && /mn\.manzur@protonmail\.com/.test(legalHtml));
   check('CSP keeps scripts self-hosted and framing blocked', (() => {
     const vj = JSON.parse(fs.readFileSync(path.join(__dirname, 'vercel.json'), 'utf8'));
     const csp = vj.headers.find(h => h.source === '/(.*)').headers.find(x => x.key === 'Content-Security-Policy').value;
