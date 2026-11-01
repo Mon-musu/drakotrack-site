@@ -129,6 +129,12 @@ O pegando cada archivo completo en el **SQL Editor** del panel de Supabase. Cada
 uno empieza con `begin;` y termina con `commit;`, así que se aplica entero o no
 se aplica. Las dos se pueden reaplicar sin error.
 
+Ojo con qué se pega: los dos renglones de arriba son comandos de terminal
+(`psql …`), no SQL. Al SQL Editor va el **contenido** del archivo `.sql`
+completo, desde `begin;` hasta `commit;`; pegar `psql "$SUPABASE_DB_URL" -f …`
+ahí da un error de sintaxis, porque el editor ejecuta SQL y no entiende de
+variables de entorno ni de banderas.
+
 Pueden ir en cualquier orden: cada una toca la tabla de la otra solo dentro de un
 bloque `do` guardado con `to_regclass`, y las dos crean la misma política
 `profiles_linked_read`. Si aplicás `trainer_index` primero, volvé a correrlo
