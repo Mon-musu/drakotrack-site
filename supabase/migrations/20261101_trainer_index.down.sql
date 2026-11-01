@@ -9,6 +9,17 @@ begin;
 
 drop trigger if exists app_data_session_index on public.app_data;
 
+-- The linked-profile policy lives on profiles but depends on trainer_links, so
+-- it has to go before the table it references. Guarded because profiles comes
+-- from its own migration and may not exist here.
+do $do$
+begin
+  if to_regclass('public.profiles') is not null then
+    execute 'drop policy if exists profiles_linked_read on public.profiles';
+  end if;
+end
+$do$;
+
 drop function if exists public.dt_reindex_all_sessions();
 drop function if exists public.dt_reindex_sessions(uuid);
 drop function if exists public.dt_session_rows(jsonb);

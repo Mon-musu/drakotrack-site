@@ -73,18 +73,24 @@ create table if not exists public.trainer_links (
   invite_code text not null unique check (invite_code ~ '^[A-Z0-9]{10}$'),
   status text not null default 'pending' check (status in ('pending', 'active', 'revoked')),
   created_at timestamptz not null default now(),
-  accepted_at timestamptz,
+  invite_expires_at timestamptz not null default now() + interval '7 days',
+  consented_at timestamptz,
   revoked_at timestamptz,
   constraint trainer_links_no_self check (trainee_id is null or trainee_id <> trainer_id),
+  constraint trainer_links_invite_window check (invite_expires_at > created_at),
   constraint trainer_links_state check (
-    (status = 'pending' and trainee_id is null and accepted_at is null and revoked_at is null)
-    or (status = 'active' and trainee_id is not null and accepted_at is not null and revoked_at is null)
+    (status = 'pending' and trainee_id is null and consented_at is null and revoked_at is null)
+    or (status = 'active' and trainee_id is not null and consented_at is not null and revoked_at is null)
     or (status = 'revoked' and revoked_at is not null)
   )
 );
 
 comment on table public.trainer_links is
   'Consent record between trainer and trainee. The only table here whose rows are not derived from app_data.';
+comment on column public.trainer_links.consented_at is
+  'Set by the trainee when they redeem the invitation. Consent is written by the trainee, never by the trainer.';
+comment on column public.trainer_links.invite_expires_at is
+  'Pending invitations stop being redeemable after this instant; the row stays so the trainer can cancel it.';
 
 -- One live link per pair; a revoked link stays as history and can be replaced.
 create unique index if not exists trainer_links_pair_idx
@@ -324,6 +330,13 @@ begin
     raise exception 'too_many_trainees' using errcode = '54000';
   end if;
 
+  -- Someone who starts inviting is a trainer. The role lives in profiles and is
+  -- only ever widened here, never downgraded; the guard keeps this migration
+  -- usable even if profiles has not been applied yet.
+  if to_regclass('public.profiles') is not null then
+    update public.profiles set role = 'trainer' where id = v_trainer and role = 'athlete';
+  end if;
+
   loop
     v_try := v_try + 1;
     v_code := upper(substr(replace(gen_random_uuid()::text, '-', ''), 1, 10));
@@ -354,13 +367,22 @@ begin
   end if;
 
   update public.trainer_links
-     set trainee_id = v_trainee, status = 'active', accepted_at = now()
+     set trainee_id = v_trainee, status = 'active', consented_at = now()
    where invite_code = upper(btrim(coalesce(p_code, '')))
      and status = 'pending'
      and trainer_id <> v_trainee
+     and invite_expires_at > now()
   returning id into v_link;
 
   if v_link is null then
+    if exists (
+      select 1 from public.trainer_links
+       where invite_code = upper(btrim(coalesce(p_code, '')))
+         and status = 'pending'
+         and invite_expires_at <= now()
+    ) then
+      raise exception 'invite_expired' using errcode = 'P0002';
+    end if;
     raise exception 'invite_not_found' using errcode = 'P0002';
   end if;
 
@@ -396,7 +418,9 @@ end;
 $fn$;
 
 comment on function public.dt_redeem_trainer_invite(text) is
-  'Accepts an invitation as the signed-in user. The trainee''s own consent is the row that turns active.';
+  'Accepts an unexpired invitation as the signed-in user. The trainee''s own consent is the row that turns active.';
+comment on function public.dt_create_trainer_invite() is
+  'Mints a single-use invitation valid for 7 days and widens the caller''s role to trainer.';
 
 -- ------------------------------------------------------------------ access
 alter table public.session_index enable row level security;
@@ -427,6 +451,7 @@ create policy session_index_trainer_read on public.session_index
      where l.trainee_id = session_index.user_id
        and l.trainer_id = auth.uid()
        and l.status = 'active'
+       and l.consented_at is not null
   ));
 
 drop policy if exists trainer_links_participants_read on public.trainer_links;
@@ -454,6 +479,7 @@ create policy training_plans_read on public.training_plans
        where l.trainee_id = training_plans.trainee_id
          and l.trainer_id = auth.uid()
          and l.status = 'active'
+         and l.consented_at is not null
     )
   );
 
@@ -465,6 +491,7 @@ create policy training_plans_trainer_insert on public.training_plans
      where l.trainee_id = training_plans.trainee_id
        and l.trainer_id = auth.uid()
        and l.status = 'active'
+       and l.consented_at is not null
   ));
 
 drop policy if exists training_plans_trainer_update on public.training_plans;
@@ -475,13 +502,39 @@ create policy training_plans_trainer_update on public.training_plans
      where l.trainee_id = training_plans.trainee_id
        and l.trainer_id = auth.uid()
        and l.status = 'active'
+       and l.consented_at is not null
   ))
   with check (exists (
     select 1 from public.trainer_links l
      where l.trainee_id = training_plans.trainee_id
        and l.trainer_id = auth.uid()
        and l.status = 'active'
+       and l.consented_at is not null
   ));
+
+-- A trainer may read the profile of a trainee who consented, and a trainee the
+-- profile of their trainer. Guarded so this migration also applies on a
+-- database where 20261101_profiles.sql has not been run yet.
+do $do$
+begin
+  if to_regclass('public.profiles') is not null then
+    execute 'drop policy if exists profiles_linked_read on public.profiles';
+    execute $policy$
+      create policy profiles_linked_read on public.profiles
+        for select to authenticated
+        using (exists (
+          select 1 from public.trainer_links l
+           where l.status = 'active'
+             and l.consented_at is not null
+             and (
+               (l.trainer_id = auth.uid() and l.trainee_id = profiles.id)
+               or (l.trainee_id = auth.uid() and l.trainer_id = profiles.id)
+             )
+        ))
+    $policy$;
+  end if;
+end
+$do$;
 
 -- Function surface: participants may invite, accept and revoke; only the
 -- service role may reindex.
