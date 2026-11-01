@@ -9,6 +9,7 @@ native-shell changes need a new APK.
 | Change | New APK? |
 | --- | --- |
 | Any web code (`app.js`, `styles.css`, `index.html`, `api/**`, programs) | **No** — deploy the site, the app picks it up |
+| The bundled `assets/public/*` fallback | **No** — every release rebuilds it from the repository (see below) |
 | Changing the start URL (`server.url`), app name/icon, plugins, permissions | **Yes** |
 | Bumping the version shown to users | **Yes** |
 
@@ -98,13 +99,19 @@ It performs, in order:
 1. Reads the current version from `apk-version.json` and bumps it — `versionCode`
    +1, and the name `1.1 → 1.2 … 1.9 → 2.0` (names stay three characters long
    because the version name is patched in place).
-2. Patches `AndroidManifest.xml` inside the shell APK (`apk-build/bump-version.py`)
-   and stamps the build number into the start URL, giving
+2. Patches `AndroidManifest.xml` inside the shell APK (`apk-build/bump-version.py`),
+   stamps the build number into the start URL, giving
    `https://drakotrack.vercel.app?apk=<versionCode>` — that query parameter is
-   how the web app knows which build is installed.
+   how the web app knows which build is installed — and **rebuilds the bundled
+   site** (`assets/public/*`) from the `WEB_ASSETS` list in `release-apk.sh`.
+   The shell loads `server.url`, so the deployed site always wins; the bundle
+   is only the offline fallback, and it is regenerated on every release so it
+   can never be a hand-made copy that drifts.
 3. Aligns (`zipalign -p 4`) and signs (`apksigner`, v2 + v3, min SDK 24).
 4. Verifies signature, zip integrity, alignment, and that `versionCode`,
-   `versionName` and the URL tag were applied — it aborts if any check fails.
+   `versionName` and the URL tag were applied, then that the bundled site has
+   exactly the `WEB_ASSETS` files and that each one is byte-identical to the
+   repository — it aborts if any check fails.
 5. Writes the artefacts and the update feed.
 
 Outputs:
@@ -160,9 +167,9 @@ Serving details live in `vercel.json`: `/apk/version.json` is `no-store`, and
   with the version and a **Descargar** button (it hands the URL to Android's
   share sheet, because `<a download>` does nothing inside this WebView).
   Dismissals are remembered per version in `localStorage`.
-- Permanent download links: the APK links in `index.html` are edited by hand
-  (they currently serve the Supabase-hosted copy). A release only rewrites the
-  in-app feed, so publishing never touches the page markup.
+- Permanent download links: the login-screen button and the user-menu entry both
+  point at `https://github.com/Mon-musu/drakotrack-site/releases/latest`, which
+  GitHub forwards to the newest `apk-*` release, so they never need editing.
 - In a normal browser there is no `?apk=`, so the banner never appears.
 
 ## Verifying a build by hand

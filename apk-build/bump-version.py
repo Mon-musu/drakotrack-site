@@ -7,8 +7,13 @@ so every chunk size stays the same and nothing else in the file moves.
 
 With --tag-apk the shell's start URL also gets its build number appended
 (?apk=<versionCode>), which is how the web app knows which APK is running.
+
+With --web-dir/--web-files the APK's bundled copy of the site
+(assets/public/*) is rebuilt from the repository files, so the offline
+fallback can never drift away from what is deployed.
 """
 import json
+import os
 import re
 import struct
 import sys
@@ -16,6 +21,21 @@ import zipfile
 
 NEW_CODE = 2
 NEW_NAME = "1.1"
+WEB_PREFIX = "assets/public/"
+
+
+def read_web_assets(web_dir, names):
+    """Read the site files that go into assets/public/ as (name, bytes) pairs."""
+    if not names:
+        raise SystemExit("--web-files was empty: refusing to strip the bundled site")
+    out = []
+    for name in names:
+        path = os.path.join(web_dir, name)
+        if not os.path.isfile(path):
+            raise SystemExit(f"web asset not found: {path}")
+        with open(path, "rb") as fh:
+            out.append((name, fh.read()))
+    return out
 
 
 def read_varint(buf, off):
@@ -124,7 +144,7 @@ def tag_config(raw, code):
     return json.dumps(cfg, indent="\t").encode("utf-8")
 
 
-def main(src_apk, dst_apk, new_code, new_name, tag_apk=False):
+def main(src_apk, dst_apk, new_code, new_name, tag_apk=False, web_assets=None):
     with zipfile.ZipFile(src_apk) as zin:
         manifest = bytearray(zin.read("AndroidManifest.xml"))
         original_len = len(manifest)
@@ -134,9 +154,14 @@ def main(src_apk, dst_apk, new_code, new_name, tag_apk=False):
         print("patched:", report)
 
         with zipfile.ZipFile(dst_apk, "w", zipfile.ZIP_DEFLATED) as zout:
+            managed = {name for name, _ in web_assets or []}
             for info in zin.infolist():
                 if info.filename.endswith("/"):
                     continue
+                if (web_assets is not None
+                        and info.filename.startswith(WEB_PREFIX)
+                        and info.filename[len(WEB_PREFIX):] in managed):
+                    continue    # rebuilt below from the repository copies
                 data = manifest if info.filename == "AndroidManifest.xml" else zin.read(info.filename)
                 if tag_apk and info.filename.endswith("assets/capacitor.config.json"):
                     data = tag_config(data, new_code)
@@ -145,13 +170,45 @@ def main(src_apk, dst_apk, new_code, new_name, tag_apk=False):
                 zi.create_system = 0
                 zi.compress_type = info.compress_type
                 zout.writestr(zi, bytes(data))
+            for name, data in web_assets or []:
+                zi = zipfile.ZipInfo(WEB_PREFIX + name, date_time=(1981, 1, 1, 1, 1, 0))
+                zi.external_attr = 0o644 << 16
+                zi.create_system = 0
+                zi.compress_type = zipfile.ZIP_DEFLATED
+                zout.writestr(zi, data)
+    if web_assets is not None:
+        print("bundled site:", len(web_assets), "files from", WEB_PREFIX)
     print("wrote", dst_apk)
 
 
 if __name__ == "__main__":
-    args = [a for a in sys.argv[1:] if not a.startswith("--")]
-    tag = "--tag-apk" in sys.argv
-    src, dst = args[0], args[1]
-    code = int(args[2]) if len(args) > 2 else NEW_CODE
-    name = args[3] if len(args) > 3 else NEW_NAME
-    main(src, dst, code, name, tag)
+    flag_only = {"--tag-apk"}
+    with_value = {"--web-dir", "--web-files"}
+    flags, values, positional = set(), {}, []
+    argv = sys.argv[1:]
+    i = 0
+    while i < len(argv):
+        token = argv[i]
+        if token in flag_only:
+            flags.add(token)
+        elif token in with_value:
+            if i + 1 >= len(argv):
+                raise SystemExit(f"{token} needs a value")
+            values[token] = argv[i + 1]
+            i += 1
+        elif token.startswith("--"):
+            raise SystemExit(f"unknown flag: {token}")
+        else:
+            positional.append(token)
+        i += 1
+    if len(positional) < 2:
+        raise SystemExit("usage: bump-version.py SRC DST [CODE] [NAME] [--tag-apk] [--web-dir DIR --web-files 'a b c']")
+    src, dst = positional[0], positional[1]
+    code = int(positional[2]) if len(positional) > 2 else NEW_CODE
+    name = positional[3] if len(positional) > 3 else NEW_NAME
+    assets = None
+    if "--web-dir" in values or "--web-files" in values:
+        if not ("--web-dir" in values and "--web-files" in values):
+            raise SystemExit("--web-dir and --web-files must be used together")
+        assets = read_web_assets(values["--web-dir"], values["--web-files"].split())
+    main(src, dst, code, name, "--tag-apk" in flags, assets)

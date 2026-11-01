@@ -14,3 +14,8 @@ apk-build/*
 
 # APK binaries are published as GitHub release assets; the repo keeps only the feed
 apk/*.apk
+
+# Árboles de despliegue y enlaces locales de la CLI
+.deploy-stage/
+.vercel/
+artifacts/

@@ -5,12 +5,13 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <meta name="theme-color" id="theme-color" content="#0a0a0c">
 <meta name="description" content="DrakoTrack — tu compañero de gimnasio. Entrenamientos, récords y control de peso, guardados en tu dispositivo.">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; img-src 'self' data:; connect-src 'self' https://rxamdcgcpjzfeygxeukj.supabase.co; worker-src 'self' blob: data:; child-src 'self' blob: data:; object-src 'none'; base-uri 'self'; form-action 'self'">
 <title>DrakoTrack — Seguimiento de entrenamiento</title>
 <link rel="icon" href="logo.png?v=5">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="styles.css?v=10">
+<link rel="stylesheet" href="styles.css?v=21">
 </head>
 <body>
 <a class="skip-link" href="#main">Saltar al contenido</a>
@@ -62,10 +63,15 @@
           </label>
           <p class="consent-note">Puedes borrar el peso, la foto o toda tu cuenta cuando quieras desde el menú de usuario. <a href="legal.html#derechos" target="_blank" rel="noopener noreferrer">Cómo se eliminan tus datos</a>.</p>
         </div>
+        <div id="captcha-box" class="captcha-box hidden" role="group" aria-labelledby="captcha-label">
+          <!-- El widget ALTCHA se monta desde app.js: prueba de trabajo propia, sin cookies ni rastreo. -->
+          <span class="captcha-label" id="captcha-label">Verificación anti-bots</span>
+          <p class="captcha-note">Tu navegador resuelve un pequeño reto matemático. No usamos cookies, huellas del dispositivo ni servicios de terceros.</p>
+        </div>
         <button type="submit" class="btn btn-primary btn-block btn-lg" id="auth-submit">Iniciar sesión</button>
         <p class="auth-note" id="auth-note">Las cuentas locales viven solo en este dispositivo. Con <b>Nube</b> tus datos se guardan en Supabase y puedes restaurarlos desde cualquier dispositivo o si olvidas tu contraseña.</p>
       </form>
-      <a class="btn btn-ghost btn-block" href="https://rxamdcgcpjzfeygxeukj.supabase.co/storage/v1/object/public/drakotrack-assets/drakotrack.apk" style="margin-top:14px">Descargar app Android (APK)</a>
+      <a class="btn btn-ghost btn-block" href="https://github.com/Mon-musu/drakotrack-site/releases/latest" style="margin-top:14px">Descargar app Android (APK)</a>
 
       <footer class="site-footer">
         <nav class="footer-links" aria-label="Información legal y privacidad">
@@ -99,7 +105,9 @@
         <button type="button" class="hidden" id="sb-restore" data-action="sb-pull">Restaurar copia de la nube</button>
         <button type="button" class="hidden" id="sb-export" data-action="sb-export">Descargar mis datos (JSON)</button>
         <button type="button" data-action="open-change-pass">Cambiar contraseña</button>
+        <button type="button" data-action="open-settings">Ajustes</button>
         <a href="legal.html" target="_blank" rel="noopener noreferrer">Información legal y privacidad</a>
+        <a href="https://github.com/Mon-musu/drakotrack-site/releases/latest">Descargar la app (APK)</a>
         <button type="button" data-action="reset-data">Borrar mis datos de entrenamiento</button>
         <button type="button" data-action="open-delete-account">Eliminar mi cuenta y todos mis datos</button>
         <button type="button" data-action="logout">Cerrar sesión</button>
@@ -110,6 +118,7 @@
   <nav class="sidebar" id="sidebar" aria-label="Secciones principales">
     <button class="nav-btn active" data-action="tab" data-route="workouts" aria-current="page"><span>Entrenamientos</span></button>
     <button class="nav-btn" data-action="tab" data-route="history"><span>Historial</span></button>
+    <button class="nav-btn" data-action="tab" data-route="progress"><span>Progreso</span></button>
     <button class="nav-btn" data-action="tab" data-route="prs"><span>Récords</span></button>
     <button class="nav-btn" data-action="tab" data-route="weight"><span>Peso</span></button>
     <div class="sidebar-foot">Entrena como un dragón.</div>
@@ -118,6 +127,7 @@
   <nav class="bottomnav" id="bottomnav" aria-label="Secciones principales (móvil)">
     <button class="nav-btn active" data-action="tab" data-route="workouts" aria-current="page"><span>Entrenamientos</span></button>
     <button class="nav-btn" data-action="tab" data-route="history"><span>Historial</span></button>
+    <button class="nav-btn" data-action="tab" data-route="progress"><span>Progreso</span></button>
     <button class="nav-btn" data-action="tab" data-route="prs"><span>Récords</span></button>
     <button class="nav-btn" data-action="tab" data-route="weight"><span>Peso</span></button>
   </nav>
@@ -131,6 +141,8 @@
 <script src="supabase.js?v=2"></script>
 <script src="boostcamp.js?v=3"></script>
 <script src="share.js?v=4"></script>
-<script src="app.js?v=15"></script>
+<script src="app.js?v=29"></script>
+<script src="update-check.js?v=1" defer></script>
+<script type="module" src="altcha-setup.js?v=1"></script>
 </body>
 </html>

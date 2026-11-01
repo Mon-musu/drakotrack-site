@@ -70,8 +70,8 @@
 
     <h3>2.1. Qué datos tratamos</h3>
     <ul class="legal-list">
-      <li><b>Cuenta en la nube (opcional):</b> correo electrónico y contraseña. La contraseña no se guarda en claro: la gestiona Supabase Auth y se almacena cifrada con hash (bcrypt).</li>
-      <li><b>Cuenta local (opcional, solo este dispositivo):</b> nombre de usuario y contraseña cifrada con PBKDF2-SHA256 (150.000 iteraciones, sal aleatoria de 16 bytes). No sale del navegador.</li>
+      <li><b>Cuenta en la nube (opcional):</b> correo electrónico y contraseña. La contraseña no se guarda en claro: Supabase Auth la almacena como hash bcrypt.</li>
+      <li><b>Cuenta local (opcional, solo este dispositivo):</b> nombre de usuario y contraseña almacenada como hash PBKDF2-SHA256 (150.000 iteraciones, sal aleatoria de 16 bytes). No sale del navegador.</li>
       <li><b>Datos de entrenamiento:</b> entrenamientos, sesiones, series, repeticiones, pesos, récords personales, historial y registros de peso corporal.</li>
       <li><b>Foto de progreso (opcional):</b> imagen que tú eliges. Se comprime en tu dispositivo, se guarda en tu cuenta y, si usas la nube, se sincroniza como parte de tu copia.</li>
       <li><b>Consentimiento:</b> fecha, versión de este documento y las casillas que aceptaste al crear la cuenta.</li>
@@ -89,7 +89,7 @@
 
     <h3>2.3. Para qué y con qué base legal</h3>
     <ul class="legal-list">
-      <li><b>Prestarte el servicio</b> (guardar y sincronizar tus entrenamientos, restaurar tu cuenta): los datos son necesarios para la relación contractual que establishes al crear la cuenta, sin consentimiento previo (art. 9 de la Ley 18.331) y con tu consentimiento expreso al registrarte.</li>
+      <li><b>Prestarte el servicio</b> (guardar y sincronizar tus entrenamientos, restaurar tu cuenta): los datos son necesarios para la relación contractual que estableces al crear la cuenta, sin consentimiento previo (art. 9 de la Ley 18.331) y con tu consentimiento expreso al registrarte.</li>
       <li><b>Peso y foto de progreso</b>: tu consentimiento expreso y específico para datos sensibles (arts. 9 y 18 de la Ley 18.331).</li>
       <li><b>Seguridad y prevención de abuso</b> (límites de intentos de acceso, protección de la base de datos): interés legítimo del titular en proteger el servicio, dentro de lo que la ley permite (art. 9 de la Ley 18.331).</li>
       <li><b>Cumplir obligaciones legales</b> que pudieran aplicarse: cuando una norma lo exige, no se requiere consentimiento previo (art. 9 de la Ley 18.331).</li>
@@ -98,7 +98,7 @@
 
     <h3>2.4. Dónde se guardan</h3>
     <ul class="legal-list">
-      <li><b>En tu dispositivo:</b> siempre hay una copia en el almacenamiento local del navegador (localStorage). Sin cuenta en la nube, es la única copia.</li>
+      <li><b>En tu dispositivo:</b> los datos de la app se guardan en el almacenamiento local del navegador (localStorage). Sin cuenta en la nube, es la única copia. En las cuentas de nube, los tokens de sesión no se guardan en localStorage.</li>
       <li><b>En la nube (solo si creas una cuenta en la nube):</b> en Supabase (Postgres + Auth), en la región del proyecto contratado por el titular. El acceso está aislado por fila: cada usuario autenticado solo puede leer y escribir su propio registro (Row Level Security).</li>
       <li><b>Alojamiento del sitio:</b> Vercel sirve el HTML, los estilos y los scripts. Los programas de entrenamiento se sirven como JSON estático.</li>
       <li><b>Transferencias internacionales:</b> Supabase y Vercel tratan datos fuera de Uruguay (Estados Unidos). Solo se transfiere lo necesario para prestar el servicio, con las garantías publicadas por cada proveedor (cláusulas contractuales estándar), como permite el art. 23 de la Ley 18.331.</li>
@@ -120,19 +120,20 @@
 
     <h3>2.7. Seguridad</h3>
     <ul class="legal-list">
-      <li>HTTPS obligatorio, HSTS en producción y cabeceras de seguridad (CSP sin scripts inline, `frame-ancestors 'none'`, `nosniff`, `Referrer-Policy`).</li>
+      <li>HTTPS obligatorio, HSTS en producción y cabeceras de seguridad (CSP sin scripts inline, frame-ancestors none, nosniff y Referrer-Policy).</li>
       <li>Contraseñas: PBKDF2-SHA256 con sal en las cuentas locales; bcrypt gestionado por Supabase en las cuentas en la nube. Nunca se guardan en claro ni se registran en logs.</li>
-      <li>La clave «anon» de Supabase es pública por diseño: no da acceso a datos sin sesión y todas las filas están protegidas por RLS.</li>
+      <li>La clave pública de Supabase se usa desde el servidor; no se incluye ninguna clave administrativa en el cliente. Las filas están protegidas por RLS.</li>
+      <li>Las sesiones de nube se mantienen en cookies HttpOnly, Secure y SameSite=Strict; las peticiones de cambio requieren origen propio y las rutas de autenticación tienen límite de solicitudes en el firewall.</li>
       <li>Mensajes de error genéricos al iniciar sesión para no revelar si una cuenta existe.</li>
-      <li>      Ningún sistema es infalible. Si detectas un problema de seguridad, comunícalo al titular (datos en §1; no hay correo público).</li>
+      <li>Ningún sistema es infalible. Si detectas un problema de seguridad, comunícalo al titular (datos en §1; no hay correo público).</li>
     </ul>
   </section>
 
   <section id="cookies" class="legal-sec">
     <h2>3. Cookies y almacenamiento local</h2>
     <p class="legal-body">
-      DrakoTrack <b>no usa cookies</b> de publicidad, analítica ni seguimiento, y no incorpora banners de consentimiento porque no hay cookies no esenciales.
-      Usamos únicamente almacenamiento técnico del navegador (localStorage) imprescindible para que la app funcione:
+      DrakoTrack no usa cookies de publicidad, analítica ni seguimiento, y no incorpora banners porque no hay cookies no esenciales.
+      Para las sesiones de nube se usan cookies técnicas <code>HttpOnly</code>, <code>Secure</code> y <code>SameSite=Strict</code>, imprescindibles para autenticarte; no son accesibles desde JavaScript. La app también usa almacenamiento local del navegador (localStorage) para guardar tus datos y preferencias:
     </p>
     <div class="legal-table-wrap">
       <table class="legal-table">
@@ -141,7 +142,7 @@
         <tbody>
           <tr><td><code>draktrack_v1</code></td><td>Cuentas locales y copia de tus datos en este dispositivo</td><td>Hasta que borres los datos</td></tr>
           <tr><td><code>draktrack_session_v1</code></td><td>Recordar qué cuenta está abierta</td><td>Hasta cerrar sesión</td></tr>
-          <tr><td><code>draktrack_sb_session_v1</code></td><td>Token de sesión de la cuenta en la nube</td><td>Hasta cerrar sesión o caducar</td></tr>
+          <tr><td><code>__Host-dt_access</code>, <code>__Host-dt_refresh</code></td><td>Tokens de sesión de nube en cookies Secure, HttpOnly, SameSite=Strict; no accesibles desde JavaScript</td><td>Hasta cerrar sesión o caducar</td></tr>
           <tr><td><code>draktrack_theme_v1</code></td><td>Tema claro u oscuro</td><td>Permanente (preferencia)</td></tr>
           <tr><td><code>draktrack_ui_v1</code></td><td>Secciones plegadas (biblioteca y programas)</td><td>Permanente (preferencia)</td></tr>
           <tr><td><code>draktrack_backup_due</code></td><td>Fecha del recordatorio quincenal de copia de seguridad</td><td>14 días, se renueva</td></tr>
@@ -153,8 +154,9 @@
   <section id="terceros" class="legal-sec">
     <h2>4. Terceros: auditoría de servicios y SDK</h2>
     <p class="legal-body">
-      Auditoría del 27 de octubre de 2026 sobre el código desplegado. La app es JavaScript propio sin dependencias en el navegador: no hay SDK de analítica,
-      publicidad, errores, mapas, redes sociales ni pagos. Estos son todos los terceros que intervienen:
+      Auditoría del 27 de octubre de 2026 sobre el código desplegado. La app es JavaScript propio más una única librería autoalojada (ALTCHA, ver §8): no hay SDK de analítica,
+      publicidad, errores, mapas, redes sociales ni pagos. La verificación anti-bots del registro se resuelve entre tu navegador y nuestro servidor,
+      sin proveedores externos de captcha y sin cookies. Estos son todos los terceros que intervienen:
     </p>
     <div class="legal-table-wrap">
       <table class="legal-table">
@@ -165,7 +167,7 @@
           <tr>
             <td>Supabase</td>
             <td>Cuentas en la nube y base de datos (Auth + Postgres)</td>
-            <td>Correo, contraseña cifrada, token de sesión, copia de tus datos de entrenamiento</td>
+            <td>Correo, contraseña procesada por Auth, token de sesión y copia de tus datos de entrenamiento</td>
             <td>Solo si creas o usas una cuenta en la nube</td>
           </tr>
           <tr>
@@ -181,8 +183,8 @@
             <td>Siempre, al cargar la app (si el navegador la solicita)</td>
           </tr>
           <tr>
-            <td>Boostcamp</td>
-            <td>Origen del catálogo público de programas</td>
+            <td>Boostcamp y Muscle &amp; Strength</td>
+            <td>Origen de los catálogos públicos de programas</td>
             <td>Ninguno: los programas se extrajeron y se sirven desde nuestro propio almacenamiento</td>
             <td>Nunca en tiempo de ejecución</td>
           </tr>
@@ -288,7 +290,7 @@
     <ul class="legal-list">
       <li><b>Tus datos son tuyos.</b> Solo nos concedes la licencia técnica mínima para almacenarlos, sincronizarlos y mostrártelos. No los usamos para nada más.</li>
       <li>El nombre DrakoTrack, el logo, los textos y el código de la app pertenecen al titular. No se concede licencia de reutilización.</li>
-      <li>Los programas de entrenamiento provienen del catálogo público de Boostcamp y pertenecen a Boostcamp y a sus autores. Se muestran con atribución para uso personal; no reclamamos su propiedad. Si un titular de derechos lo solicita, se retiran.</li>
+      <li>Los programas de entrenamiento provienen de los catálogos públicos de Boostcamp y Muscle &amp; Strength y pertenecen a cada sitio y a sus autores. Se muestran con atribución y enlace al original para uso personal; no reclamamos su propiedad. Si un titular de derechos lo solicita, se retiran.</li>
       <li>Las licencias de tipografía e imágenes se detallan en <a href="#licencias">Licencias</a>.</li>
     </ul>
 
@@ -349,13 +351,18 @@
           </tr>
           <tr>
             <td>Programas de entrenamiento</td>
-            <td>© Boostcamp y cada autor (p. ej. Jim Wendler, Jon Candito, Cody Lefever)</td>
-            <td>Contenido del catálogo público de boostcamp.app, mostrado con atribución y para uso personal. No se reclama propiedad ni se sublicencia.</td>
+            <td>© Boostcamp y Muscle &amp; Strength, y sus autores (p. ej. Jim Wendler, Jon Candito, Cody Lefever)</td>
+            <td>Estructuras de programa de los catálogos públicos de boostcamp.app y muscleandstrength.com, mostradas con atribución y enlace al original para uso personal. No se reclama propiedad ni se sublicencia.</td>
+          </tr>
+          <tr>
+            <td>ALTCHA (captcha del registro)</td>
+            <td>© ALTCHA / Daniel Regeci</td>
+            <td>Licencia MIT. Se sirve desde nuestro propio dominio (<code>altcha.js</code>), sin CDN ni llamadas de red a altcha.org; solo se enlaza su web en el aviso del widget.</td>
           </tr>
           <tr>
             <td>Código de la app</td>
             <td>© DrakoTrack</td>
-            <td>JavaScript propio sin dependencias en el navegador. No es software libre; no se concede licencia de redistribución.</td>
+            <td>JavaScript propio, salvo ALTCHA (MIT, fila anterior). No es software libre; no se concede licencia de redistribución.</td>
           </tr>
         </tbody>
       </table>

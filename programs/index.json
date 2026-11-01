@@ -1,0 +1,4821 @@
+[
+  {
+    "t": "100 LBS in 100 Days Deadlift Program",
+    "a": "Matt Vena",
+    "slug": "100-lbs-in-100-days-deadlift-program",
+    "diff": [
+      "Intermediate",
+      "Advanced"
+    ],
+    "equip": null,
+    "tag": "Increase your deadlift by 100 lbs in 100 days",
+    "dpw": 1,
+    "weeks": 0,
+    "ok": true,
+    "c": [
+      "strength"
+    ],
+    "src": "local",
+    "name": "100-lbs-in-100-days-deadlift-program",
+    "url": ""
+  },
+  {
+    "t": "KONG: Savage Size in 12 Weeks",
+    "a": "Alex Bromley",
+    "slug": "12-week-hypertrophy",
+    "diff": [
+      "Intermediate"
+    ],
+    "equip": null,
+    "tag": "12-week program to build savage muscular size, designed with 3 blocks of 4 week chunks.",
+    "dpw": 1,
+    "weeks": 0,
+    "ok": true,
+    "c": [
+      "hyper"
+    ],
+    "src": "local",
+    "name": "12-week-hypertrophy",
+    "url": ""
+  },
+  {
+    "t": "3 Day Beginner Olympic Weightlifting Program",
+    "a": "Glenn Pendlay",
+    "slug": "3-day-beginner-olympic-weightlifting-program",
+    "diff": [
+      "Beginner",
+      "Intermediate"
+    ],
+    "equip": null,
+    "tag": "For athletes looking to learn and improve Olympic lifts",
+    "dpw": 1,
+    "weeks": 0,
+    "ok": true,
+    "c": [
+      "strength"
+    ],
+    "src": "local",
+    "name": "3-day-beginner-olympic-weightlifting-program",
+    "url": ""
+  },
+  {
+    "t": "4 Day Upper Lower Program",
+    "a": "Dr. Swole",
+    "slug": "4-day-upper-lower-program-moderate-volume",
+    "diff": [
+      "Beginner",
+      "Intermediate"
+    ],
+    "equip": null,
+    "tag": "Dr. Swole's most popular free bodybuilding program",
+    "dpw": 2,
+    "weeks": 0,
+    "ok": true,
+    "c": [
+      "hyper"
+    ],
+    "src": "local",
+    "name": "4-day-upper-lower-program-moderate-volume",
+    "url": ""
+  },
+  {
+    "t": "5/3/1 Boring But Big",
+    "a": "Jim Wendler",
+    "slug": "5-3-1-boring-but-big",
+    "diff": [
+      "Intermediate"
+    ],
+    "equip": null,
+    "tag": "BBB is one of the most popular 5/3/1 versions with a focus on high volume accessories for size gains",
+    "dpw": 4,
+    "weeks": 4,
+    "ok": true,
+    "c": [
+      "hyper",
+      "strength"
+    ],
+    "src": "local",
+    "name": "5-3-1-boring-but-big",
+    "url": ""
+  },
+  {
+    "t": "5/3/1 Building the Monolith",
+    "a": "Jim Wendler",
+    "slug": "5-3-1-building-the-monlith",
+    "diff": [
+      "Advanced"
+    ],
+    "equip": null,
+    "tag": "Jim Wendler's size building template. BtM is for advanced athletes and is harder than 5/3/1 BBB",
+    "dpw": 1,
+    "weeks": 0,
+    "ok": true,
+    "c": [
+      "hyper",
+      "strength"
+    ],
+    "src": "local",
+    "name": "5-3-1-building-the-monlith",
+    "url": ""
+  },
+  {
+    "t": "5/3/1 for Beginners",
+    "a": "Jim Wendler",
+    "slug": "5-3-1-for-beginners",
+    "diff": [
+      "Beginner",
+      "Intermediate"
+    ],
+    "equip": null,
+    "tag": "The famous 5/3/1 philosophy for beginner lifters",
+    "dpw": 3,
+    "weeks": 3,
+    "ok": true,
+    "c": [
+      "strength"
+    ],
+    "src": "local",
+    "name": "5-3-1-for-beginners",
+    "url": ""
+  },
+  {
+    "t": "70s Powerlifter",
+    "a": "Alex Bromley",
+    "slug": "70s-powerlifter",
+    "diff": [
+      "Intermediate",
+      "Advanced"
+    ],
+    "equip": null,
+    "tag": "18 week old school powerlifting protocol to will leave you in a different solar system",
+    "dpw": 1,
+    "weeks": 0,
+    "ok": true,
+    "c": [
+      "strength"
+    ],
+    "src": "local",
+    "name": "70s-powerlifter",
+    "url": ""
+  },
+  {
+    "t": "Alberto Nuñez Upper Lower Program",
+    "a": "Alberto Nuñez",
+    "slug": "alberto-nu-ez-upper-lower-program",
+    "diff": [
+      "Beginner",
+      "Intermediate"
+    ],
+    "equip": null,
+    "tag": "4-day a week upper lower split by bodybuilding coach Alberto Nuñez, with 4 program variations.",
+    "dpw": 4,
+    "weeks": 0,
+    "ok": true,
+    "c": [
+      "hyper"
+    ],
+    "src": "local",
+    "name": "alberto-nu-ez-upper-lower-program",
+    "url": ""
+  },
+  {
+    "t": "APOLLO: Efficient Aesthetic Focused Training",
+    "a": "Josh Brett",
+    "slug": "apollo-efficient-aesthetic-focused-training",
+    "diff": [
+      "Beginner",
+      "Intermediate"
+    ],
+    "equip": null,
+    "tag": "12 week, 3 day per week training program designed to build an aesthetic, athletic phyisque without living in the gym.",
+    "dpw": 1,
+    "weeks": 0,
+    "ok": true,
+    "c": [
+      "hyper"
+    ],
+    "src": "local",
+    "name": "apollo-efficient-aesthetic-focused-training",
+    "url": ""
+  },
+  {
+    "t": "Arleth's Bodybuilding (5 Day Split)",
+    "a": "Arleth Diaz",
+    "slug": "arleth-s-bodybuilding-5-day-split",
+    "diff": [
+      "Beginner",
+      "Intermediate"
+    ],
+    "equip": null,
+    "tag": "5 day women's bodybuilding split to build your glutes, core, and overall aesthetics",
+    "dpw": 1,
+    "weeks": 0,
+    "ok": true,
+    "c": [
+      "hyper"
+    ],
+    "src": "local",
+    "name": "arleth-s-bodybuilding-5-day-split",
+    "url": ""
+  },
+  {
+    "t": "Arnold Schwarzenegger Home Workout",
+    "a": "Arnold Schwarzenegger",
+    "slug": "arnold-schwarzenegger-home-workout",
+    "diff": [
+      "Beginner"
+    ],
+    "equip": null,
+    "tag": "Arnold's beginner bodyweight workout that you can do anywhere with no gym access",
+    "dpw": 2,
+    "weeks": 0,
+    "ok": true,
+    "c": [
+      "fitness"
+    ],
+    "src": "local",
+    "name": "arnold-schwarzenegger-home-workout",
+    "url": ""
+  },
+  {
+    "t": "Arnold Schwarzenegger Volume Workout - Variation 1",
+    "a": "Arnold Schwarzenegger",
+    "slug": "arnold-schwarzenegger-volume-workout-variation",
+    "diff": [
+      "Advanced"
+    ],
+    "equip": null,
+    "tag": "7-time Mr. Olympia Arnold Schwarzenegger's high frequency and high volume approach",
+    "dpw": 6,
+    "weeks": 16,
+    "ok": true,
+    "c": [
+      "hyper"
+    ],
+    "src": "local",
+    "name": "arnold-schwarzenegger-volume-workout-variation",
+    "url": ""
+  },
+  {
+    "t": "Athenian Bulk Blueprint",
+    "a": "Josh Brett",
+    "slug": "athenian-bulk-blueprint",
+    "diff": [
+      "Beginner",
+      "Intermediate"
+    ],
+    "equip": null,
+    "tag": "Science-based 12 week bulk program to help you reach your muscular potential.",
+    "dpw": 1,
+    "weeks": 0,
+    "ok": true,
+    "c": [
+      "hyper"
+    ],
+    "src": "local",
+    "name": "athenian-bulk-blueprint",
+    "url": ""
+  },
+  {
+    "t": "Athletic Base",
+    "a": "Dr. Ramsey Nijem",
+    "slug": "athletic-base",
+    "diff": [
+      "Beginner",
+      "Intermediate"
+    ],
+    "equip": null,
+    "tag": "Bodyweight-focused program for everyday athletes to develop strength, power, agility, and speed. ",
+    "dpw": 4,
+    "weeks": 12,
+    "ok": true,
+    "c": [
+      "fitness"
+    ],
+    "free": true,
+    "src": "local",
+    "name": "athletic-base",
+    "url": ""
+  },
+  {
+    "t": "Bald Swordman",
+    "a": "Bald Omni-Man",
+    "slug": "bald-swordman",
+    "diff": [
+      "Advanced"
+    ],
+    "equip": null,
+    "tag": "Advanced hypertrophy program used by Coach Butler (Bald Omni-Man)",
+    "dpw": 1,
+    "weeks": 0,
+    "ok": true,
+    "c": [
+      "hyper"
+    ],
+    "src": "local",
+    "name": "bald-swordman",
+    "url": ""
+  },
+  {
+    "t": "Basement Bodybuilding: Home Gym Upper Lower",
+    "a": "Basement Bodybuilding",
+    "slug": "basement-bodybuilding-home-gym-upper-lower",
+    "diff": [
+      "Beginner",
+      "Intermediate"
+    ],
+    "equip": null,
+    "tag": "4 day upper lower split to help you build muscle with just a squat rack and dumbbells.",
+    "dpw": 1,
+    "weeks": 0,
+    "ok": true,
+    "c": [
+      "hyper"
+    ],
+    "src": "local",
+    "name": "basement-bodybuilding-home-gym-upper-lower",
+    "url": ""
+  },
+  {
+    "t": "Basement Bodybuilding: PPLPP Program",
+    "a": "Basement Bodybuilding",
+    "slug": "basement-bodybuilding-pplpp-program",
+    "diff": [
+      "Intermediate",
+      "Advanced"
+    ],
+    "equip": null,
+    "tag": "5 day Push Pull Legs Push Pull (PPLPL) program from youtube educator Basement Bodybuilding",
+    "dpw": 1,
+    "weeks": 0,
+    "ok": true,
+    "c": [
+      "hyper"
+    ],
+    "src": "local",
+    "name": "basement-bodybuilding-pplpp-program",
+    "url": ""
+  },
+  {
+    "t": "Basement Bodybuilding: Upper Lower Program",
+    "a": "Basement Bodybuilding",
+    "slug": "basement-bodybuilding-upper-lower-program",
+    "diff": [
+      "Beginner",
+      "Intermediate"
+    ],
+    "equip": null,
+    "tag": "4 day upper lower split to help you gain serious mass and build an aesthetic physique.",
+    "dpw": 1,
+    "weeks": 0,
+    "ok": true,
+    "c": [
+      "hyper"
+    ],
+    "src": "local",
+    "name": "basement-bodybuilding-upper-lower-program",
+    "url": ""
+  },
+  {
+    "t": "Beast Slayer - Berserk Method Full Body Program",
+    "a": "Bald Omni-Man",
+    "slug": "beast-slayer",
+    "diff": [
+      "Beginner",
+      "Intermediate",
+      "Advanced"
+    ],
+    "equip": null,
+    "tag": "Ultimate Full Body Program for BRUTAL Size & Strength",
+    "dpw": 2,
+    "weeks": 0,
+    "ok": true,
+    "c": [
+      "hyper",
+      "strength"
+    ],
+    "src": "local",
+    "name": "beast-slayer",
+    "url": ""
+  },
+  {
+    "t": "Beast Slayer: Berserk Method Full Body Program 2.0",
+    "a": "Bald Omni-Man",
+    "slug": "beast-slayer-berserk-method-full-body-program-2025",
+    "diff": [
+      "Beginner",
+      "Intermediate",
+      "Advanced"
+    ],
+    "equip": null,
+    "tag": "Ultimate Full Body Program for BRUTAL Size & Strength. Updated 2025 version!",
+    "dpw": 1,
+    "weeks": 0,
+    "ok": true,
+    "c": [
+      "hyper",
+      "strength"
+    ],
+    "src": "local",
+    "name": "beast-slayer-berserk-method-full-body-program-2025",
+    "url": ""
+  },
+  {
+    "t": "Maconi Modified Pressing Routine",
+    "a": "Dr. Dave Maconi",
+    "slug": "bench-overhead-press-specialization",
+    "diff": [
+      "Intermediate",
+      "Advanced"
+    ],
+    "equip": null,
+    "tag": "Specialization program to increase your maximal strength in the bench press or overhead press.",
+    "dpw": 2,
+    "weeks": 0,
+    "ok": true,
+    "c": [
+      "strength"
+    ],
+    "src": "local",
+    "name": "bench-overhead-press-specialization",
+    "url": ""
+  },
+  {
+    "t": "Big Like Bane Beginner 10-Week Strength Program",
+    "a": "Paris Demers",
+    "slug": "big-like-bane-beginner-10-week-strength-program",
+    "diff": [
+      "Beginner",
+      "Intermediate"
+    ],
+    "equip": null,
+    "tag": "This program is specially designed to get you started on your muscle and strength-building journey!",
+    "dpw": 1,
+    "weeks": 0,
+    "ok": true,
+    "c": [
+      "hyper",
+      "strength"
+    ],
+    "src": "local",
+    "name": "big-like-bane-beginner-10-week-strength-program",
+    "url": ""
+  },
+  {
+    "t": "Bikini Body",
+    "a": "Menno Henselmans",
+    "slug": "bikini-body",
+    "diff": [
+      "Beginner"
+    ],
+    "equip": null,
+    "tag": "Beginner program for female trainees that want a Bikini Fitness type body.",
+    "dpw": 2,
+    "weeks": 8,
+    "ok": true,
+    "c": [
+      "hyper"
+    ],
+    "src": "local",
+    "name": "bikini-body",
+    "url": ""
+  },
+  {
+    "t": "Blind Barbell 12 Week Powerbuilding",
+    "a": "Quentin Oppenlander",
+    "slug": "blind-barbell-12-week-powerbuilding",
+    "diff": [
+      "Intermediate",
+      "Advanced"
+    ],
+    "equip": null,
+    "tag": "12 weeks of intense training and hardcore gains",
+    "dpw": 1,
+    "weeks": 0,
+    "ok": true,
+    "c": [
+      "strength"
+    ],
+    "src": "local",
+    "name": "blind-barbell-12-week-powerbuilding",
+    "url": ""
+  },
+  {
+    "t": "Blind Barbell Bench Program",
+    "a": "Quentin Oppenlander",
+    "slug": "blind-barbell-bench-program",
+    "diff": [
+      "Intermediate",
+      "Advanced"
+    ],
+    "equip": null,
+    "tag": "Build unstoppable pressing power with heavy top sets, AMRAP challenges, and strategic progression. No excuses. Just results.",
+    "dpw": 1,
+    "weeks": 0,
+    "ok": true,
+    "c": [
+      "strength"
+    ],
+    "src": "local",
+    "name": "blind-barbell-bench-program",
+    "url": ""
+  },
+  {
+    "t": "Boostcamp Hybrid Athlete Program",
+    "a": "Bryan Boorstein",
+    "slug": "boostcamp-hybrid-athlete-program",
+    "diff": [
+      "Intermediate",
+      "Advanced"
+    ],
+    "equip": null,
+    "tag": "Designed by Bryan Boorstein, this is a hybrid program for bodybuilding and cardio training to make you an elite hybrid athlete.",
+    "dpw": 1,
+    "weeks": 0,
+    "ok": true,
+    "c": [
+      "endurance"
+    ],
+    "src": "local",
+    "name": "boostcamp-hybrid-athlete-program",
+    "url": ""
+  },
+  {
+    "t": "Bradley Barbell's Bench PR",
+    "a": "Dr. Adam Bradley",
+    "slug": "bradley-barbell-s-bench-pr",
+    "diff": [
+      "Intermediate"
+    ],
+    "equip": null,
+    "tag": "For intermediate lifters looking to hit an all-time bench press PR.",
+    "dpw": 1,
+    "weeks": 0,
+    "ok": true,
+    "c": [
+      "strength"
+    ],
+    "src": "local",
+    "name": "bradley-barbell-s-bench-pr",
+    "url": ""
+  },
+  {
+    "t": "Brandon Campbell PRS",
+    "a": "Brandon Campbell",
+    "slug": "brandon-campbell-prs",
+    "diff": [
+      "Intermediate",
+      "Advanced"
+    ],
+    "equip": null,
+    "tag": "This program combines Power, Reps, and Speed (PRS) to help you build maximal strength and crush PRs.",
+    "dpw": 1,
+    "weeks": 0,
+    "ok": true,
+    "c": [
+      "strength"
+    ],
+    "src": "local",
+    "name": "brandon-campbell-prs",
+    "url": ""
+  },
+  {
+    "t": "Fullsterkur Strongman Program",
+    "a": "Alex Bromley",
+    "slug": "bromley-beginner-strongman",
+    "diff": [
+      "Intermediate"
+    ],
+    "equip": null,
+    "tag": "Strongman program that you can do in a regular gym",
+    "dpw": 2,
+    "weeks": 0,
+    "ok": true,
+    "c": [
+      "strength"
+    ],
+    "src": "local",
+    "name": "bromley-beginner-strongman",
+    "url": ""
+  },
+  {
+    "t": "Bruce Lee’s Old School Training Plan",
+    "a": "Paris Demers",
+    "slug": "bruce-lee-s-old-school-training-plan-condensed",
+    "diff": [
+      "Beginner",
+      "Intermediate"
+    ],
+    "equip": null,
+    "tag": "Follow this Bruce Lee inspired workout program to build a ripped physique with athletic performance!",
+    "dpw": 1,
+    "weeks": 0,
+    "ok": true,
+    "c": [
+      "hyper"
+    ],
+    "src": "local",
+    "name": "bruce-lee-s-old-school-training-plan-condensed",
+    "url": ""
+  },
+  {
+    "t": "Bryce Lewis Program: Greatest Hits",
+    "a": "Bryce Lewis",
+    "slug": "bryce-lewis-program-greatest-hits",
+    "diff": [
+      "Intermediate"
+    ],
+    "equip": null,
+    "tag": "9 week intermediate powerlifting program based on all of Bryce's latest learnings",
+    "dpw": 4,
+    "weeks": 0,
+    "ok": true,
+    "c": [
+      "strength"
+    ],
+    "src": "local",
+    "name": "bryce-lewis-program-greatest-hits",
+    "url": ""
+  },
+  {
+    "t": "Bullmastiff",
+    "a": "Alex Bromley",
+    "slug": "bullmastiff",
+    "diff": [
+      "Intermediate"
+    ],
+    "equip": null,
+    "tag": "Pack on serious strength and size with this 3-week wave structure with a base and a peak phase",
+    "dpw": 1,
+    "weeks": 0,
+    "ok": true,
+    "c": [
+      "strength"
+    ],
+    "src": "local",
+    "name": "bullmastiff",
+    "url": ""
+  },
+  {
+    "t": "Candito 5 Week 10RM Squat Program",
+    "a": "Jonnie Candito",
+    "slug": "candito-5-week-10rm-squat-program",
+    "diff": [
+      "Intermediate"
+    ],
+    "equip": null,
+    "tag": "Jonnie Candito's new 5 Week 10RM ATG squat program for building strength, mass, power, and characher",
+    "dpw": 2,
+    "weeks": 5,
+    "ok": true,
+    "c": [
+      "strength"
+    ],
+    "src": "local",
+    "name": "candito-5-week-10rm-squat-program",
+    "url": ""
+  },
+  {
+    "t": "Candito 6 Week Strength Program",
+    "a": "Jonnie Candito",
+    "slug": "candito-6-week-strength-program",
+    "diff": [
+      "Intermediate",
+      "Advanced"
+    ],
+    "equip": null,
+    "tag": "Break personal records and learn the highly-effective periodization training method.",
+    "dpw": 1,
+    "weeks": 0,
+    "ok": true,
+    "c": [
+      "strength"
+    ],
+    "src": "local",
+    "name": "candito-6-week-strength-program",
+    "url": ""
+  },
+  {
+    "t": "Captain America - Hybrid Training Program",
+    "a": "Paris Demers",
+    "slug": "captain-america-hybrid-training-program",
+    "diff": [
+      "Intermediate",
+      "Advanced"
+    ],
+    "equip": null,
+    "tag": "2-phase hybrid program to help you build a muscular physique worthy of Chris Evans’ Captain America–boost your strength, endurance, explosiveness, athleticism",
+    "dpw": 1,
+    "weeks": 0,
+    "ok": true,
+    "c": [
+      "endurance"
+    ],
+    "src": "local",
+    "name": "captain-america-hybrid-training-program",
+    "url": ""
+  },
+  {
+    "t": "Cure to Progressive Overload Anxiety",
+    "a": "Basement Bodybuilding",
+    "slug": "cure-to-progressive-overload-anxiety",
+    "diff": [
+      "Intermediate",
+      "Advanced"
+    ],
+    "equip": null,
+    "tag": "Systematic way to continue making gains at an intermediate level without the anxiety.",
+    "dpw": 1,
+    "weeks": 0,
+    "ok": true,
+    "c": [
+      "hyper"
+    ],
+    "src": "local",
+    "name": "cure-to-progressive-overload-anxiety",
+    "url": ""
+  },
+  {
+    "t": "Dad Bod To Father Figure",
+    "a": "Adam Pecoraro",
+    "slug": "dad-bod-to-father-figure-16-week-workout",
+    "diff": [
+      "Beginner",
+      "Intermediate"
+    ],
+    "equip": null,
+    "tag": "Ditch the dad bod with this 16 week workout program.",
+    "dpw": 1,
+    "weeks": 0,
+    "ok": true,
+    "c": [
+      "hyper"
+    ],
+    "src": "local",
+    "name": "dad-bod-to-father-figure-16-week-workout",
+    "url": ""
+  },
+  {
+    "t": "Doom Slayer PPL Program",
+    "a": "Natural Hypertrophy",
+    "slug": "doom-slayer-ppl-program",
+    "diff": [
+      "Intermediate",
+      "Advanced"
+    ],
+    "equip": null,
+    "tag": "The ultimate push pull legs program to build a Doom Slayer physique",
+    "dpw": 6,
+    "weeks": 12,
+    "ok": true,
+    "c": [
+      "hyper"
+    ],
+    "free": true,
+    "src": "local",
+    "name": "doom-slayer-ppl-program",
+    "url": ""
+  },
+  {
+    "t": "Dorian Yates High Intensity Training (HIT) Program",
+    "a": "Dorian Yates",
+    "slug": "dorian-yates-4-day-split",
+    "diff": [
+      "Intermediate",
+      "Advanced"
+    ],
+    "equip": null,
+    "tag": "4-day Split High Intensity Training (HIT) program from one of the greatest bodybuilders of all time.",
+    "dpw": 1,
+    "weeks": 0,
+    "ok": true,
+    "c": [
+      "hyper"
+    ],
+    "src": "local",
+    "name": "dorian-yates-4-day-split",
+    "url": ""
+  },
+  {
+    "t": "Dragon Fist: ULPPL Hybrid Program",
+    "a": "Bald Omni-Man",
+    "slug": "dragon-fist-ulppl-hybrid-program",
+    "diff": [
+      "Intermediate",
+      "Advanced"
+    ],
+    "equip": null,
+    "tag": "Limit Breaking Hypertrophy Program for All Experience Levels",
+    "dpw": 1,
+    "weeks": 0,
+    "ok": true,
+    "c": [
+      "hyper"
+    ],
+    "src": "local",
+    "name": "dragon-fist-ulppl-hybrid-program",
+    "url": ""
+  },
+  {
+    "t": "Dumbbell PPL",
+    "a": "r/Fitness",
+    "slug": "dumbbell-p-p-l",
+    "diff": [
+      "Beginner",
+      "Intermediate"
+    ],
+    "equip": null,
+    "tag": "A beginner dumbbell routine based on a Push Pull Legs split",
+    "dpw": 3,
+    "weeks": 8,
+    "ok": true,
+    "c": [
+      "hyper",
+      "fitness"
+    ],
+    "src": "local",
+    "name": "dumbbell-p-p-l",
+    "url": ""
+  },
+  {
+    "t": "Fazlifts Full Body",
+    "a": "Fazlifts",
+    "slug": "fazlifts-hlm-full-body-the-wizard",
+    "diff": [
+      "Intermediate"
+    ],
+    "equip": null,
+    "tag": "This routine is meant for beginners primarily in hypertrophy, with a secondary focus on strength.",
+    "dpw": 1,
+    "weeks": 0,
+    "ok": true,
+    "c": [
+      "hyper"
+    ],
+    "src": "local",
+    "name": "fazlifts-hlm-full-body-the-wizard",
+    "url": ""
+  },
+  {
+    "t": "Fazlifts Upper Lower",
+    "a": "Fazlifts",
+    "slug": "fazlifts-upper-lower-the-barbarian",
+    "diff": [
+      "Beginner",
+      "Intermediate"
+    ],
+    "equip": null,
+    "tag": "This is the beginner version of one of the most effective routines of all time, the Upper/Lower.",
+    "dpw": 2,
+    "weeks": 0,
+    "ok": true,
+    "c": [
+      "hyper"
+    ],
+    "src": "local",
+    "name": "fazlifts-upper-lower-the-barbarian",
+    "url": ""
+  },
+  {
+    "t": "Fierce 5",
+    "a": "Lift Vault",
+    "slug": "fierce-5",
+    "diff": [
+      "Beginner",
+      "Intermediate"
+    ],
+    "equip": null,
+    "tag": "2x per week beginner bodybuilding program",
+    "dpw": 1,
+    "weeks": 0,
+    "ok": true,
+    "c": [
+      "hyper"
+    ],
+    "src": "local",
+    "name": "fierce-5",
+    "url": ""
+  },
+  {
+    "t": "Flex Wheeler Bro Split Hypertrophy",
+    "a": "Flex Wheeler",
+    "slug": "flex-wheeler-hypertrophy-program",
+    "diff": [
+      "Intermediate"
+    ],
+    "equip": null,
+    "tag": "Build Golden Era muscle mass with this workout program the legend himself used.",
+    "dpw": 1,
+    "weeks": 0,
+    "ok": true,
+    "c": [
+      "hyper"
+    ],
+    "src": "local",
+    "name": "flex-wheeler-hypertrophy-program",
+    "url": ""
+  },
+  {
+    "t": "Flex Wheeler Super Hypertrophy Program",
+    "a": "Flex Wheeler",
+    "slug": "flex-wheeler-super-hypertrophy-program",
+    "diff": [
+      "Intermediate",
+      "Advanced"
+    ],
+    "equip": null,
+    "tag": "Build Golden Era Muscle with Flex Wheeler's Super Hypertrophy",
+    "dpw": 1,
+    "weeks": 0,
+    "ok": true,
+    "c": [
+      "hyper"
+    ],
+    "src": "local",
+    "name": "flex-wheeler-super-hypertrophy-program",
+    "url": ""
+  },
+  {
+    "t": "Foundations of Strength",
+    "a": "Team GGR",
+    "slug": "foundations-of-strength",
+    "diff": [
+      "Intermediate"
+    ],
+    "equip": null,
+    "tag": "Short on time and want effective and efficient workouts? This program combines resistance training, power movements, and mobility work that you can do at home.",
+    "dpw": 3,
+    "weeks": 12,
+    "ok": true,
+    "c": [
+      "strength",
+      "fitness"
+    ],
+    "free": true,
+    "src": "local",
+    "name": "foundations-of-strength",
+    "url": ""
+  },
+  {
+    "t": "Frankoman's Dumbbell Only Split",
+    "a": "r/Fitness",
+    "slug": "frankoman-s-dumbbell-only-split",
+    "diff": [
+      "Beginner",
+      "Intermediate"
+    ],
+    "equip": null,
+    "tag": "A dumbbell only workout program for home or the gym that will pack on muscle mass for beginners.",
+    "dpw": 1,
+    "weeks": 0,
+    "ok": true,
+    "c": [
+      "hyper",
+      "fitness"
+    ],
+    "src": "local",
+    "name": "frankoman-s-dumbbell-only-split",
+    "url": ""
+  },
+  {
+    "slug": "ms-frankoman-dumbbell-only-split",
+    "name": "Frankoman's Dumbbell Only Split",
+    "src": "ms",
+    "url": "https://www.muscleandstrength.com/workouts/frankoman-dumbbell-only-split"
+  },
+  {
+    "t": "Full Body Powerbuilding Split",
+    "a": "Dr. Swole",
+    "slug": "full-body-powerbuilding-split",
+    "diff": [
+      "Beginner",
+      "Intermediate"
+    ],
+    "equip": null,
+    "tag": "3 days a week program for a beginner to early intermediate athlete to build strength and muscle mass",
+    "dpw": 3,
+    "weeks": 8,
+    "ok": true,
+    "c": [
+      "hyper",
+      "strength"
+    ],
+    "src": "local",
+    "name": "full-body-powerbuilding-split",
+    "url": ""
+  },
+  {
+    "t": "Full Body Pump",
+    "a": "Team GGR",
+    "slug": "full-body-pump",
+    "diff": [
+      "Intermediate"
+    ],
+    "equip": null,
+    "tag": "Looking for a garage gym hypertrophy program? Try Full Body Pump—a 3-day, bodybuilding-style program focused on compound movements.",
+    "dpw": 1,
+    "weeks": 0,
+    "ok": true,
+    "c": [
+      "hyper"
+    ],
+    "src": "local",
+    "name": "full-body-pump",
+    "url": ""
+  },
+  {
+    "t": "Fullbodymaxxing",
+    "a": "Basement Bodybuilding",
+    "slug": "fullbodymaxxing",
+    "diff": [
+      "Beginner",
+      "Intermediate"
+    ],
+    "equip": null,
+    "tag": "3-days per week full body training split for high frequency muscle building",
+    "dpw": 1,
+    "weeks": 0,
+    "ok": true,
+    "c": [
+      "hyper"
+    ],
+    "src": "local",
+    "name": "fullbodymaxxing",
+    "url": ""
+  },
+  {
+    "t": "Functional Strength 101",
+    "a": "Justina Ercole",
+    "slug": "functional-strength-101",
+    "diff": [
+      "Beginner"
+    ],
+    "equip": null,
+    "tag": "Stronger & Smarter in the Gym",
+    "dpw": 1,
+    "weeks": 0,
+    "ok": true,
+    "c": [
+      "strength",
+      "fitness"
+    ],
+    "src": "local",
+    "name": "functional-strength-101",
+    "url": ""
+  },
+  {
+    "t": "Goku Training Plan (16-Week At-Home)",
+    "a": "Paris Demers",
+    "slug": "goku-training-plan-16-week-at-home",
+    "diff": [
+      "Beginner",
+      "Intermediate"
+    ],
+    "equip": null,
+    "tag": "Train like Goku and build the jacked athletic body using this three-level functional workout program",
+    "dpw": 4,
+    "weeks": 16,
+    "ok": true,
+    "c": [
+      "fitness"
+    ],
+    "free": true,
+    "src": "local",
+    "name": "goku-training-plan-16-week-at-home",
+    "url": ""
+  },
+  {
+    "t": "Golden Six",
+    "a": "Arnold Schwarzenegger",
+    "slug": "golden-six",
+    "diff": [
+      "Beginner",
+      "Intermediate"
+    ],
+    "equip": null,
+    "tag": "Bodybuilding centered on 6 exercises: Squat, Bench, Chin-up, Overhead Press, Curl, Sit-up",
+    "dpw": 3,
+    "weeks": 8,
+    "ok": true,
+    "c": [
+      "hyper",
+      "strength"
+    ],
+    "src": "local",
+    "name": "golden-six",
+    "url": ""
+  },
+  {
+    "t": "Golden Warrior: Adaptive Hypertrophy Program",
+    "a": "Bald Omni-Man",
+    "slug": "golden-warrior-adaptive-hypertrophy-program",
+    "diff": [
+      "Beginner",
+      "Intermediate",
+      "Advanced"
+    ],
+    "equip": null,
+    "tag": "3-5x Per Week Upper Lower ADAPTIVE Strength and Hypertrophy Program (1 hour run time or less per workout).",
+    "dpw": 3,
+    "weeks": 0,
+    "ok": true,
+    "c": [
+      "hyper",
+      "strength"
+    ],
+    "src": "local",
+    "name": "golden-warrior-adaptive-hypertrophy-program",
+    "url": ""
+  },
+  {
+    "t": "Greg Nuckols Beginner Program",
+    "a": "Greg Nuckols",
+    "slug": "greg-nuckols-beginner-program",
+    "diff": [
+      "Beginner"
+    ],
+    "equip": null,
+    "tag": "Build muscle and strength with full-gym equipment including barbells, dumbbells, and machines.",
+    "dpw": 2,
+    "weeks": 0,
+    "ok": true,
+    "c": [
+      "hyper",
+      "strength"
+    ],
+    "src": "local",
+    "name": "greg-nuckols-beginner-program",
+    "url": ""
+  },
+  {
+    "t": "Phrak's Greyskull LP",
+    "a": "r/Fitness",
+    "slug": "greyskull-linear-progression",
+    "diff": [
+      "Beginner",
+      "Intermediate"
+    ],
+    "equip": null,
+    "tag": "Beginner linear progression program with a good balance of push and pull movements.",
+    "dpw": 1,
+    "weeks": 0,
+    "ok": true,
+    "c": [
+      "strength"
+    ],
+    "src": "local",
+    "name": "greyskull-linear-progression",
+    "url": ""
+  },
+  {
+    "t": "Guts Training Program",
+    "a": "Natural Hypertrophy",
+    "slug": "guts-training-program",
+    "diff": [
+      "Intermediate",
+      "Advanced"
+    ],
+    "equip": null,
+    "tag": "4x/week Gentleman Split with emphasis on arms and back.",
+    "dpw": 4,
+    "weeks": 12,
+    "ok": true,
+    "c": [
+      "hyper"
+    ],
+    "free": true,
+    "src": "local",
+    "name": "guts-training-program",
+    "url": ""
+  },
+  {
+    "t": "GZCL Program (GZCLP)",
+    "a": "Cody Lefever",
+    "slug": "gzcl-program-gzclp",
+    "diff": [
+      "Beginner",
+      "Intermediate"
+    ],
+    "equip": null,
+    "tag": "Cody Lefever's famous linear progression program for beginners",
+    "dpw": 2,
+    "weeks": 0,
+    "ok": true,
+    "c": [
+      "strength"
+    ],
+    "src": "local",
+    "name": "gzcl-program-gzclp",
+    "url": ""
+  },
+  {
+    "t": "Hugh Jackman's Wolverine Training Program",
+    "a": "Paris Demers",
+    "slug": "hugh-jackman-s-wolverine-training-program",
+    "diff": [
+      "Intermediate"
+    ],
+    "equip": null,
+    "tag": "The Wolverine training plan replicates the workout regimen that Hugh Jackman uses to get into superhero shape for his role as Wolverine. ",
+    "dpw": 1,
+    "weeks": 0,
+    "ok": true,
+    "c": [
+      "hyper"
+    ],
+    "src": "local",
+    "name": "hugh-jackman-s-wolverine-training-program",
+    "url": ""
+  },
+  {
+    "t": "Intermediate Bodybuilding Program (by Eric Helms)",
+    "a": "Dr. Eric Helms",
+    "slug": "intermediate-bodybuilding-program",
+    "diff": [
+      "Intermediate"
+    ],
+    "equip": null,
+    "tag": "Five-day a week program based on the principles from the Muscle and Strength Pyramid: Training",
+    "dpw": 1,
+    "weeks": 0,
+    "ok": true,
+    "c": [
+      "hyper"
+    ],
+    "src": "local",
+    "name": "intermediate-bodybuilding-program",
+    "url": ""
+  },
+  {
+    "t": "It All Starts Here",
+    "a": "Aliza Tessler (@liztess)",
+    "slug": "it-all-starts-here",
+    "diff": [
+      "Beginner",
+      "Intermediate"
+    ],
+    "equip": null,
+    "tag": "Beginner 4 Week Powerlifting Program to Get You Strong",
+    "dpw": 2,
+    "weeks": 0,
+    "ok": true,
+    "c": [
+      "strength"
+    ],
+    "src": "local",
+    "name": "it-all-starts-here",
+    "url": ""
+  },
+  {
+    "t": "Jacked Intellectual (5-Day Version)",
+    "a": "Fazlifts",
+    "slug": "jacked-intellectual",
+    "diff": [
+      "Intermediate",
+      "Advanced"
+    ],
+    "equip": null,
+    "tag": "This is a hypertrophy specific plan, which uses a phasic approach to build mass and strength over time.",
+    "dpw": 1,
+    "weeks": 0,
+    "ok": true,
+    "c": [
+      "hyper"
+    ],
+    "src": "local",
+    "name": "jacked-intellectual",
+    "url": ""
+  },
+  {
+    "t": "Jacked Intellectual (4-Day Version)",
+    "a": "Fazlifts",
+    "slug": "jacked-intellectual-4-day-split",
+    "diff": [
+      "Intermediate",
+      "Advanced"
+    ],
+    "equip": null,
+    "tag": "This is a hypertrophy specific plan, which uses a phasic approach to build mass and strength over time.",
+    "dpw": 1,
+    "weeks": 0,
+    "ok": true,
+    "c": [
+      "hyper"
+    ],
+    "src": "local",
+    "name": "jacked-intellectual-4-day-split",
+    "url": ""
+  },
+  {
+    "t": "Jacked and Tan 2.0",
+    "a": "Cody Lefever",
+    "slug": "jacked-tan-2-0",
+    "diff": [
+      "Intermediate"
+    ],
+    "equip": null,
+    "tag": "Jacked & Tan 2.0 is an intermediate powerbuilding program focused on hypertrophy and work capacity",
+    "dpw": 1,
+    "weeks": 0,
+    "ok": true,
+    "c": [
+      "hyper"
+    ],
+    "src": "local",
+    "name": "jacked-tan-2-0",
+    "url": ""
+  },
+  {
+    "t": "Jacob Oestreicher Hypertrophy Program",
+    "a": "Jacob Oestreicher",
+    "slug": "jacob-oestreicher-hypertrophy-program",
+    "diff": [
+      "Beginner",
+      "Intermediate"
+    ],
+    "equip": null,
+    "tag": "My Push Pull Legs X Upper Lower split to put on the most muscle in the fastest time",
+    "dpw": 1,
+    "weeks": 0,
+    "ok": true,
+    "c": [
+      "hyper"
+    ],
+    "src": "local",
+    "name": "jacob-oestreicher-hypertrophy-program",
+    "url": ""
+  },
+  {
+    "t": "Road House Training Plan",
+    "a": "Paris Demers",
+    "slug": "jake-gyllenhaal-road-house-plan",
+    "diff": [
+      "Intermediate"
+    ],
+    "equip": null,
+    "tag": "Build a ripped athletic body with this 8-week functional push/pull training program!",
+    "dpw": 1,
+    "weeks": 0,
+    "ok": true,
+    "c": [
+      "hyper",
+      "endurance"
+    ],
+    "src": "local",
+    "name": "jake-gyllenhaal-road-house-plan",
+    "url": ""
+  },
+  {
+    "t": "Rock The Bells",
+    "a": "Rebecca Rouse",
+    "slug": "kb-beginner-program",
+    "diff": [
+      "Beginner",
+      "Intermediate"
+    ],
+    "equip": null,
+    "tag": "Get Strong. Get Lean. Get After It.",
+    "dpw": 3,
+    "weeks": 6,
+    "ok": true,
+    "c": [
+      "hyper",
+      "fitness"
+    ],
+    "src": "local",
+    "name": "kb-beginner-program",
+    "url": ""
+  },
+  {
+    "t": "Kristen Dunsmore Beginner Program",
+    "a": "Kristen Dunsmore",
+    "slug": "kristen-dunsmore-beginner-program",
+    "diff": [
+      "Beginner",
+      "Intermediate"
+    ],
+    "equip": null,
+    "tag": "For new lifters who want to combine foundational strength training with planned cardio workouts.",
+    "dpw": 1,
+    "weeks": 0,
+    "ok": true,
+    "c": [
+      "strength"
+    ],
+    "src": "local",
+    "name": "kristen-dunsmore-beginner-program",
+    "url": ""
+  },
+  {
+    "t": "Kristen Dunsmore Intermediate Program",
+    "a": "Kristen Dunsmore",
+    "slug": "kristen-dunsmore-intermediate-program",
+    "diff": [
+      "Intermediate"
+    ],
+    "equip": null,
+    "tag": "12 week powerlifting program for novice & intermediate lifters to gain strength and peak for a meet.",
+    "dpw": 1,
+    "weeks": 0,
+    "ok": true,
+    "c": [
+      "strength"
+    ],
+    "src": "local",
+    "name": "kristen-dunsmore-intermediate-program",
+    "url": ""
+  },
+  {
+    "t": "LizTess Advanced Powerlifting Program",
+    "a": "Aliza Tessler (@liztess)",
+    "slug": "liztess-advanced-powerlifting-program",
+    "diff": [
+      "Intermediate",
+      "Advanced"
+    ],
+    "equip": null,
+    "tag": "Build muscle, gain strength, and peak for new PRs with this structured 12-week powerlifting program. Progress with purpose—lift heavy, lift smart.",
+    "dpw": 1,
+    "weeks": 0,
+    "ok": true,
+    "c": [
+      "strength"
+    ],
+    "src": "local",
+    "name": "liztess-advanced-powerlifting-program",
+    "url": ""
+  },
+  {
+    "t": "Intermediate Block Periodization Oly Program",
+    "a": "Dr. Kyle Pierce of LSUS Weightlifting",
+    "slug": "lsus-intermediate-weightlifting-program",
+    "diff": [
+      "Intermediate"
+    ],
+    "equip": null,
+    "tag": "For intermediate Olympic lifters looking to continue building strength and technique",
+    "dpw": 1,
+    "weeks": 0,
+    "ok": true,
+    "c": [
+      "strength"
+    ],
+    "src": "local",
+    "name": "lsus-intermediate-weightlifting-program",
+    "url": ""
+  },
+  {
+    "t": "M&S 5 Day Dumbbell Program",
+    "a": "r/Fitness",
+    "slug": "m-s-5-day-dumbbell-only-program",
+    "diff": [
+      "Intermediate"
+    ],
+    "equip": null,
+    "tag": "This 5 day dumbbell only workout split only requires dumbbells for building muscle.",
+    "dpw": 1,
+    "weeks": 0,
+    "ok": true,
+    "c": [
+      "hyper",
+      "fitness"
+    ],
+    "src": "local",
+    "name": "m-s-5-day-dumbbell-only-program",
+    "url": ""
+  },
+  {
+    "t": "M&S 6 Day Dumbbell Program",
+    "a": "r/Fitness",
+    "slug": "m-s-5-day-dumbbell-program",
+    "diff": [
+      "Intermediate",
+      "Advanced"
+    ],
+    "equip": null,
+    "tag": "This 6 day dumbbell workout split only requires dumbbells for building muscle.",
+    "dpw": 1,
+    "weeks": 0,
+    "ok": true,
+    "c": [
+      "hyper",
+      "fitness"
+    ],
+    "src": "local",
+    "name": "m-s-5-day-dumbbell-program",
+    "url": ""
+  },
+  {
+    "t": "MASS IMPACT",
+    "a": "Geoffrey Verity Schofield",
+    "slug": "mass-impact",
+    "diff": [
+      "Intermediate",
+      "Advanced"
+    ],
+    "equip": null,
+    "tag": "Geoff Verity Schofield's PPLPP Program to Get MASSIVE FAST",
+    "dpw": 1,
+    "weeks": 0,
+    "ok": true,
+    "c": [
+      "hyper"
+    ],
+    "src": "local",
+    "name": "mass-impact",
+    "url": ""
+  },
+  {
+    "t": "Matt Vena Intermediate Powerlifting Program",
+    "a": "Matt Vena",
+    "slug": "matt-vena-intermediate-powerlifting-program",
+    "diff": [
+      "Intermediate"
+    ],
+    "equip": null,
+    "tag": "From Canadian champion powerlifter and elite coach Matt Vena",
+    "dpw": 1,
+    "weeks": 0,
+    "ok": true,
+    "c": [
+      "strength"
+    ],
+    "src": "local",
+    "name": "matt-vena-intermediate-powerlifting-program",
+    "url": ""
+  },
+  {
+    "t": "Meathook",
+    "a": "Mark Rosenberg",
+    "slug": "meathook",
+    "diff": [
+      "Intermediate",
+      "Advanced"
+    ],
+    "equip": null,
+    "tag": "Deadliestlift's all purpose training program for hypertrophy and strength",
+    "dpw": 1,
+    "weeks": 0,
+    "ok": true,
+    "c": [
+      "hyper"
+    ],
+    "src": "local",
+    "name": "meathook",
+    "url": ""
+  },
+  {
+    "t": "Mike Mentzer Heavy Duty Training Program",
+    "a": "Mike Mentzer",
+    "slug": "mike-mentzer-heavy-duty-training-program",
+    "diff": [
+      "Intermediate",
+      "Advanced"
+    ],
+    "equip": null,
+    "tag": "Mike Mentzer's preferred training program from his book Heavy Duty",
+    "dpw": 1,
+    "weeks": 0,
+    "ok": true,
+    "c": [
+      "hyper"
+    ],
+    "src": "local",
+    "name": "mike-mentzer-heavy-duty-training-program",
+    "url": ""
+  },
+  {
+    "t": "Mike Tyson Inspired At-Home Training Program",
+    "a": "Paris Demers",
+    "slug": "mike-tyson-inspired-at-home-training-program",
+    "diff": [
+      "Beginner",
+      "Intermediate"
+    ],
+    "equip": null,
+    "tag": "A quick and efficient at-home training plan you can quickly do anywhere and anytime.",
+    "dpw": 4,
+    "weeks": 8,
+    "ok": true,
+    "c": [
+      "fitness"
+    ],
+    "free": true,
+    "src": "local",
+    "name": "mike-tyson-inspired-at-home-training-program",
+    "url": ""
+  },
+  {
+    "t": "Bodybuilding Minimum Effective Dose Program",
+    "a": "Dr. Pak",
+    "slug": "minimum-effective-dose-hypertrophy-program",
+    "diff": [
+      "Beginner",
+      "Intermediate",
+      "Advanced"
+    ],
+    "equip": null,
+    "tag": "For people who care about building muscle but don't have time with \"optimal\" training volumes.",
+    "dpw": 1,
+    "weeks": 0,
+    "ok": true,
+    "c": [
+      "hyper"
+    ],
+    "src": "local",
+    "name": "minimum-effective-dose-hypertrophy-program",
+    "url": ""
+  },
+  {
+    "t": "10 Week Mass Building Program",
+    "a": "Muscle & Strength",
+    "slug": "ms-10-week-mass-building-program",
+    "src": "local",
+    "url": "https://www.muscleandstrength.com/workouts/10-week-mass-building-program",
+    "diff": [],
+    "equip": null,
+    "tag": "4 días por semana · 1 semana · Rutina publicada en Muscle & Strength",
+    "dpw": 4,
+    "weeks": 1,
+    "ok": true,
+    "c": [
+      "hyper"
+    ],
+    "name": "ms-10-week-mass-building-program"
+  },
+  {
+    "t": "10 Week Upper/Lower Workout Program for Women",
+    "a": "Muscle & Strength",
+    "slug": "ms-10-week-upper-lower-workout-for-women",
+    "src": "local",
+    "url": "https://www.muscleandstrength.com/workouts/10-week-upper-lower-workout-for-women",
+    "diff": [],
+    "equip": null,
+    "tag": "4 días por semana · 1 semana · Rutina publicada en Muscle & Strength",
+    "dpw": 4,
+    "weeks": 1,
+    "ok": true,
+    "c": [
+      "hyper"
+    ],
+    "name": "ms-10-week-upper-lower-workout-for-women"
+  },
+  {
+    "t": "12 Week Full Body Workout Routine for Beginners",
+    "a": "Muscle & Strength",
+    "slug": "ms-12-week-beginners-training-routine",
+    "src": "local",
+    "url": "https://www.muscleandstrength.com/workouts/12-week-beginners-training-routine",
+    "diff": [
+      "Beginner"
+    ],
+    "equip": null,
+    "tag": "4 días por semana · 1 semana · Rutina publicada en Muscle & Strength",
+    "dpw": 4,
+    "weeks": 1,
+    "ok": true,
+    "c": [
+      "fitness",
+      "hyper"
+    ],
+    "name": "ms-12-week-beginners-training-routine"
+  },
+  {
+    "t": "Kettlebell Ab Workout: 12 Week Progression for Increased Core Strength",
+    "a": "Muscle & Strength",
+    "slug": "ms-12-week-kettlebell-ab-workout",
+    "src": "local",
+    "url": "https://www.muscleandstrength.com/workouts/12-week-kettlebell-ab-workout",
+    "diff": [],
+    "equip": null,
+    "tag": "1 día por semana · 1 semana · Rutina publicada en Muscle & Strength",
+    "dpw": 1,
+    "weeks": 1,
+    "ok": true,
+    "c": [
+      "strength"
+    ],
+    "name": "ms-12-week-kettlebell-ab-workout"
+  },
+  {
+    "t": "The BodyMorph: 12 Week Transformation Workout to Help You Build Muscle",
+    "a": "Muscle & Strength",
+    "slug": "ms-12-week-total-transformation-workout",
+    "src": "local",
+    "url": "https://www.muscleandstrength.com/workouts/12-week-total-transformation-workout",
+    "diff": [],
+    "equip": null,
+    "tag": "3 días por semana · 1 semana · Rutina publicada en Muscle & Strength",
+    "dpw": 3,
+    "weeks": 1,
+    "ok": true,
+    "c": [
+      "hyper"
+    ],
+    "name": "ms-12-week-total-transformation-workout"
+  },
+  {
+    "t": "2 Day Simple A/B Split by Steve",
+    "a": "Muscle & Strength",
+    "slug": "ms-2-day-simple-ab-split-by-steve",
+    "src": "local",
+    "url": "https://www.muscleandstrength.com/workouts/2-day-simple-ab-split-by-steve",
+    "diff": [
+      "Beginner"
+    ],
+    "equip": null,
+    "tag": "1 día por semana · 1 semana · Rutina publicada en Muscle & Strength",
+    "dpw": 1,
+    "weeks": 1,
+    "ok": true,
+    "c": [
+      "fitness"
+    ],
+    "name": "ms-2-day-simple-ab-split-by-steve"
+  },
+  {
+    "t": "2014 Minutes To A Better Body: 8 Week Fast Start Plan",
+    "a": "Muscle & Strength",
+    "slug": "ms-2014-minutes-better-body-fast-start-plan",
+    "src": "local",
+    "url": "https://www.muscleandstrength.com/workouts/2014-minutes-better-body-fast-start-plan",
+    "diff": [
+      "Beginner"
+    ],
+    "equip": null,
+    "tag": "1 día por semana · 1 semana · Rutina publicada en Muscle & Strength",
+    "dpw": 1,
+    "weeks": 1,
+    "ok": true,
+    "c": [
+      "fitness"
+    ],
+    "name": "ms-2014-minutes-better-body-fast-start-plan"
+  },
+  {
+    "t": "3 Day Full Body Women's Dumbbell Only Workout",
+    "a": "Muscle & Strength",
+    "slug": "ms-3-day-dumbbell-only-workout-for-women",
+    "src": "local",
+    "url": "https://www.muscleandstrength.com/workouts/3-day-dumbbell-only-workout-for-women",
+    "diff": [],
+    "equip": null,
+    "tag": "3 días por semana · 1 semana · Rutina publicada en Muscle & Strength",
+    "dpw": 3,
+    "weeks": 1,
+    "ok": true,
+    "c": [
+      "hyper"
+    ],
+    "name": "ms-3-day-dumbbell-only-workout-for-women"
+  },
+  {
+    "t": "Dumbbell Only Workout: 3 Day Full Body Dumbbell Workout",
+    "a": "Muscle & Strength",
+    "slug": "ms-3-day-full-body-dumbbell-workout",
+    "src": "local",
+    "url": "https://www.muscleandstrength.com/workouts/3-day-full-body-dumbbell-workout",
+    "diff": [
+      "Beginner"
+    ],
+    "equip": null,
+    "tag": "3 días por semana · 1 semana · Rutina publicada en Muscle & Strength",
+    "dpw": 3,
+    "weeks": 1,
+    "ok": true,
+    "c": [
+      "fitness",
+      "hyper"
+    ],
+    "name": "ms-3-day-full-body-dumbbell-workout"
+  },
+  {
+    "t": "3 Day Full Body Beginner Kettlebell Workout",
+    "a": "Muscle & Strength",
+    "slug": "ms-3-day-full-body-kettlebell-workout",
+    "src": "local",
+    "url": "https://www.muscleandstrength.com/workouts/3-day-full-body-kettlebell-workout",
+    "diff": [
+      "Beginner"
+    ],
+    "equip": null,
+    "tag": "3 días por semana · 1 semana · Rutina publicada en Muscle & Strength",
+    "dpw": 3,
+    "weeks": 1,
+    "ok": true,
+    "c": [
+      "fitness"
+    ],
+    "name": "ms-3-day-full-body-kettlebell-workout"
+  },
+  {
+    "t": "3 Day Full Body Planet Fitness Workout (Machines & Dumbbells Only)",
+    "a": "Muscle & Strength",
+    "slug": "ms-3-day-full-body-planet-fitness-workout",
+    "src": "local",
+    "url": "https://www.muscleandstrength.com/workouts/3-day-full-body-planet-fitness-workout",
+    "diff": [
+      "Beginner"
+    ],
+    "equip": null,
+    "tag": "3 días por semana · 1 semana · Rutina publicada en Muscle & Strength",
+    "dpw": 3,
+    "weeks": 1,
+    "ok": true,
+    "c": [
+      "fitness",
+      "hyper"
+    ],
+    "name": "ms-3-day-full-body-planet-fitness-workout"
+  },
+  {
+    "t": "3 Day Push/Pull/Legs (PPL) Workout for Beginners",
+    "a": "Muscle & Strength",
+    "slug": "ms-3-day-ppl-workout-for-beginners",
+    "src": "local",
+    "url": "https://www.muscleandstrength.com/workouts/3-day-PPL-workout-for-beginners",
+    "diff": [
+      "Beginner"
+    ],
+    "equip": null,
+    "tag": "3 días por semana · 1 semana · Rutina publicada en Muscle & Strength",
+    "dpw": 3,
+    "weeks": 1,
+    "ok": true,
+    "c": [
+      "fitness",
+      "strength",
+      "hyper"
+    ],
+    "name": "ms-3-day-ppl-workout-for-beginners"
+  },
+  {
+    "t": "3 Day Workout Routine and Diet for Beginners",
+    "a": "Muscle & Strength",
+    "slug": "ms-3-day-workout-routine-and-diet-for-beginners",
+    "src": "local",
+    "url": "https://www.muscleandstrength.com/workouts/3-day-workout-routine-and-diet-for-beginners",
+    "diff": [
+      "Beginner"
+    ],
+    "equip": null,
+    "tag": "1 día por semana · 1 semana · Rutina publicada en Muscle & Strength",
+    "dpw": 1,
+    "weeks": 1,
+    "ok": true,
+    "c": [
+      "fitness"
+    ],
+    "name": "ms-3-day-workout-routine-and-diet-for-beginners"
+  },
+  {
+    "t": "Introduction To Bodybuilding Workout",
+    "a": "Muscle & Strength",
+    "slug": "ms-3-introduction-to-bodybuilding-workout",
+    "src": "local",
+    "url": "https://www.muscleandstrength.com/workouts/3-introduction-to-bodybuilding-workout",
+    "diff": [
+      "Beginner"
+    ],
+    "equip": null,
+    "tag": "1 día por semana · 1 semana · Rutina publicada en Muscle & Strength",
+    "dpw": 1,
+    "weeks": 1,
+    "ok": true,
+    "c": [
+      "fitness"
+    ],
+    "name": "ms-3-introduction-to-bodybuilding-workout"
+  },
+  {
+    "t": "3 Week NFL Combine Bench Press Program",
+    "a": "Muscle & Strength",
+    "slug": "ms-3-week-nfl-combine-bench-press-program",
+    "src": "local",
+    "url": "https://www.muscleandstrength.com/workouts/3-week-nfl-combine-bench-press-program",
+    "diff": [],
+    "equip": null,
+    "tag": "1 día por semana · 1 semana · Rutina publicada en Muscle & Strength",
+    "dpw": 1,
+    "weeks": 1,
+    "ok": true,
+    "c": [
+      "endurance"
+    ],
+    "name": "ms-3-week-nfl-combine-bench-press-program"
+  },
+  {
+    "t": "Beginner Shoulder Workout",
+    "a": "Muscle & Strength",
+    "slug": "ms-34-beginner-shoulder-workout",
+    "src": "local",
+    "url": "https://www.muscleandstrength.com/workouts/34-beginner-shoulder-workout",
+    "diff": [
+      "Beginner"
+    ],
+    "equip": null,
+    "tag": "1 día por semana · 1 semana · Rutina publicada en Muscle & Strength",
+    "dpw": 1,
+    "weeks": 1,
+    "ok": true,
+    "c": [
+      "fitness"
+    ],
+    "name": "ms-34-beginner-shoulder-workout"
+  },
+  {
+    "t": "Beginner Tricep Workout",
+    "a": "Muscle & Strength",
+    "slug": "ms-37-beginner-tricep-workout",
+    "src": "local",
+    "url": "https://www.muscleandstrength.com/workouts/37-beginner-tricep-workout",
+    "diff": [
+      "Beginner"
+    ],
+    "equip": null,
+    "tag": "1 día por semana · 1 semana · Rutina publicada en Muscle & Strength",
+    "dpw": 1,
+    "weeks": 1,
+    "ok": true,
+    "c": [
+      "fitness"
+    ],
+    "name": "ms-37-beginner-tricep-workout"
+  },
+  {
+    "t": "Beginner Bicep Workout",
+    "a": "Muscle & Strength",
+    "slug": "ms-39-beginner-bicep-workout",
+    "src": "local",
+    "url": "https://www.muscleandstrength.com/workouts/39-beginner-bicep-workout",
+    "diff": [
+      "Beginner"
+    ],
+    "equip": null,
+    "tag": "1 día por semana · 1 semana · Rutina publicada en Muscle & Strength",
+    "dpw": 1,
+    "weeks": 1,
+    "ok": true,
+    "c": [
+      "fitness"
+    ],
+    "name": "ms-39-beginner-bicep-workout"
+  },
+  {
+    "t": "3 Day Muscle Building Workout For Beginners",
+    "a": "Muscle & Strength",
+    "slug": "ms-3day-beginners-workout",
+    "src": "local",
+    "url": "https://www.muscleandstrength.com/workouts/3day-beginners-workout",
+    "diff": [
+      "Beginner"
+    ],
+    "equip": null,
+    "tag": "3 días por semana · 1 semana · Rutina publicada en Muscle & Strength",
+    "dpw": 3,
+    "weeks": 1,
+    "ok": true,
+    "c": [
+      "fitness",
+      "hyper"
+    ],
+    "name": "ms-3day-beginners-workout"
+  },
+  {
+    "t": "4-5 Day Workout for Building Muscle & Strength",
+    "a": "Muscle & Strength",
+    "slug": "ms-4-5-day-workout-for-building-muscle-and-strength",
+    "src": "local",
+    "url": "https://www.muscleandstrength.com/workouts/4-5-day-workout-for-building-muscle-and-strength",
+    "diff": [],
+    "equip": null,
+    "tag": "5 días por semana · 1 semana · Rutina publicada en Muscle & Strength",
+    "dpw": 5,
+    "weeks": 1,
+    "ok": true,
+    "c": [
+      "strength"
+    ],
+    "name": "ms-4-5-day-workout-for-building-muscle-and-strength"
+  },
+  {
+    "t": "4 Day Advanced Upper/Lower Workout Program to Build Mass",
+    "a": "Muscle & Strength",
+    "slug": "ms-4-day-advanced-upper-lower-workout-program-to-build-mass",
+    "src": "local",
+    "url": "https://www.muscleandstrength.com/workouts/4-day-advanced-upper-lower-workout-program-to-build-mass",
+    "diff": [],
+    "equip": null,
+    "tag": "4 días por semana · 1 semana · Rutina publicada en Muscle & Strength",
+    "dpw": 4,
+    "weeks": 1,
+    "ok": true,
+    "c": [
+      "hyper"
+    ],
+    "name": "ms-4-day-advanced-upper-lower-workout-program-to-build-mass"
+  },
+  {
+    "t": "4 Day Barbell Only Workout (No Rack Required)",
+    "a": "Muscle & Strength",
+    "slug": "ms-4-day-barbell-only-workout",
+    "src": "local",
+    "url": "https://www.muscleandstrength.com/workouts/4-day-barbell-only-workout",
+    "diff": [],
+    "equip": null,
+    "tag": "4 días por semana · 1 semana · Rutina publicada en Muscle & Strength",
+    "dpw": 4,
+    "weeks": 1,
+    "ok": true,
+    "c": [
+      "strength"
+    ],
+    "name": "ms-4-day-barbell-only-workout"
+  },
+  {
+    "t": "4 Day Maximum Mass Workout",
+    "a": "Muscle & Strength",
+    "slug": "ms-4-day-maximum-mass-workout",
+    "src": "local",
+    "url": "https://www.muscleandstrength.com/workouts/4-day-maximum-mass-workout",
+    "diff": [],
+    "equip": null,
+    "tag": "4 días por semana · 1 semana · Rutina publicada en Muscle & Strength",
+    "dpw": 4,
+    "weeks": 1,
+    "ok": true,
+    "c": [
+      "hyper"
+    ],
+    "name": "ms-4-day-maximum-mass-workout"
+  },
+  {
+    "t": "4 Day Power Muscle Burn Workout Split",
+    "a": "Muscle & Strength",
+    "slug": "ms-4-day-power-muscle-burn-workout-split",
+    "src": "local",
+    "url": "https://www.muscleandstrength.com/workouts/4-day-power-muscle-burn-workout-split",
+    "diff": [],
+    "equip": null,
+    "tag": "4 días por semana · 1 semana · Rutina publicada en Muscle & Strength",
+    "dpw": 4,
+    "weeks": 1,
+    "ok": true,
+    "c": [
+      "hyper"
+    ],
+    "name": "ms-4-day-power-muscle-burn-workout-split"
+  },
+  {
+    "t": "4 Day Muscle Building Workout: PPL Split w/ V Taper Intensifier",
+    "a": "Muscle & Strength",
+    "slug": "ms-4-day-ppl-and-v-taper-intensifier-workout",
+    "src": "local",
+    "url": "https://www.muscleandstrength.com/workouts/4-day-ppl-and-v-taper-intensifier-workout",
+    "diff": [],
+    "equip": null,
+    "tag": "4 días por semana · 1 semana · Rutina publicada en Muscle & Strength",
+    "dpw": 4,
+    "weeks": 1,
+    "ok": true,
+    "c": [
+      "hyper"
+    ],
+    "name": "ms-4-day-ppl-and-v-taper-intensifier-workout"
+  },
+  {
+    "t": "4 Day Upper/Lower Planet Fitness Workout (Machine & Dumbbell Only)",
+    "a": "Muscle & Strength",
+    "slug": "ms-4-day-upper-lower-planet-fitness-workout",
+    "src": "local",
+    "url": "https://www.muscleandstrength.com/workouts/4-day-upper-lower-planet-fitness-workout",
+    "diff": [
+      "Beginner"
+    ],
+    "equip": null,
+    "tag": "4 días por semana · 1 semana · Rutina publicada en Muscle & Strength",
+    "dpw": 4,
+    "weeks": 1,
+    "ok": true,
+    "c": [
+      "fitness"
+    ],
+    "name": "ms-4-day-upper-lower-planet-fitness-workout"
+  },
+  {
+    "t": "5 Day Body Part Split Planet Fitness Workout",
+    "a": "Muscle & Strength",
+    "slug": "ms-5-day-body-part-split-planet-fitness-workout",
+    "src": "local",
+    "url": "https://www.muscleandstrength.com/workouts/5-day-body-part-split-planet-fitness-workout",
+    "diff": [
+      "Beginner"
+    ],
+    "equip": null,
+    "tag": "5 días por semana · 1 semana · Rutina publicada en Muscle & Strength",
+    "dpw": 5,
+    "weeks": 1,
+    "ok": true,
+    "c": [
+      "fitness"
+    ],
+    "name": "ms-5-day-body-part-split-planet-fitness-workout"
+  },
+  {
+    "t": "5 Day Muscle & Strength Building Workout Split",
+    "a": "Muscle & Strength",
+    "slug": "ms-5-day-muscle-and-strength-building-workout-split",
+    "src": "local",
+    "url": "https://www.muscleandstrength.com/workouts/5-day-muscle-and-strength-building-workout-split",
+    "diff": [],
+    "equip": null,
+    "tag": "6 días por semana · 1 semana · Rutina publicada en Muscle & Strength",
+    "dpw": 6,
+    "weeks": 1,
+    "ok": true,
+    "c": [
+      "hyper"
+    ],
+    "name": "ms-5-day-muscle-and-strength-building-workout-split"
+  },
+  {
+    "t": "Dumbbell Only Workout: 6 Day Dumbbell Workout Split",
+    "a": "Muscle & Strength",
+    "slug": "ms-6-day-dumbbell-only-workout",
+    "src": "local",
+    "url": "https://www.muscleandstrength.com/workouts/6-day-dumbbell-only-workout",
+    "diff": [],
+    "equip": null,
+    "tag": "6 días por semana · 1 semana · Rutina publicada en Muscle & Strength",
+    "dpw": 6,
+    "weeks": 1,
+    "ok": true,
+    "c": [
+      "hyper"
+    ],
+    "name": "ms-6-day-dumbbell-only-workout"
+  },
+  {
+    "t": "6 Day Push/Pull/Legs (PPL) Powerbuilding Workout Split & Meal Plan",
+    "a": "Muscle & Strength",
+    "slug": "ms-6-day-powerbuilding-split-meal-plan",
+    "src": "local",
+    "url": "https://www.muscleandstrength.com/workouts/6-day-powerbuilding-split-meal-plan",
+    "diff": [],
+    "equip": null,
+    "tag": "6 días por semana · 1 semana · Rutina publicada en Muscle & Strength",
+    "dpw": 6,
+    "weeks": 1,
+    "ok": true,
+    "c": [
+      "strength"
+    ],
+    "name": "ms-6-day-powerbuilding-split-meal-plan"
+  },
+  {
+    "t": "6 Day Push/Pull/Legs Planet Fitness Workout",
+    "a": "Muscle & Strength",
+    "slug": "ms-6-day-push-pull-legs-planet-fitness-workout",
+    "src": "local",
+    "url": "https://www.muscleandstrength.com/workouts/6-day-push-pull-legs-planet-fitness-workout",
+    "diff": [
+      "Beginner"
+    ],
+    "equip": null,
+    "tag": "6 días por semana · 1 semana · Rutina publicada en Muscle & Strength",
+    "dpw": 6,
+    "weeks": 1,
+    "ok": true,
+    "c": [
+      "fitness"
+    ],
+    "name": "ms-6-day-push-pull-legs-planet-fitness-workout"
+  },
+  {
+    "t": "6 Week Navy Seal Workout Routine: Speed, Strength & Endurance",
+    "a": "Muscle & Strength",
+    "slug": "ms-6-week-navy-seal-workout-routine",
+    "src": "local",
+    "url": "https://www.muscleandstrength.com/workouts/6-week-navy-seal-workout-routine",
+    "diff": [],
+    "equip": null,
+    "tag": "4 días por semana · 1 semana · Rutina publicada en Muscle & Strength",
+    "dpw": 4,
+    "weeks": 1,
+    "ok": true,
+    "c": [
+      "strength"
+    ],
+    "name": "ms-6-week-navy-seal-workout-routine"
+  },
+  {
+    "t": "Lean Mass: 6 Week Workout Program to Build Lean Muscle",
+    "a": "Muscle & Strength",
+    "slug": "ms-6-week-workout-program-to-build-lean-muscle",
+    "src": "local",
+    "url": "https://www.muscleandstrength.com/workouts/6-week-workout-program-to-build-lean-muscle",
+    "diff": [],
+    "equip": null,
+    "tag": "4 días por semana · 1 semana · Rutina publicada en Muscle & Strength",
+    "dpw": 4,
+    "weeks": 1,
+    "ok": true,
+    "c": [
+      "hyper"
+    ],
+    "name": "ms-6-week-workout-program-to-build-lean-muscle"
+  },
+  {
+    "t": "8-Week Fat Loss Program for Adults 40+",
+    "a": "Muscle & Strength",
+    "slug": "ms-8-week-fat-loss-program-adults-40",
+    "src": "local",
+    "url": "https://www.muscleandstrength.com/workouts/8-week-fat-loss-program-adults-40",
+    "diff": [
+      "Beginner"
+    ],
+    "equip": null,
+    "tag": "3 días por semana · 1 semana · Rutina publicada en Muscle & Strength",
+    "dpw": 3,
+    "weeks": 1,
+    "ok": true,
+    "c": [
+      "fitness"
+    ],
+    "name": "ms-8-week-fat-loss-program-adults-40"
+  },
+  {
+    "t": "8 Week Mass Building Hypertrophy Workout",
+    "a": "Muscle & Strength",
+    "slug": "ms-8-week-hypertrophy-workout",
+    "src": "local",
+    "url": "https://www.muscleandstrength.com/workouts/8-week-hypertrophy-workout",
+    "diff": [],
+    "equip": null,
+    "tag": "1 día por semana · 1 semana · Rutina publicada en Muscle & Strength",
+    "dpw": 1,
+    "weeks": 1,
+    "ok": true,
+    "c": [
+      "hyper"
+    ],
+    "name": "ms-8-week-hypertrophy-workout"
+  },
+  {
+    "t": "8 Week Mass Building Workout for Beginners",
+    "a": "Muscle & Strength",
+    "slug": "ms-8-week-mass-building-workout-for-beginners",
+    "src": "local",
+    "url": "https://www.muscleandstrength.com/workouts/8-week-mass-building-workout-for-beginners",
+    "diff": [
+      "Beginner"
+    ],
+    "equip": null,
+    "tag": "4 días por semana · 1 semana · Rutina publicada en Muscle & Strength",
+    "dpw": 4,
+    "weeks": 1,
+    "ok": true,
+    "c": [
+      "fitness",
+      "hyper"
+    ],
+    "name": "ms-8-week-mass-building-workout-for-beginners"
+  },
+  {
+    "t": "8 Week Novice Quick Start Workout Plan",
+    "a": "Muscle & Strength",
+    "slug": "ms-8-week-novice-quick-start-workout-plan",
+    "src": "local",
+    "url": "https://www.muscleandstrength.com/workouts/8-week-novice-quick-start-workout-plan",
+    "diff": [
+      "Beginner"
+    ],
+    "equip": null,
+    "tag": "3 días por semana · 1 semana · Rutina publicada en Muscle & Strength",
+    "dpw": 3,
+    "weeks": 1,
+    "ok": true,
+    "c": [
+      "fitness"
+    ],
+    "name": "ms-8-week-novice-quick-start-workout-plan"
+  },
+  {
+    "t": "Super Strength: 8 Week Strength Building Workout for Beginners",
+    "a": "Muscle & Strength",
+    "slug": "ms-8-week-super-strength-workout",
+    "src": "local",
+    "url": "https://www.muscleandstrength.com/workouts/8-week-super-strength-workout",
+    "diff": [
+      "Beginner"
+    ],
+    "equip": null,
+    "tag": "5 días por semana · 1 semana · Rutina publicada en Muscle & Strength",
+    "dpw": 5,
+    "weeks": 1,
+    "ok": true,
+    "c": [
+      "fitness",
+      "strength",
+      "hyper"
+    ],
+    "name": "ms-8-week-super-strength-workout"
+  },
+  {
+    "t": "8 Week Beginner Fat Loss Workout for Women",
+    "a": "Muscle & Strength",
+    "slug": "ms-8-week-womens-beginner-fat-loss-workout",
+    "src": "local",
+    "url": "https://www.muscleandstrength.com/workouts/8-week-womens-beginner-fat-loss-workout",
+    "diff": [
+      "Beginner"
+    ],
+    "equip": null,
+    "tag": "4 días por semana · 1 semana · Rutina publicada en Muscle & Strength",
+    "dpw": 4,
+    "weeks": 1,
+    "ok": true,
+    "c": [
+      "fitness"
+    ],
+    "name": "ms-8-week-womens-beginner-fat-loss-workout"
+  },
+  {
+    "t": "8-Week Advanced Muscle Building Workout for Women",
+    "a": "Muscle & Strength",
+    "slug": "ms-advanced-muscle-building-workout-for-women",
+    "src": "local",
+    "url": "https://www.muscleandstrength.com/workouts/advanced-muscle-building-workout-for-women",
+    "diff": [],
+    "equip": null,
+    "tag": "4 días por semana · 1 semana · Rutina publicada en Muscle & Strength",
+    "dpw": 4,
+    "weeks": 1,
+    "ok": true,
+    "c": [
+      "hyper"
+    ],
+    "name": "ms-advanced-muscle-building-workout-for-women"
+  },
+  {
+    "t": "4-Day At-Home Glute Building Workout",
+    "a": "Muscle & Strength",
+    "slug": "ms-at-home-glute-building-program",
+    "src": "local",
+    "url": "https://www.muscleandstrength.com/workouts/at-home-glute-building-program",
+    "diff": [
+      "Beginner"
+    ],
+    "equip": null,
+    "tag": "4 días por semana · 1 semana · Rutina publicada en Muscle & Strength",
+    "dpw": 4,
+    "weeks": 1,
+    "ok": true,
+    "c": [
+      "fitness",
+      "hyper"
+    ],
+    "name": "ms-at-home-glute-building-program"
+  },
+  {
+    "t": "Batman Workout Routine: 14 Week Superhero Workout",
+    "a": "Muscle & Strength",
+    "slug": "ms-batman-workout-routine",
+    "src": "local",
+    "url": "https://www.muscleandstrength.com/workouts/batman-workout-routine",
+    "diff": [],
+    "equip": null,
+    "tag": "3 días por semana · 1 semana · Rutina publicada en Muscle & Strength",
+    "dpw": 3,
+    "weeks": 1,
+    "ok": true,
+    "c": [
+      "hyper"
+    ],
+    "name": "ms-batman-workout-routine"
+  },
+  {
+    "t": "Beef Up Your Bench Press 10x3 Workout Program",
+    "a": "Muscle & Strength",
+    "slug": "ms-beef-up-bench-press-10x3-workout-program",
+    "src": "local",
+    "url": "https://www.muscleandstrength.com/workouts/beef-up-bench-press-10x3-workout-program",
+    "diff": [],
+    "equip": null,
+    "tag": "1 día por semana · 1 semana · Rutina publicada en Muscle & Strength",
+    "dpw": 1,
+    "weeks": 1,
+    "ok": true,
+    "c": [
+      "strength"
+    ],
+    "name": "ms-beef-up-bench-press-10x3-workout-program"
+  },
+  {
+    "t": "8 Week Fat Loss Workout for Beginners",
+    "a": "Muscle & Strength",
+    "slug": "ms-beginner-fat-loss-workout",
+    "src": "local",
+    "url": "https://www.muscleandstrength.com/workouts/beginner-fat-loss-workout",
+    "diff": [
+      "Beginner"
+    ],
+    "equip": null,
+    "tag": "4 días por semana · 1 semana · Rutina publicada en Muscle & Strength",
+    "dpw": 4,
+    "weeks": 1,
+    "ok": true,
+    "c": [
+      "fitness"
+    ],
+    "name": "ms-beginner-fat-loss-workout"
+  },
+  {
+    "t": "Beginner Full-Body Workout",
+    "a": "Muscle & Strength",
+    "slug": "ms-beginner-fullbody-workout",
+    "src": "local",
+    "url": "https://www.muscleandstrength.com/workouts/beginner-fullbody-workout",
+    "diff": [
+      "Beginner"
+    ],
+    "equip": null,
+    "tag": "1 día por semana · 1 semana · Rutina publicada en Muscle & Strength",
+    "dpw": 1,
+    "weeks": 1,
+    "ok": true,
+    "c": [
+      "fitness",
+      "hyper"
+    ],
+    "name": "ms-beginner-fullbody-workout"
+  },
+  {
+    "t": "Long Cycle Beginner Muscle And Strength Building Workout",
+    "a": "Muscle & Strength",
+    "slug": "ms-beginner-long-cycle-muscle-strength-building-workout",
+    "src": "local",
+    "url": "https://www.muscleandstrength.com/workouts/beginner-long-cycle-muscle-strength-building-workout",
+    "diff": [
+      "Beginner"
+    ],
+    "equip": null,
+    "tag": "1 día por semana · 1 semana · Rutina publicada en Muscle & Strength",
+    "dpw": 1,
+    "weeks": 1,
+    "ok": true,
+    "c": [
+      "fitness",
+      "strength"
+    ],
+    "name": "ms-beginner-long-cycle-muscle-strength-building-workout"
+  },
+  {
+    "t": "Big and Strong: 8 Week Advanced Strength Building Workout",
+    "a": "Muscle & Strength",
+    "slug": "ms-big-and-strong-advanced-program",
+    "src": "local",
+    "url": "https://www.muscleandstrength.com/workouts/big-and-strong-advanced-program",
+    "diff": [],
+    "equip": null,
+    "tag": "5 días por semana · 1 semana · Rutina publicada en Muscle & Strength",
+    "dpw": 5,
+    "weeks": 1,
+    "ok": true,
+    "c": [
+      "strength"
+    ],
+    "name": "ms-big-and-strong-advanced-program"
+  },
+  {
+    "t": "Bill Starr 5x5 Linear Version For Intermediate Lifters",
+    "a": "Muscle & Strength",
+    "slug": "ms-bill-starr-5x5-linear-version-intermediate-lifters",
+    "src": "local",
+    "url": "https://www.muscleandstrength.com/workouts/bill-starr-5x5-linear-version-intermediate-lifters",
+    "diff": [],
+    "equip": null,
+    "tag": "1 día por semana · 1 semana · Rutina publicada en Muscle & Strength",
+    "dpw": 1,
+    "weeks": 1,
+    "ok": true,
+    "c": [
+      "strength"
+    ],
+    "name": "ms-bill-starr-5x5-linear-version-intermediate-lifters"
+  },
+  {
+    "t": "Body Like A God: A Complete Bodyweight Muscle Building Plan",
+    "a": "Muscle & Strength",
+    "slug": "ms-body-god-complete-bodyweight-muscle-building-plan",
+    "src": "local",
+    "url": "https://www.muscleandstrength.com/workouts/body-god-complete-bodyweight-muscle-building-plan",
+    "diff": [],
+    "equip": null,
+    "tag": "2 días por semana · 1 semana · Rutina publicada en Muscle & Strength",
+    "dpw": 2,
+    "weeks": 1,
+    "ok": true,
+    "c": [
+      "hyper"
+    ],
+    "name": "ms-body-god-complete-bodyweight-muscle-building-plan"
+  },
+  {
+    "t": "Bodyweight Basics: 3 Day Bodyweight Workout Plan",
+    "a": "Muscle & Strength",
+    "slug": "ms-bodyweight-basics-3-day-workout",
+    "src": "local",
+    "url": "https://www.muscleandstrength.com/workouts/bodyweight-basics-3-day-workout",
+    "diff": [
+      "Beginner"
+    ],
+    "equip": null,
+    "tag": "3 días por semana · 1 semana · Rutina publicada en Muscle & Strength",
+    "dpw": 3,
+    "weeks": 1,
+    "ok": true,
+    "c": [
+      "fitness"
+    ],
+    "name": "ms-bodyweight-basics-3-day-workout"
+  },
+  {
+    "t": "Boost Your Bench Press: The Ultimate Workout Plan to Increase Strength and Power",
+    "a": "Muscle & Strength",
+    "slug": "ms-boost-your-bench-press",
+    "src": "local",
+    "url": "https://www.muscleandstrength.com/workouts/boost-your-bench-press",
+    "diff": [],
+    "equip": null,
+    "tag": "5 días por semana · 1 semana · Rutina publicada en Muscle & Strength",
+    "dpw": 5,
+    "weeks": 1,
+    "ok": true,
+    "c": [
+      "strength",
+      "hyper"
+    ],
+    "name": "ms-boost-your-bench-press"
+  },
+  {
+    "t": "Brie Larson Inspired Workout: Train Like Captain Marvel",
+    "a": "Muscle & Strength",
+    "slug": "ms-brie-larson-workout-routine",
+    "src": "local",
+    "url": "https://www.muscleandstrength.com/workouts/brie-larson-workout-routine",
+    "diff": [],
+    "equip": null,
+    "tag": "4 días por semana · 1 semana · Rutina publicada en Muscle & Strength",
+    "dpw": 4,
+    "weeks": 1,
+    "ok": true,
+    "c": [
+      "strength"
+    ],
+    "name": "ms-brie-larson-workout-routine"
+  },
+  {
+    "t": "Bulldozer Training 3 Day Workout Split",
+    "a": "Muscle & Strength",
+    "slug": "ms-bulldozer-training-3-day-workout-split",
+    "src": "local",
+    "url": "https://www.muscleandstrength.com/workouts/bulldozer-training-3-day-workout-split",
+    "diff": [],
+    "equip": null,
+    "tag": "1 día por semana · 1 semana · Rutina publicada en Muscle & Strength",
+    "dpw": 1,
+    "weeks": 1,
+    "ok": true,
+    "c": [
+      "hyper"
+    ],
+    "name": "ms-bulldozer-training-3-day-workout-split"
+  },
+  {
+    "t": "The Conjugate System: Phase 1 of the Beginner Powerlifting Workout",
+    "a": "Muscle & Strength",
+    "slug": "ms-conjugate-system-beginner-powerlifting-workout-phase-1",
+    "src": "local",
+    "url": "https://www.muscleandstrength.com/workouts/conjugate-system-beginner-powerlifting-workout-phase-1",
+    "diff": [],
+    "equip": null,
+    "tag": "4 días por semana · 4 semanas · Rutina publicada en Muscle & Strength",
+    "dpw": 4,
+    "weeks": 4,
+    "ok": true,
+    "c": [
+      "strength"
+    ],
+    "name": "ms-conjugate-system-beginner-powerlifting-workout-phase-1"
+  },
+  {
+    "t": "The Conjugate System: Phase 3 of the Beginner Powerlifting Workout",
+    "a": "Muscle & Strength",
+    "slug": "ms-conjugate-system-beginner-powerlifting-workout-phase-3",
+    "src": "local",
+    "url": "https://www.muscleandstrength.com/workouts/conjugate-system-beginner-powerlifting-workout-phase-3",
+    "diff": [],
+    "equip": null,
+    "tag": "4 días por semana · 4 semanas · Rutina publicada en Muscle & Strength",
+    "dpw": 4,
+    "weeks": 4,
+    "ok": true,
+    "c": [
+      "strength"
+    ],
+    "name": "ms-conjugate-system-beginner-powerlifting-workout-phase-3"
+  },
+  {
+    "t": "5-Day Deadlift Workout Program for Max Strength",
+    "a": "Muscle & Strength",
+    "slug": "ms-deadlift-specialization-program",
+    "src": "local",
+    "url": "https://www.muscleandstrength.com/workouts/deadlift-specialization-program",
+    "diff": [],
+    "equip": null,
+    "tag": "5 días por semana · 1 semana · Rutina publicada en Muscle & Strength",
+    "dpw": 5,
+    "weeks": 1,
+    "ok": true,
+    "c": [
+      "strength"
+    ],
+    "name": "ms-deadlift-specialization-program"
+  },
+  {
+    "t": "Dumbbell & Barbell Mass Workout",
+    "a": "Muscle & Strength",
+    "slug": "ms-dumbbell-barbell-mass-workout",
+    "src": "local",
+    "url": "https://www.muscleandstrength.com/workouts/dumbbell-barbell-mass-workout",
+    "diff": [],
+    "equip": null,
+    "tag": "5 días por semana · 1 semana · Rutina publicada en Muscle & Strength",
+    "dpw": 5,
+    "weeks": 1,
+    "ok": true,
+    "c": [
+      "hyper"
+    ],
+    "name": "ms-dumbbell-barbell-mass-workout"
+  },
+  {
+    "t": "Dumbbell Only Workout: Increase Your Bench Press in 8 Weeks",
+    "a": "Muscle & Strength",
+    "slug": "ms-dumbbell-only-bench-press-workout",
+    "src": "local",
+    "url": "https://www.muscleandstrength.com/workouts/dumbbell-only-bench-press-workout",
+    "diff": [],
+    "equip": null,
+    "tag": "5 días por semana · 1 semana · Rutina publicada en Muscle & Strength",
+    "dpw": 5,
+    "weeks": 1,
+    "ok": true,
+    "c": [
+      "hyper"
+    ],
+    "name": "ms-dumbbell-only-bench-press-workout"
+  },
+  {
+    "t": "Dumbbell Only Home Or Gym Full Body Workout",
+    "a": "Muscle & Strength",
+    "slug": "ms-dumbbell-only-home-or-gym-fullbody-workout",
+    "src": "local",
+    "url": "https://www.muscleandstrength.com/workouts/dumbbell-only-home-or-gym-fullbody-workout",
+    "diff": [],
+    "equip": null,
+    "tag": "3 días por semana · 1 semana · Rutina publicada en Muscle & Strength",
+    "dpw": 3,
+    "weeks": 1,
+    "ok": true,
+    "c": [
+      "hyper"
+    ],
+    "name": "ms-dumbbell-only-home-or-gym-fullbody-workout"
+  },
+  {
+    "t": "Dumbbell Only Workout: 4 Day Upper/Lower Dumbbell Workout Routine",
+    "a": "Muscle & Strength",
+    "slug": "ms-dumbbell-only-upper-lower-workout-routine",
+    "src": "local",
+    "url": "https://www.muscleandstrength.com/workouts/dumbbell-only-upper-lower-workout-routine",
+    "diff": [],
+    "equip": null,
+    "tag": "4 días por semana · 1 semana · Rutina publicada en Muscle & Strength",
+    "dpw": 4,
+    "weeks": 1,
+    "ok": true,
+    "c": [
+      "hyper"
+    ],
+    "name": "ms-dumbbell-only-upper-lower-workout-routine"
+  },
+  {
+    "t": "The Ex-Hardgainer Workout And Eating Plan",
+    "a": "Muscle & Strength",
+    "slug": "ms-ex-hardgainer-workout-eating-plan",
+    "src": "local",
+    "url": "https://www.muscleandstrength.com/workouts/ex-hardgainer-workout-eating-plan",
+    "diff": [
+      "Beginner"
+    ],
+    "equip": null,
+    "tag": "1 día por semana · 1 semana · Rutina publicada en Muscle & Strength",
+    "dpw": 1,
+    "weeks": 1,
+    "ok": true,
+    "c": [
+      "fitness"
+    ],
+    "name": "ms-ex-hardgainer-workout-eating-plan"
+  },
+  {
+    "t": "Fight to be Fit Training Program",
+    "a": "Muscle & Strength",
+    "slug": "ms-fight-to-be-fit-workout",
+    "src": "local",
+    "url": "https://www.muscleandstrength.com/workouts/fight-to-be-fit-workout",
+    "diff": [],
+    "equip": null,
+    "tag": "2 días por semana · 1 semana · Rutina publicada en Muscle & Strength",
+    "dpw": 2,
+    "weeks": 1,
+    "ok": true,
+    "c": [
+      "endurance"
+    ],
+    "name": "ms-fight-to-be-fit-workout"
+  },
+  {
+    "t": "3 Day Whole Body Football Strength Workout",
+    "a": "Muscle & Strength",
+    "slug": "ms-football-strength-workout",
+    "src": "local",
+    "url": "https://www.muscleandstrength.com/workouts/football-strength-workout",
+    "diff": [],
+    "equip": null,
+    "tag": "1 día por semana · 1 semana · Rutina publicada en Muscle & Strength",
+    "dpw": 1,
+    "weeks": 1,
+    "ok": true,
+    "c": [
+      "endurance"
+    ],
+    "name": "ms-football-strength-workout"
+  },
+  {
+    "t": "Full Body Kettlebell at Home (or Anywhere) Circuit Workout",
+    "a": "Muscle & Strength",
+    "slug": "ms-full-body-kettlebell-circuit-workout",
+    "src": "local",
+    "url": "https://www.muscleandstrength.com/workouts/full-body-kettlebell-circuit-workout",
+    "diff": [
+      "Beginner"
+    ],
+    "equip": null,
+    "tag": "1 día por semana · 1 semana · Rutina publicada en Muscle & Strength",
+    "dpw": 1,
+    "weeks": 1,
+    "ok": true,
+    "c": [
+      "fitness"
+    ],
+    "name": "ms-full-body-kettlebell-circuit-workout"
+  },
+  {
+    "t": "Hollywood Muscle: Henry Cavill Inspired Workout Routine",
+    "a": "Muscle & Strength",
+    "slug": "ms-henry-cavill-workout",
+    "src": "local",
+    "url": "https://www.muscleandstrength.com/workouts/henry-cavill-workout",
+    "diff": [],
+    "equip": null,
+    "tag": "4 días por semana · 1 semana · Rutina publicada en Muscle & Strength",
+    "dpw": 4,
+    "weeks": 1,
+    "ok": true,
+    "c": [
+      "strength"
+    ],
+    "name": "ms-henry-cavill-workout"
+  },
+  {
+    "t": "Basketball Workouts: In-Season Workout Routine for Players",
+    "a": "Muscle & Strength",
+    "slug": "ms-in-season-workout-routine-for-basketball-players",
+    "src": "local",
+    "url": "https://www.muscleandstrength.com/workouts/in-season-workout-routine-for-basketball-players",
+    "diff": [],
+    "equip": null,
+    "tag": "2 días por semana · 1 semana · Rutina publicada en Muscle & Strength",
+    "dpw": 2,
+    "weeks": 1,
+    "ok": true,
+    "c": [
+      "endurance"
+    ],
+    "name": "ms-in-season-workout-routine-for-basketball-players"
+  },
+  {
+    "t": "Intermediate Boxing/MMA Workout",
+    "a": "Muscle & Strength",
+    "slug": "ms-intermediate-boxing-mma-workout",
+    "src": "local",
+    "url": "https://www.muscleandstrength.com/workouts/intermediate-boxing-mma-workout",
+    "diff": [],
+    "equip": null,
+    "tag": "2 días por semana · 1 semana · Rutina publicada en Muscle & Strength",
+    "dpw": 2,
+    "weeks": 1,
+    "ok": true,
+    "c": [
+      "endurance"
+    ],
+    "name": "ms-intermediate-boxing-mma-workout"
+  },
+  {
+    "t": "Intermediate Muscle Building Workout",
+    "a": "Muscle & Strength",
+    "slug": "ms-intermediate-muscle-building-workout",
+    "src": "local",
+    "url": "https://www.muscleandstrength.com/workouts/intermediate-muscle-building-workout",
+    "diff": [],
+    "equip": null,
+    "tag": "5 días por semana · 1 semana · Rutina publicada en Muscle & Strength",
+    "dpw": 5,
+    "weeks": 1,
+    "ok": true,
+    "c": [
+      "hyper"
+    ],
+    "name": "ms-intermediate-muscle-building-workout"
+  },
+  {
+    "t": "Jamal Browner’s 2-Day Deadlifting Program: Deadlift 1,000+ Lbs",
+    "a": "Muscle & Strength",
+    "slug": "ms-jamal-browner-deadlift-program",
+    "src": "local",
+    "url": "https://www.muscleandstrength.com/workouts/jamal-browner-deadlift-program",
+    "diff": [],
+    "equip": null,
+    "tag": "2 días por semana · 1 semana · Rutina publicada en Muscle & Strength",
+    "dpw": 2,
+    "weeks": 1,
+    "ok": true,
+    "c": [
+      "endurance",
+      "strength"
+    ],
+    "name": "ms-jamal-browner-deadlift-program"
+  },
+  {
+    "t": "Jason Blaha's Ice Cream Fitness 5x5 Novice Program",
+    "a": "Muscle & Strength",
+    "slug": "ms-jason-blaha-ice-cream-fitness-5x5-novice-workout",
+    "src": "local",
+    "url": "https://www.muscleandstrength.com/workouts/jason-blaha-ice-cream-fitness-5x5-novice-workout",
+    "diff": [
+      "Beginner"
+    ],
+    "equip": null,
+    "tag": "2 días por semana · 1 semana · Rutina publicada en Muscle & Strength",
+    "dpw": 2,
+    "weeks": 1,
+    "ok": true,
+    "c": [
+      "fitness",
+      "strength"
+    ],
+    "name": "ms-jason-blaha-ice-cream-fitness-5x5-novice-workout"
+  },
+  {
+    "t": "Jeremy's 6 Day Hardcore Strength Workout",
+    "a": "Muscle & Strength",
+    "slug": "ms-jeremys-6-day-hardcore-strength-workout",
+    "src": "local",
+    "url": "https://www.muscleandstrength.com/workouts/jeremys-6-day-hardcore-strength-workout",
+    "diff": [],
+    "equip": null,
+    "tag": "6 días por semana · 1 semana · Rutina publicada en Muscle & Strength",
+    "dpw": 6,
+    "weeks": 1,
+    "ok": true,
+    "c": [
+      "strength"
+    ],
+    "name": "ms-jeremys-6-day-hardcore-strength-workout"
+  },
+  {
+    "t": "5 Day Minimal Equipment Home Workout Routine",
+    "a": "Muscle & Strength",
+    "slug": "ms-limited-equipment-home-workout",
+    "src": "local",
+    "url": "https://www.muscleandstrength.com/workouts/limited-equipment-home-workout",
+    "diff": [
+      "Beginner"
+    ],
+    "equip": null,
+    "tag": "5 días por semana · 1 semana · Rutina publicada en Muscle & Strength",
+    "dpw": 5,
+    "weeks": 1,
+    "ok": true,
+    "c": [
+      "fitness"
+    ],
+    "name": "ms-limited-equipment-home-workout"
+  },
+  {
+    "t": "M-F Workout Routine: 5 Day Body Part Split Workout",
+    "a": "Muscle & Strength",
+    "slug": "ms-m-f-workout-routine",
+    "src": "local",
+    "url": "https://www.muscleandstrength.com/workouts/m-f-workout-routine",
+    "diff": [],
+    "equip": null,
+    "tag": "5 días por semana · 1 semana · Rutina publicada en Muscle & Strength",
+    "dpw": 5,
+    "weeks": 1,
+    "ok": true,
+    "c": [
+      "hyper"
+    ],
+    "name": "ms-m-f-workout-routine"
+  },
+  {
+    "t": "Machine Only Workout: A 3 Day Workout Split",
+    "a": "Muscle & Strength",
+    "slug": "ms-machines-only-3-day-split",
+    "src": "local",
+    "url": "https://www.muscleandstrength.com/workouts/machines-only-3-day-split",
+    "diff": [],
+    "equip": null,
+    "tag": "3 días por semana · 1 semana · Rutina publicada en Muscle & Strength",
+    "dpw": 3,
+    "weeks": 1,
+    "ok": true,
+    "c": [
+      "hyper"
+    ],
+    "name": "ms-machines-only-3-day-split"
+  },
+  {
+    "t": "Marc Megna's Complete Off Season Football Training Workout And Meal Plan",
+    "a": "Muscle & Strength",
+    "slug": "ms-marc-megna-football-training-program-meal-plan",
+    "src": "local",
+    "url": "https://www.muscleandstrength.com/workouts/marc-megna-football-training-program-meal-plan",
+    "diff": [],
+    "equip": null,
+    "tag": "4 días por semana · 1 semana · Rutina publicada en Muscle & Strength",
+    "dpw": 4,
+    "weeks": 1,
+    "ok": true,
+    "c": [
+      "endurance"
+    ],
+    "name": "ms-marc-megna-football-training-program-meal-plan"
+  },
+  {
+    "t": "Massive Bench Press 16 Week Block Training Cycle",
+    "a": "Muscle & Strength",
+    "slug": "ms-massive-bench-press-16-week-block-training",
+    "src": "local",
+    "url": "https://www.muscleandstrength.com/workouts/massive-bench-press-16-week-block-training",
+    "diff": [],
+    "equip": null,
+    "tag": "6 días por semana · 1 semana · Rutina publicada en Muscle & Strength",
+    "dpw": 6,
+    "weeks": 1,
+    "ok": true,
+    "c": [
+      "strength"
+    ],
+    "name": "ms-massive-bench-press-16-week-block-training"
+  },
+  {
+    "t": "Matt Kroc's 16 Week Strength Program & Lean Gain Diet Plan",
+    "a": "Muscle & Strength",
+    "slug": "ms-matt-kroc-16-week-strength-program-diet",
+    "src": "local",
+    "url": "https://www.muscleandstrength.com/workouts/matt-kroc-16-week-strength-program-diet",
+    "diff": [],
+    "equip": null,
+    "tag": "2 días por semana · 1 semana · Rutina publicada en Muscle & Strength",
+    "dpw": 2,
+    "weeks": 1,
+    "ok": true,
+    "c": [
+      "strength"
+    ],
+    "name": "ms-matt-kroc-16-week-strength-program-diet"
+  },
+  {
+    "t": "Doug's 4 Day Split Maximum Strength Workout",
+    "a": "Muscle & Strength",
+    "slug": "ms-maximum-strength-workout",
+    "src": "local",
+    "url": "https://www.muscleandstrength.com/workouts/maximum-strength-workout",
+    "diff": [],
+    "equip": null,
+    "tag": "4 días por semana · 1 semana · Rutina publicada en Muscle & Strength",
+    "dpw": 4,
+    "weeks": 1,
+    "ok": true,
+    "c": [
+      "strength"
+    ],
+    "name": "ms-maximum-strength-workout"
+  },
+  {
+    "t": "MFT Training: Boost Strength and Build High Performance Muscle",
+    "a": "Muscle & Strength",
+    "slug": "ms-mft-training",
+    "src": "local",
+    "url": "https://www.muscleandstrength.com/workouts/mft-training",
+    "diff": [],
+    "equip": null,
+    "tag": "1 día por semana · 1 semana · Rutina publicada en Muscle & Strength",
+    "dpw": 1,
+    "weeks": 1,
+    "ok": true,
+    "c": [
+      "strength"
+    ],
+    "name": "ms-mft-training"
+  },
+  {
+    "t": "Michael B. Jordan Inspired Workout: Train Like Black Panther's Killmonger",
+    "a": "Muscle & Strength",
+    "slug": "ms-michael-b-jordan-workout-program",
+    "src": "local",
+    "url": "https://www.muscleandstrength.com/workouts/michael-b-jordan-workout-program",
+    "diff": [],
+    "equip": null,
+    "tag": "7 días por semana · 1 semana · Rutina publicada en Muscle & Strength",
+    "dpw": 7,
+    "weeks": 1,
+    "ok": true,
+    "c": [
+      "hyper"
+    ],
+    "name": "ms-michael-b-jordan-workout-program"
+  },
+  {
+    "t": "EKnight's Modified Westside Barbell Strength Workout",
+    "a": "Muscle & Strength",
+    "slug": "ms-modified-westside-barbell-strength-workout",
+    "src": "local",
+    "url": "https://www.muscleandstrength.com/workouts/modified-westside-barbell-strength-workout",
+    "diff": [],
+    "equip": null,
+    "tag": "4 días por semana · 1 semana · Rutina publicada en Muscle & Strength",
+    "dpw": 4,
+    "weeks": 1,
+    "ok": true,
+    "c": [
+      "strength"
+    ],
+    "name": "ms-modified-westside-barbell-strength-workout"
+  },
+  {
+    "t": "Muscle Mass Inflation: 8 Week Muscle Growth Workout",
+    "a": "Muscle & Strength",
+    "slug": "ms-muscle-mass-inflation",
+    "src": "local",
+    "url": "https://www.muscleandstrength.com/workouts/muscle-mass-inflation",
+    "diff": [],
+    "equip": null,
+    "tag": "4 días por semana · 1 semana · Rutina publicada en Muscle & Strength",
+    "dpw": 4,
+    "weeks": 1,
+    "ok": true,
+    "c": [
+      "hyper"
+    ],
+    "name": "ms-muscle-mass-inflation"
+  },
+  {
+    "t": "The \"Muscle Rebound\" Workout: 4 Day Strength Split Program",
+    "a": "Muscle & Strength",
+    "slug": "ms-muscle-rebound-workout",
+    "src": "local",
+    "url": "https://www.muscleandstrength.com/workouts/muscle-rebound-workout",
+    "diff": [],
+    "equip": null,
+    "tag": "4 días por semana · 1 semana · Rutina publicada en Muscle & Strength",
+    "dpw": 4,
+    "weeks": 1,
+    "ok": true,
+    "c": [
+      "strength"
+    ],
+    "name": "ms-muscle-rebound-workout"
+  },
+  {
+    "t": "Muscle & Strength Full Body Workout Routine",
+    "a": "Muscle & Strength",
+    "slug": "ms-muscle-strength-full-body-workout-routine",
+    "src": "local",
+    "url": "https://www.muscleandstrength.com/workouts/muscle-strength-full-body-workout-routine",
+    "diff": [],
+    "equip": null,
+    "tag": "3 días por semana · 1 semana · Rutina publicada en Muscle & Strength",
+    "dpw": 3,
+    "weeks": 1,
+    "ok": true,
+    "c": [
+      "strength",
+      "hyper"
+    ],
+    "name": "ms-muscle-strength-full-body-workout-routine"
+  },
+  {
+    "t": "Nick Wright NWB Power Training Workout Split",
+    "a": "Muscle & Strength",
+    "slug": "ms-nick-wright-bodybuilding-workout-split",
+    "src": "local",
+    "url": "https://www.muscleandstrength.com/workouts/nick-wright-bodybuilding-workout-split",
+    "diff": [],
+    "equip": null,
+    "tag": "4 días por semana · 4 semanas · Rutina publicada en Muscle & Strength",
+    "dpw": 4,
+    "weeks": 4,
+    "ok": true,
+    "c": [
+      "strength"
+    ],
+    "name": "ms-nick-wright-bodybuilding-workout-split"
+  },
+  {
+    "t": "Off-Season Baseball Strength Workout",
+    "a": "Muscle & Strength",
+    "slug": "ms-off-season-baseball-strength-workout",
+    "src": "local",
+    "url": "https://www.muscleandstrength.com/workouts/off-season-baseball-strength-workout",
+    "diff": [],
+    "equip": null,
+    "tag": "1 día por semana · 1 semana · Rutina publicada en Muscle & Strength",
+    "dpw": 1,
+    "weeks": 1,
+    "ok": true,
+    "c": [
+      "endurance"
+    ],
+    "name": "ms-off-season-baseball-strength-workout"
+  },
+  {
+    "t": "Off-Season Football Training",
+    "a": "Muscle & Strength",
+    "slug": "ms-off-season-football-training",
+    "src": "local",
+    "url": "https://www.muscleandstrength.com/workouts/off-season-football-training",
+    "diff": [],
+    "equip": null,
+    "tag": "1 día por semana · 1 semana · Rutina publicada en Muscle & Strength",
+    "dpw": 1,
+    "weeks": 1,
+    "ok": true,
+    "c": [
+      "endurance"
+    ],
+    "name": "ms-off-season-football-training"
+  },
+  {
+    "t": "Dominate the Combine: Complete Off Season Football Workout",
+    "a": "Muscle & Strength",
+    "slug": "ms-offseason-football-workout",
+    "src": "local",
+    "url": "https://www.muscleandstrength.com/workouts/offseason-football-workout",
+    "diff": [],
+    "equip": null,
+    "tag": "3 días por semana · 1 semana · Rutina publicada en Muscle & Strength",
+    "dpw": 3,
+    "weeks": 1,
+    "ok": true,
+    "c": [
+      "endurance"
+    ],
+    "name": "ms-offseason-football-workout"
+  },
+  {
+    "t": "Pause Rep Workout Program for Serious Strength Gains",
+    "a": "Muscle & Strength",
+    "slug": "ms-pause-reps",
+    "src": "local",
+    "url": "https://www.muscleandstrength.com/workouts/pause-reps",
+    "diff": [],
+    "equip": null,
+    "tag": "3 días por semana · 1 semana · Rutina publicada en Muscle & Strength",
+    "dpw": 3,
+    "weeks": 1,
+    "ok": true,
+    "c": [
+      "strength"
+    ],
+    "name": "ms-pause-reps"
+  },
+  {
+    "t": "Phase Training Pt.1: 5 Week Primer Workout for Muscle Size",
+    "a": "Muscle & Strength",
+    "slug": "ms-phase-training-pt-1-primer-workout",
+    "src": "local",
+    "url": "https://www.muscleandstrength.com/workouts/phase-training-pt-1-primer-workout",
+    "diff": [
+      "Beginner"
+    ],
+    "equip": null,
+    "tag": "3 días por semana · 1 semana · Rutina publicada en Muscle & Strength",
+    "dpw": 3,
+    "weeks": 1,
+    "ok": true,
+    "c": [
+      "fitness"
+    ],
+    "name": "ms-phase-training-pt-1-primer-workout"
+  },
+  {
+    "t": "Phase Training Pt. 2: 5 Week Workout to Build Muscle Size",
+    "a": "Muscle & Strength",
+    "slug": "ms-phase-training-pt-2-size-building",
+    "src": "local",
+    "url": "https://www.muscleandstrength.com/workouts/phase-training-pt-2-size-building",
+    "diff": [
+      "Beginner"
+    ],
+    "equip": null,
+    "tag": "2 días por semana · 1 semana · Rutina publicada en Muscle & Strength",
+    "dpw": 2,
+    "weeks": 1,
+    "ok": true,
+    "c": [
+      "fitness"
+    ],
+    "name": "ms-phase-training-pt-2-size-building"
+  },
+  {
+    "t": "Power Hypertrophy Upper Lower (P.H.U.L.) Workout",
+    "a": "Muscle & Strength",
+    "slug": "ms-phul-workout",
+    "src": "local",
+    "url": "https://www.muscleandstrength.com/workouts/phul-workout",
+    "diff": [],
+    "equip": null,
+    "tag": "4 días por semana · 1 semana · Rutina publicada en Muscle & Strength",
+    "dpw": 4,
+    "weeks": 1,
+    "ok": true,
+    "c": [
+      "hyper"
+    ],
+    "name": "ms-phul-workout"
+  },
+  {
+    "t": "Power Muscle Burn 5 Day Powerbuilding Split",
+    "a": "Muscle & Strength",
+    "slug": "ms-power-muscle-burn-5-day-powerbuilding-split",
+    "src": "local",
+    "url": "https://www.muscleandstrength.com/workouts/power-muscle-burn-5-day-powerbuilding-split",
+    "diff": [],
+    "equip": null,
+    "tag": "5 días por semana · 1 semana · Rutina publicada en Muscle & Strength",
+    "dpw": 5,
+    "weeks": 1,
+    "ok": true,
+    "c": [
+      "strength"
+    ],
+    "name": "ms-power-muscle-burn-5-day-powerbuilding-split"
+  },
+  {
+    "t": "8 Week Power Physique Workout",
+    "a": "Muscle & Strength",
+    "slug": "ms-power-physique-8-week-program",
+    "src": "local",
+    "url": "https://www.muscleandstrength.com/workouts/power-physique-8-week-program",
+    "diff": [],
+    "equip": null,
+    "tag": "4 días por semana · 1 semana · Rutina publicada en Muscle & Strength",
+    "dpw": 4,
+    "weeks": 1,
+    "ok": true,
+    "c": [
+      "strength"
+    ],
+    "name": "ms-power-physique-8-week-program"
+  },
+  {
+    "t": "Power Training Workout for Increased Athletic Performance",
+    "a": "Muscle & Strength",
+    "slug": "ms-power-training-workout-for-increased-athletic-performance",
+    "src": "local",
+    "url": "https://www.muscleandstrength.com/workouts/power-training-workout-for-increased-athletic-performance",
+    "diff": [],
+    "equip": null,
+    "tag": "1 día por semana · 1 semana · Rutina publicada en Muscle & Strength",
+    "dpw": 1,
+    "weeks": 1,
+    "ok": true,
+    "c": [
+      "endurance"
+    ],
+    "name": "ms-power-training-workout-for-increased-athletic-performance"
+  },
+  {
+    "t": "100% Powerlifting Workout",
+    "a": "Muscle & Strength",
+    "slug": "ms-powerlifting-workout",
+    "src": "local",
+    "url": "https://www.muscleandstrength.com/workouts/powerlifting-workout",
+    "diff": [],
+    "equip": null,
+    "tag": "7 días por semana · 1 semana · Rutina publicada en Muscle & Strength",
+    "dpw": 7,
+    "weeks": 1,
+    "ok": true,
+    "c": [
+      "strength"
+    ],
+    "name": "ms-powerlifting-workout"
+  },
+  {
+    "t": "Push/Pull Sample Planet Fitness Workout",
+    "a": "Muscle & Strength",
+    "slug": "ms-push-pull-sample-planet-fitness-workout",
+    "src": "local",
+    "url": "https://www.muscleandstrength.com/workouts/push-pull-sample-planet-fitness-workout",
+    "diff": [
+      "Beginner"
+    ],
+    "equip": null,
+    "tag": "2 días por semana · 1 semana · Rutina publicada en Muscle & Strength",
+    "dpw": 2,
+    "weeks": 1,
+    "ok": true,
+    "c": [
+      "fitness"
+    ],
+    "name": "ms-push-pull-sample-planet-fitness-workout"
+  },
+  {
+    "t": "Rippetoe Wichita Falls Novice Program",
+    "a": "Muscle & Strength",
+    "slug": "ms-rippetoe-wichita-falls-novice-program",
+    "src": "local",
+    "url": "https://www.muscleandstrength.com/workouts/rippetoe-wichita-falls-novice-program",
+    "diff": [
+      "Beginner"
+    ],
+    "equip": null,
+    "tag": "3 días por semana · 1 semana · Rutina publicada en Muscle & Strength",
+    "dpw": 3,
+    "weeks": 1,
+    "ok": true,
+    "c": [
+      "fitness",
+      "strength"
+    ],
+    "name": "ms-rippetoe-wichita-falls-novice-program"
+  },
+  {
+    "t": "Robert Downey Jr Inspired Workout Program: Train Like Iron Man",
+    "a": "Muscle & Strength",
+    "slug": "ms-robert-downey-jr-workout",
+    "src": "local",
+    "url": "https://www.muscleandstrength.com/workouts/robert-downey-jr-workout",
+    "diff": [
+      "Beginner"
+    ],
+    "equip": null,
+    "tag": "4 días por semana · 1 semana · Rutina publicada en Muscle & Strength",
+    "dpw": 4,
+    "weeks": 1,
+    "ok": true,
+    "c": [
+      "fitness"
+    ],
+    "name": "ms-robert-downey-jr-workout"
+  },
+  {
+    "t": "Sculpted Strength: The Ultimate 12 Week Bodybuilding Program",
+    "a": "Muscle & Strength",
+    "slug": "ms-sculpted-strength-bodybuilding-program",
+    "src": "local",
+    "url": "https://www.muscleandstrength.com/workouts/sculpted-strength-bodybuilding-program",
+    "diff": [],
+    "equip": null,
+    "tag": "6 días por semana · 1 semana · Rutina publicada en Muscle & Strength",
+    "dpw": 6,
+    "weeks": 1,
+    "ok": true,
+    "c": [
+      "hyper"
+    ],
+    "name": "ms-sculpted-strength-bodybuilding-program"
+  },
+  {
+    "t": "September Starter Workout: 4 Week Beginner Workout Routine",
+    "a": "Muscle & Strength",
+    "slug": "ms-september-starter-beginner-workout",
+    "src": "local",
+    "url": "https://www.muscleandstrength.com/workouts/september-starter-beginner-workout",
+    "diff": [
+      "Beginner"
+    ],
+    "equip": null,
+    "tag": "4 días por semana · 1 semana · Rutina publicada en Muscle & Strength",
+    "dpw": 4,
+    "weeks": 1,
+    "ok": true,
+    "c": [
+      "fitness"
+    ],
+    "name": "ms-september-starter-beginner-workout"
+  },
+  {
+    "t": "Shaun's 3 Day Muscle Building Split Workout",
+    "a": "Muscle & Strength",
+    "slug": "ms-shaun--s-3-day-muscle-building-split",
+    "src": "local",
+    "url": "https://www.muscleandstrength.com/workouts/shaun--s-3-day-muscle-building-split",
+    "diff": [],
+    "equip": null,
+    "tag": "3 días por semana · 1 semana · Rutina publicada en Muscle & Strength",
+    "dpw": 3,
+    "weeks": 1,
+    "ok": true,
+    "c": [
+      "hyper"
+    ],
+    "name": "ms-shaun--s-3-day-muscle-building-split"
+  },
+  {
+    "t": "Shaun's 4 Day Muscle Building Split Routine",
+    "a": "Muscle & Strength",
+    "slug": "ms-shauns-4-day-muscle-building-split-routine",
+    "src": "local",
+    "url": "https://www.muscleandstrength.com/workouts/shauns-4-day-muscle-building-split-routine",
+    "diff": [],
+    "equip": null,
+    "tag": "4 días por semana · 1 semana · Rutina publicada en Muscle & Strength",
+    "dpw": 4,
+    "weeks": 1,
+    "ok": true,
+    "c": [
+      "hyper"
+    ],
+    "name": "ms-shauns-4-day-muscle-building-split-routine"
+  },
+  {
+    "t": "Modified Strength Hypertrophy Upper Lower (S.H.U.L) Workout",
+    "a": "Muscle & Strength",
+    "slug": "ms-shul-workout",
+    "src": "local",
+    "url": "https://www.muscleandstrength.com/workouts/shul-workout",
+    "diff": [],
+    "equip": null,
+    "tag": "1 día por semana · 1 semana · Rutina publicada en Muscle & Strength",
+    "dpw": 1,
+    "weeks": 1,
+    "ok": true,
+    "c": [
+      "strength"
+    ],
+    "name": "ms-shul-workout"
+  },
+  {
+    "t": "Start from Scratch Series: 6 Week Complete Beginner Program",
+    "a": "Muscle & Strength",
+    "slug": "ms-start-from-scratch-beginner-workout",
+    "src": "local",
+    "url": "https://www.muscleandstrength.com/workouts/start-from-scratch-beginner-workout",
+    "diff": [
+      "Beginner"
+    ],
+    "equip": null,
+    "tag": "3 días por semana · 1 semana · Rutina publicada en Muscle & Strength",
+    "dpw": 3,
+    "weeks": 1,
+    "ok": true,
+    "c": [
+      "fitness"
+    ],
+    "name": "ms-start-from-scratch-beginner-workout"
+  },
+  {
+    "t": "Start from Scratch: Phase 2 of the Complete Beginner's Program",
+    "a": "Muscle & Strength",
+    "slug": "ms-start-from-scratch-phase-2",
+    "src": "local",
+    "url": "https://www.muscleandstrength.com/workouts/start-from-scratch-phase-2",
+    "diff": [
+      "Beginner"
+    ],
+    "equip": null,
+    "tag": "3 días por semana · 1 semana · Rutina publicada en Muscle & Strength",
+    "dpw": 3,
+    "weeks": 1,
+    "ok": true,
+    "c": [
+      "fitness"
+    ],
+    "name": "ms-start-from-scratch-phase-2"
+  },
+  {
+    "t": "Start from Scratch Series: Phase 3 of the Complete Beginner’s Program",
+    "a": "Muscle & Strength",
+    "slug": "ms-start-from-scratch-phase-3",
+    "src": "local",
+    "url": "https://www.muscleandstrength.com/workouts/start-from-scratch-phase-3",
+    "diff": [
+      "Beginner"
+    ],
+    "equip": null,
+    "tag": "3 días por semana · 1 semana · Rutina publicada en Muscle & Strength",
+    "dpw": 3,
+    "weeks": 1,
+    "ok": true,
+    "c": [
+      "fitness"
+    ],
+    "name": "ms-start-from-scratch-phase-3"
+  },
+  {
+    "t": "Starting Strong: The Ultimate 8 Week Workout for Beginners",
+    "a": "Muscle & Strength",
+    "slug": "ms-starting-strong-8-week-workout-for-beginners",
+    "src": "local",
+    "url": "https://www.muscleandstrength.com/workouts/starting-strong-8-week-workout-for-beginners",
+    "diff": [
+      "Beginner"
+    ],
+    "equip": null,
+    "tag": "3 días por semana · 1 semana · Rutina publicada en Muscle & Strength",
+    "dpw": 3,
+    "weeks": 1,
+    "ok": true,
+    "c": [
+      "fitness"
+    ],
+    "name": "ms-starting-strong-8-week-workout-for-beginners"
+  },
+  {
+    "t": "Steel Core MMA Abs Workout Routine",
+    "a": "Muscle & Strength",
+    "slug": "ms-steel-core-mma-abs-workout-routine",
+    "src": "local",
+    "url": "https://www.muscleandstrength.com/workouts/steel-core-mma-abs-workout-routine",
+    "diff": [],
+    "equip": null,
+    "tag": "1 día por semana · 1 semana · Rutina publicada en Muscle & Strength",
+    "dpw": 1,
+    "weeks": 1,
+    "ok": true,
+    "c": [
+      "endurance"
+    ],
+    "name": "ms-steel-core-mma-abs-workout-routine"
+  },
+  {
+    "t": "Density & Strength: 4-Day Powerbuilding Split",
+    "a": "Muscle & Strength",
+    "slug": "ms-steves-density-and-strength-4-day-split",
+    "src": "local",
+    "url": "https://www.muscleandstrength.com/workouts/steves-density-and-strength-4-day-split",
+    "diff": [],
+    "equip": null,
+    "tag": "4 días por semana · 1 semana · Rutina publicada en Muscle & Strength",
+    "dpw": 4,
+    "weeks": 1,
+    "ok": true,
+    "c": [
+      "strength"
+    ],
+    "name": "ms-steves-density-and-strength-4-day-split"
+  },
+  {
+    "t": "Strength And Bulk Beginner Workout - Linear Progression",
+    "a": "Muscle & Strength",
+    "slug": "ms-strength-bulk-beginner-workout-linear-progression",
+    "src": "local",
+    "url": "https://www.muscleandstrength.com/workouts/strength-bulk-beginner-workout-linear-progression",
+    "diff": [
+      "Beginner"
+    ],
+    "equip": null,
+    "tag": "3 días por semana · 1 semana · Rutina publicada en Muscle & Strength",
+    "dpw": 3,
+    "weeks": 1,
+    "ok": true,
+    "c": [
+      "fitness",
+      "strength"
+    ],
+    "name": "ms-strength-bulk-beginner-workout-linear-progression"
+  },
+  {
+    "t": "Summer Strength: 4 Day Strength Building Workout Split",
+    "a": "Muscle & Strength",
+    "slug": "ms-summer-strength-4-day-strength-split",
+    "src": "local",
+    "url": "https://www.muscleandstrength.com/workouts/summer-strength-4-day-strength-split",
+    "diff": [],
+    "equip": null,
+    "tag": "4 días por semana · 1 semana · Rutina publicada en Muscle & Strength",
+    "dpw": 4,
+    "weeks": 1,
+    "ok": true,
+    "c": [
+      "strength"
+    ],
+    "name": "ms-summer-strength-4-day-strength-split"
+  },
+  {
+    "t": "Sweatshirt Swole: The Ultimate Bulking Workout Plan",
+    "a": "Muscle & Strength",
+    "slug": "ms-sweatshirt-swole-program",
+    "src": "local",
+    "url": "https://www.muscleandstrength.com/workouts/sweatshirt-swole-program",
+    "diff": [],
+    "equip": null,
+    "tag": "4 días por semana · 1 semana · Rutina publicada en Muscle & Strength",
+    "dpw": 4,
+    "weeks": 1,
+    "ok": true,
+    "c": [
+      "strength"
+    ],
+    "name": "ms-sweatshirt-swole-program"
+  },
+  {
+    "t": "The Tactical Physique: A Functional Strength Training & Conditioning Workout",
+    "a": "Muscle & Strength",
+    "slug": "ms-tactical-physique-strength-conditioning-workout",
+    "src": "local",
+    "url": "https://www.muscleandstrength.com/workouts/tactical-physique-strength-conditioning-workout",
+    "diff": [],
+    "equip": null,
+    "tag": "4 días por semana · 1 semana · Rutina publicada en Muscle & Strength",
+    "dpw": 4,
+    "weeks": 1,
+    "ok": true,
+    "c": [
+      "strength"
+    ],
+    "name": "ms-tactical-physique-strength-conditioning-workout"
+  },
+  {
+    "t": "The Best 15-Minute Warm-Ups",
+    "a": "Muscle & Strength",
+    "slug": "ms-the-best-15-minute-warm-up",
+    "src": "local",
+    "url": "https://www.muscleandstrength.com/workouts/the-best-15-minute-warm-up",
+    "diff": [
+      "Beginner"
+    ],
+    "equip": null,
+    "tag": "1 día por semana · 1 semana · Rutina publicada en Muscle & Strength",
+    "dpw": 1,
+    "weeks": 1,
+    "ok": true,
+    "c": [
+      "fitness"
+    ],
+    "name": "ms-the-best-15-minute-warm-up"
+  },
+  {
+    "t": "The Best Upper Body Workout Routine",
+    "a": "Muscle & Strength",
+    "slug": "ms-the-best-upper-body-workout-routine",
+    "src": "local",
+    "url": "https://www.muscleandstrength.com/workouts/the-best-upper-body-workout-routine",
+    "diff": [],
+    "equip": null,
+    "tag": "3 días por semana · 1 semana · Rutina publicada en Muscle & Strength",
+    "dpw": 3,
+    "weeks": 1,
+    "ok": true,
+    "c": [
+      "hyper"
+    ],
+    "name": "ms-the-best-upper-body-workout-routine"
+  },
+  {
+    "t": "The Complete Squat Program: Build Strength & Muscle in 8 Weeks",
+    "a": "Muscle & Strength",
+    "slug": "ms-the-complete-squat-program",
+    "src": "local",
+    "url": "https://www.muscleandstrength.com/workouts/the-complete-squat-program",
+    "diff": [],
+    "equip": null,
+    "tag": "3 días por semana · 1 semana · Rutina publicada en Muscle & Strength",
+    "dpw": 3,
+    "weeks": 1,
+    "ok": true,
+    "c": [
+      "strength"
+    ],
+    "name": "ms-the-complete-squat-program"
+  },
+  {
+    "t": "The Ultimate Bro Split: 12 Weeks to MASS",
+    "a": "Muscle & Strength",
+    "slug": "ms-the-ultimate-bro-split",
+    "src": "local",
+    "url": "https://www.muscleandstrength.com/workouts/the-ultimate-bro-split",
+    "diff": [],
+    "equip": null,
+    "tag": "5 días por semana · 1 semana · Rutina publicada en Muscle & Strength",
+    "dpw": 5,
+    "weeks": 1,
+    "ok": true,
+    "c": [
+      "hyper"
+    ],
+    "name": "ms-the-ultimate-bro-split"
+  },
+  {
+    "t": "Chris Hemsworth Inspired Workout Program: Train Like Thor",
+    "a": "Muscle & Strength",
+    "slug": "ms-thor-ragnarok-chris-hemsworth-inspired-workout",
+    "src": "local",
+    "url": "https://www.muscleandstrength.com/workouts/thor-ragnarok-chris-hemsworth-inspired-workout",
+    "diff": [],
+    "equip": null,
+    "tag": "5 días por semana · 1 semana · Rutina publicada en Muscle & Strength",
+    "dpw": 5,
+    "weeks": 1,
+    "ok": true,
+    "c": [
+      "hyper"
+    ],
+    "name": "ms-thor-ragnarok-chris-hemsworth-inspired-workout"
+  },
+  {
+    "t": "Upper/Lower 4 Day Bodybuilding Workout",
+    "a": "Muscle & Strength",
+    "slug": "ms-upper-lower-4-day-gym-bodybuilding-workout",
+    "src": "local",
+    "url": "https://www.muscleandstrength.com/workouts/upper-lower-4-day-gym-bodybuilding-workout",
+    "diff": [],
+    "equip": null,
+    "tag": "4 días por semana · 1 semana · Rutina publicada en Muscle & Strength",
+    "dpw": 4,
+    "weeks": 1,
+    "ok": true,
+    "c": [
+      "hyper"
+    ],
+    "name": "ms-upper-lower-4-day-gym-bodybuilding-workout"
+  },
+  {
+    "t": "Push-Pull Superset Workout Program Ft. NFL Tight End Vernon Davis",
+    "a": "Muscle & Strength",
+    "slug": "ms-vernon-davis-push-pull-superset-workout",
+    "src": "local",
+    "url": "https://www.muscleandstrength.com/workouts/vernon-davis-push-pull-superset-workout",
+    "diff": [],
+    "equip": null,
+    "tag": "1 día por semana · 1 semana · Rutina publicada en Muscle & Strength",
+    "dpw": 1,
+    "weeks": 1,
+    "ok": true,
+    "c": [
+      "endurance"
+    ],
+    "name": "ms-vernon-davis-push-pull-superset-workout"
+  },
+  {
+    "t": "10-Week Lean & Strong Program for Women 40+",
+    "a": "Muscle & Strength",
+    "slug": "ms-women-over-40",
+    "src": "local",
+    "url": "https://www.muscleandstrength.com/workouts/women-over-40",
+    "diff": [],
+    "equip": null,
+    "tag": "4 días por semana · 1 semana · Rutina publicada en Muscle & Strength",
+    "dpw": 4,
+    "weeks": 1,
+    "ok": true,
+    "c": [
+      "hyper"
+    ],
+    "name": "ms-women-over-40"
+  },
+  {
+    "t": "Muscle Mommy Manual",
+    "a": "Team Boostcamp",
+    "slug": "muscle-mommy-workout-program",
+    "diff": [
+      "Beginner",
+      "Intermediate"
+    ],
+    "equip": null,
+    "tag": "Build Your Strong, Sculpted, Feminine Muscle Mommy Physique",
+    "dpw": 1,
+    "weeks": 0,
+    "ok": true,
+    "c": [
+      "hyper"
+    ],
+    "src": "local",
+    "name": "muscle-mommy-workout-program",
+    "url": ""
+  },
+  {
+    "t": "Novice Bodybuilding Program (by Eric Helms)",
+    "a": "Dr. Eric Helms",
+    "slug": "novice-bodybuilding-program",
+    "diff": [
+      "Beginner",
+      "Intermediate"
+    ],
+    "equip": null,
+    "tag": "4-day a week program based on the principles from the book Muscle & Strength Pyramid: Training",
+    "dpw": 4,
+    "weeks": 8,
+    "ok": true,
+    "c": [
+      "hyper"
+    ],
+    "src": "local",
+    "name": "novice-bodybuilding-program",
+    "url": ""
+  },
+  {
+    "t": "nSuns 5/3/1",
+    "a": "r/Fitness",
+    "slug": "nsuns-linear-progression",
+    "diff": [
+      "Intermediate"
+    ],
+    "equip": null,
+    "tag": "One of the most popular linear progression intermediate powerbuilding programs",
+    "dpw": 4,
+    "weeks": 0,
+    "ok": true,
+    "c": [
+      "strength"
+    ],
+    "src": "local",
+    "name": "nsuns-linear-progression",
+    "url": ""
+  },
+  {
+    "t": "Old School Size and Strength",
+    "a": "Pete Khatcherian",
+    "slug": "old-school-size-and-strength-by-pete-khatcherian",
+    "diff": [
+      "Intermediate",
+      "Advanced"
+    ],
+    "equip": null,
+    "tag": "Build Old School Strength, Old School Muscle, With Old School Training!",
+    "dpw": 1,
+    "weeks": 0,
+    "ok": true,
+    "c": [
+      "hyper"
+    ],
+    "src": "local",
+    "name": "old-school-size-and-strength-by-pete-khatcherian",
+    "url": ""
+  },
+  {
+    "t": "Oldschool Dorian Yates H.I.T Training",
+    "a": "Fazlifts",
+    "slug": "oldschool-dorian-yates-h-i-t-training",
+    "diff": [
+      "Intermediate",
+      "Advanced"
+    ],
+    "equip": null,
+    "tag": "4 Day High Intensity Training (HIT) Split Inspired by Dorian Yates",
+    "dpw": 1,
+    "weeks": 0,
+    "ok": true,
+    "c": [
+      "hyper"
+    ],
+    "src": "local",
+    "name": "oldschool-dorian-yates-h-i-t-training",
+    "url": ""
+  },
+  {
+    "t": "Overcoming Gravity",
+    "a": "Steven Low",
+    "slug": "overcoming-gravity",
+    "diff": [
+      "Beginner",
+      "Intermediate",
+      "Advanced"
+    ],
+    "equip": null,
+    "tag": "The Bible of bodyweight fitness and calisthenics training",
+    "dpw": 5,
+    "weeks": 0,
+    "ok": true,
+    "c": [
+      "fitness"
+    ],
+    "src": "local",
+    "name": "overcoming-gravity",
+    "url": ""
+  },
+  {
+    "t": "P-Zero Ultra (GZCL 2.0)",
+    "a": "Cody Lefever",
+    "slug": "p-zero-ultra-gzcl-2-0",
+    "diff": [
+      "Beginner",
+      "Intermediate"
+    ],
+    "equip": null,
+    "tag": "The next evolution of the famous GZCL Program to unlock strength, size, and limitless gains.",
+    "dpw": 1,
+    "weeks": 0,
+    "ok": true,
+    "c": [
+      "strength"
+    ],
+    "src": "local",
+    "name": "p-zero-ultra-gzcl-2-0",
+    "url": ""
+  },
+  {
+    "t": "Pete Rubish Deadlift PR Program",
+    "a": "Pete Rubish",
+    "slug": "pete-rubish-deadlift-pr-program",
+    "diff": [
+      "Intermediate",
+      "Advanced"
+    ],
+    "equip": null,
+    "tag": "12 week deadlift training plan for you to break plateaus and hit massive PRs",
+    "dpw": 1,
+    "weeks": 0,
+    "ok": true,
+    "c": [
+      "strength"
+    ],
+    "src": "local",
+    "name": "pete-rubish-deadlift-pr-program",
+    "url": ""
+  },
+  {
+    "t": "PHAT Workout Program",
+    "a": "Layne Norton",
+    "slug": "phat",
+    "diff": [
+      "Intermediate",
+      "Advanced"
+    ],
+    "equip": null,
+    "tag": "Developed by Dr. Layne Norton, PHAT is for lifters that want to look aesthetic without being weak.",
+    "dpw": 5,
+    "weeks": 4,
+    "ok": true,
+    "c": [
+      "hyper",
+      "strength"
+    ],
+    "src": "local",
+    "name": "phat",
+    "url": ""
+  },
+  {
+    "t": "PHUL Workout Program",
+    "a": "Brandon Campbell",
+    "slug": "phul-4-day-split",
+    "diff": [
+      "Intermediate"
+    ],
+    "equip": null,
+    "tag": "One of the most popular programs for building strength and muscle.",
+    "dpw": 4,
+    "weeks": 12,
+    "ok": true,
+    "c": [
+      "hyper",
+      "strength"
+    ],
+    "src": "local",
+    "name": "phul-4-day-split",
+    "url": ""
+  },
+  {
+    "t": "Power Bomb PPL",
+    "a": "Bald Omni-Man",
+    "slug": "power-bomb-ppl",
+    "diff": [
+      "Intermediate"
+    ],
+    "equip": null,
+    "tag": "Push Pull Legs split that corrects the torso dominance that you typically see with most PPL splits.",
+    "dpw": 1,
+    "weeks": 0,
+    "ok": true,
+    "c": [
+      "hyper"
+    ],
+    "src": "local",
+    "name": "power-bomb-ppl",
+    "url": ""
+  },
+  {
+    "t": "Power Muscle Blast",
+    "a": "Steve Shaw - Massive Iron",
+    "slug": "power-muscle-bench",
+    "diff": [
+      "Intermediate",
+      "Advanced"
+    ],
+    "equip": null,
+    "tag": "The Steve Shaw (Massive Iron) 4-day program to build strength and size.",
+    "dpw": 1,
+    "weeks": 0,
+    "ok": true,
+    "c": [
+      "hyper",
+      "strength"
+    ],
+    "src": "local",
+    "name": "power-muscle-bench",
+    "url": ""
+  },
+  {
+    "t": "Powerlifting Foundation 1",
+    "a": "Morit Summers",
+    "slug": "powerlifting-foundation-1",
+    "diff": [
+      "Beginner",
+      "Intermediate"
+    ],
+    "equip": null,
+    "tag": "Beginner strength training program for women and men of all sizes and ages",
+    "dpw": 1,
+    "weeks": 0,
+    "ok": true,
+    "c": [
+      "strength"
+    ],
+    "src": "local",
+    "name": "powerlifting-foundation-1",
+    "url": ""
+  },
+  {
+    "t": "Powerlifting Minimum Effective Dose Program",
+    "a": "Dr. Pak",
+    "slug": "powerlifting-minimum-effective-dose-program",
+    "diff": [
+      "Beginner",
+      "Intermediate",
+      "Advanced"
+    ],
+    "equip": null,
+    "tag": "For people who want to build peak strength but don't have time with \"optimal\" training volumes.",
+    "dpw": 1,
+    "weeks": 0,
+    "ok": true,
+    "c": [
+      "strength"
+    ],
+    "src": "local",
+    "name": "powerlifting-minimum-effective-dose-program",
+    "url": ""
+  },
+  {
+    "t": "Push Pull Legs Upper Lower (PPLUL)",
+    "a": "Dr. Swole",
+    "slug": "push-pull-legs-upper-lower-pplul",
+    "diff": [
+      "Intermediate"
+    ],
+    "equip": null,
+    "tag": "Dr. Swole's 5 day a week PPLUL program that combines the best of PPL and UL splits",
+    "dpw": 5,
+    "weeks": 8,
+    "ok": true,
+    "c": [
+      "hyper"
+    ],
+    "src": "local",
+    "name": "push-pull-legs-upper-lower-pplul",
+    "url": ""
+  },
+  {
+    "t": "PWRBLD Advanced Program",
+    "a": "CT Whitney",
+    "slug": "pwrbld-advanced-program",
+    "diff": [
+      "Advanced",
+      "Intermediate"
+    ],
+    "equip": null,
+    "tag": "Advanced powerbuilding program to help you build muscle and maximize your strength.",
+    "dpw": 1,
+    "weeks": 0,
+    "ok": true,
+    "c": [
+      "hyper",
+      "strength"
+    ],
+    "src": "local",
+    "name": "pwrbld-advanced-program",
+    "url": ""
+  },
+  {
+    "t": "PWRBLD Intermediate Program",
+    "a": "CT Whitney",
+    "slug": "pwrbld-intermediate-program",
+    "diff": [
+      "Intermediate"
+    ],
+    "equip": null,
+    "tag": "16 week powerbuilding program for building muscle and strength",
+    "dpw": 1,
+    "weeks": 0,
+    "ok": true,
+    "c": [
+      "strength"
+    ],
+    "src": "local",
+    "name": "pwrbld-intermediate-program",
+    "url": ""
+  },
+  {
+    "t": "Reddit's Bodyweight Fitness Recommended Routine",
+    "a": "r/BodyweightFitness",
+    "slug": "r-bodyweight-recommended-routine",
+    "diff": [
+      "Beginner",
+      "Intermediate"
+    ],
+    "equip": null,
+    "tag": "The Recommend Routine (RR) is the bodyweight training program made by r/BodyweightFitness community.",
+    "dpw": 3,
+    "weeks": 12,
+    "ok": true,
+    "c": [
+      "fitness"
+    ],
+    "free": true,
+    "src": "local",
+    "name": "r-bodyweight-recommended-routine",
+    "url": ""
+  },
+  {
+    "t": "r/Fitness Basic Beginner Routine (3x5)",
+    "a": "r/Fitness",
+    "slug": "r-fitness-basic-beginner-routine",
+    "diff": [
+      "Beginner",
+      "Intermediate"
+    ],
+    "equip": null,
+    "tag": "3x5 routine for complete beginners to strength training using barbells",
+    "dpw": 3,
+    "weeks": 12,
+    "ok": true,
+    "c": [
+      "strength"
+    ],
+    "src": "local",
+    "name": "r-fitness-basic-beginner-routine",
+    "url": ""
+  },
+  {
+    "t": "Raider",
+    "a": "Bald Omni-Man",
+    "slug": "raider",
+    "diff": [
+      "Intermediate"
+    ],
+    "equip": null,
+    "tag": "Upper/Lower Bodybuilding Program",
+    "dpw": 1,
+    "weeks": 0,
+    "ok": true,
+    "c": [
+      "hyper"
+    ],
+    "src": "local",
+    "name": "raider",
+    "url": ""
+  },
+  {
+    "t": "Raider 2.0",
+    "a": "Bald Omni-Man",
+    "slug": "raider-2025",
+    "diff": [
+      "Intermediate"
+    ],
+    "equip": null,
+    "tag": "Upper/Lower Bodybuilding Program. Updated 2025!",
+    "dpw": 1,
+    "weeks": 0,
+    "ok": true,
+    "c": [
+      "hyper"
+    ],
+    "src": "local",
+    "name": "raider-2025",
+    "url": ""
+  },
+  {
+    "t": "RAMPAGE",
+    "a": "Geoffrey Verity Schofield",
+    "slug": "rampage",
+    "diff": [
+      "Intermediate"
+    ],
+    "equip": null,
+    "tag": "3x/week full body hypertrophy program from Geoff Schofield's Resurrecting Your Gains ebook",
+    "dpw": 1,
+    "weeks": 0,
+    "ok": true,
+    "c": [
+      "hyper"
+    ],
+    "src": "local",
+    "name": "rampage",
+    "url": ""
+  },
+  {
+    "t": "RAVAGE",
+    "a": "Geoffrey Verity Schofield",
+    "slug": "ravage",
+    "diff": [
+      "Intermediate",
+      "Advanced"
+    ],
+    "equip": null,
+    "tag": "6x/week intermediate hypertrophy program from Geoff Schofield's Resurrecting Your Gains ebook",
+    "dpw": 1,
+    "weeks": 0,
+    "ok": true,
+    "c": [
+      "hyper"
+    ],
+    "src": "local",
+    "name": "ravage",
+    "url": ""
+  },
+  {
+    "t": "Recovering Powerlifters",
+    "a": "Geoffrey Verity Schofield",
+    "slug": "recovering-powerlifters",
+    "diff": [
+      "Intermediate",
+      "Advanced"
+    ],
+    "equip": null,
+    "tag": "For powerlifters who want to build a more aesthetic physique",
+    "dpw": 1,
+    "weeks": 0,
+    "ok": true,
+    "c": [
+      "hyper",
+      "strength"
+    ],
+    "src": "local",
+    "name": "recovering-powerlifters",
+    "url": ""
+  },
+  {
+    "t": "Deadly Efficient - Train Like The Red Hood",
+    "a": "Paris Demers",
+    "slug": "red-hood-training-plan",
+    "diff": [
+      "Intermediate",
+      "Advanced"
+    ],
+    "equip": null,
+    "tag": "Build a muscular and explosively athletic body with only 4 weekly time-efficient workouts!",
+    "dpw": 4,
+    "weeks": 8,
+    "ok": true,
+    "c": [
+      "endurance"
+    ],
+    "free": true,
+    "src": "local",
+    "name": "red-hood-training-plan",
+    "url": ""
+  },
+  {
+    "t": "Reddit PPL",
+    "a": "r/Fitness",
+    "slug": "reddit-ppl",
+    "diff": [
+      "Intermediate"
+    ],
+    "equip": null,
+    "tag": "The unofficial r/fitness program for novice lifters to pack on strength and muscle.",
+    "dpw": 1,
+    "weeks": 0,
+    "ok": true,
+    "c": [
+      "hyper"
+    ],
+    "src": "local",
+    "name": "reddit-ppl",
+    "url": ""
+  },
+  {
+    "t": "Reddit's Bodyweight Fitness Primer",
+    "a": "r/BodyweightFitness",
+    "slug": "reddit-s-bodyweight-fitness-primer",
+    "diff": [
+      "Beginner"
+    ],
+    "equip": null,
+    "tag": "14-day bodyweight training routine for absolute beginners new to fitness",
+    "dpw": 1,
+    "weeks": 0,
+    "ok": true,
+    "c": [
+      "fitness"
+    ],
+    "src": "local",
+    "name": "reddit-s-bodyweight-fitness-primer",
+    "url": ""
+  },
+  {
+    "t": "Rip And Tear",
+    "a": "Mark Rosenberg",
+    "slug": "rip-and-tear",
+    "diff": [
+      "Advanced"
+    ],
+    "equip": null,
+    "tag": "Intense Strength Program with High Frequency, High Weight Squat, Bench and Deadlift",
+    "dpw": 4,
+    "weeks": 12,
+    "ok": true,
+    "c": [
+      "strength"
+    ],
+    "src": "local",
+    "name": "rip-and-tear",
+    "url": ""
+  },
+  {
+    "t": "SBD101 - Powerbuilding for Students",
+    "a": "Alec Chen",
+    "slug": "sbd101-powerbuilding-for-students",
+    "diff": [
+      "Beginner",
+      "Intermediate"
+    ],
+    "equip": null,
+    "tag": "The powerbuilding program optimized for the college student's schedule and lifestyle",
+    "dpw": 2,
+    "weeks": 0,
+    "ok": true,
+    "c": [
+      "strength"
+    ],
+    "src": "local",
+    "name": "sbd101-powerbuilding-for-students",
+    "url": ""
+  },
+  {
+    "t": "ShredSmart Full Body Program",
+    "a": "Radu Antoniu",
+    "slug": "shredsmart-full-body",
+    "diff": [
+      "Beginner",
+      "Intermediate"
+    ],
+    "equip": null,
+    "tag": "3x or 4x per week full body program to look great at the intermediate level.",
+    "dpw": 2,
+    "weeks": 0,
+    "ok": true,
+    "c": [
+      "hyper"
+    ],
+    "src": "local",
+    "name": "shredsmart-full-body",
+    "url": ""
+  },
+  {
+    "t": "ShredSmart PPL Full Body Program",
+    "a": "Radu Antoniu",
+    "slug": "shredsmart-ppl-full-body",
+    "diff": [
+      "Intermediate"
+    ],
+    "equip": null,
+    "tag": "4x per week Legs, Push, Pull, Full Body program to look great at the intermediate level.",
+    "dpw": 1,
+    "weeks": 0,
+    "ok": true,
+    "c": [
+      "hyper"
+    ],
+    "src": "local",
+    "name": "shredsmart-ppl-full-body",
+    "url": ""
+  },
+  {
+    "t": "Silver Era Aesthetics Program",
+    "a": "Natural Hypertrophy",
+    "slug": "silver-era-aesthetics-program",
+    "diff": [
+      "Intermediate",
+      "Advanced"
+    ],
+    "equip": null,
+    "tag": "Steve Reeves Physique Workout",
+    "dpw": 4,
+    "weeks": 16,
+    "ok": true,
+    "c": [
+      "hyper"
+    ],
+    "free": true,
+    "src": "local",
+    "name": "silver-era-aesthetics-program",
+    "url": ""
+  },
+  {
+    "t": "Strong Curves: Bootyful Beginnings",
+    "a": "Bret Contreras",
+    "slug": "strong-curves-bootyful-beginnings",
+    "diff": [
+      "Beginner",
+      "Intermediate",
+      "Novice"
+    ],
+    "equip": null,
+    "tag": "A woman's guide to building a better butt and body",
+    "dpw": 3,
+    "weeks": 8,
+    "ok": true,
+    "c": [
+      "hyper"
+    ],
+    "src": "local",
+    "name": "strong-curves-bootyful-beginnings",
+    "url": ""
+  },
+  {
+    "t": "Stronger Miles",
+    "a": "Tiffany Ma",
+    "slug": "stronger-miles",
+    "diff": [
+      "Beginner",
+      "Intermediate"
+    ],
+    "equip": null,
+    "tag": "12-week progressive plan for beginner runners to build endurance, strength, and confidence for a 5k race at the end of the program.",
+    "dpw": 1,
+    "weeks": 0,
+    "ok": true,
+    "c": [
+      "endurance"
+    ],
+    "src": "local",
+    "name": "stronger-miles",
+    "url": ""
+  },
+  {
+    "t": "SuperGains (Superset Program)",
+    "a": "Dr. Pak",
+    "slug": "supergains-superset-program",
+    "diff": [
+      "Intermediate",
+      "Advanced"
+    ],
+    "equip": null,
+    "tag": "3-day superset based program with an upper body focus for massive muscle gain in no time!",
+    "dpw": 1,
+    "weeks": 0,
+    "ok": true,
+    "c": [
+      "hyper"
+    ],
+    "src": "local",
+    "name": "supergains-superset-program",
+    "url": ""
+  },
+  {
+    "t": "Superman Aesthetics Bodybuilding Program",
+    "a": "Natural Hypertrophy",
+    "slug": "superman-aesthetics-bodybuilding-program",
+    "diff": [
+      "Intermediate"
+    ],
+    "equip": null,
+    "tag": "Train to look like Henry Cavill by following this physique workout",
+    "dpw": 4,
+    "weeks": 12,
+    "ok": true,
+    "c": [
+      "hyper"
+    ],
+    "free": true,
+    "src": "local",
+    "name": "superman-aesthetics-bodybuilding-program",
+    "url": ""
+  },
+  {
+    "t": "The Absolute Athlete",
+    "a": "Hadyn Wiseman",
+    "slug": "the-absolute-athlete",
+    "diff": [
+      "Intermediate"
+    ],
+    "equip": null,
+    "tag": "Performance above all",
+    "dpw": 1,
+    "weeks": 0,
+    "ok": true,
+    "c": [
+      "hyper",
+      "endurance"
+    ],
+    "src": "local",
+    "name": "the-absolute-athlete",
+    "url": ""
+  },
+  {
+    "t": "The Baki Maxing Plan",
+    "a": "Paris Demers",
+    "slug": "the-baki-maxing-plan",
+    "diff": [
+      "Intermediate",
+      "Advanced"
+    ],
+    "equip": null,
+    "tag": "The Baki Maxing Plan is a 27-week, 3-phase, science-based bodybuilding program",
+    "dpw": 1,
+    "weeks": 0,
+    "ok": true,
+    "c": [
+      "hyper"
+    ],
+    "src": "local",
+    "name": "the-baki-maxing-plan",
+    "url": ""
+  },
+  {
+    "t": "The Dumbbell Stopgap",
+    "a": "r/Fitness",
+    "slug": "the-dumbbell-stopgap",
+    "diff": [
+      "Beginner",
+      "Intermediate"
+    ],
+    "equip": null,
+    "tag": "Simple beginner dumbbell only program from the r/Fitness wiki",
+    "dpw": 1,
+    "weeks": 0,
+    "ok": true,
+    "c": [
+      "strength",
+      "fitness"
+    ],
+    "src": "local",
+    "name": "the-dumbbell-stopgap",
+    "url": ""
+  },
+  {
+    "t": "The Rippler (GZCL Official)",
+    "a": "Cody Lefever",
+    "slug": "the-rippler-gzcl-official",
+    "diff": [
+      "Intermediate"
+    ],
+    "equip": null,
+    "tag": "Cody Lefever's official ",
+    "dpw": 1,
+    "weeks": 0,
+    "ok": true,
+    "c": [
+      "strength"
+    ],
+    "src": "local",
+    "name": "the-rippler-gzcl-official",
+    "url": ""
+  },
+  {
+    "t": "The Sculpt Method",
+    "a": "Tiffany Ma",
+    "slug": "the-sculpt-method",
+    "diff": [
+      "Beginner",
+      "Intermediate"
+    ],
+    "equip": null,
+    "tag": "Designed for women who want to build lean muscle, gain strength, and sculpt their physique, without the fear of getting bulky.",
+    "dpw": 1,
+    "weeks": 0,
+    "ok": true,
+    "c": [
+      "hyper"
+    ],
+    "src": "local",
+    "name": "the-sculpt-method",
+    "url": ""
+  },
+  {
+    "t": "The Squat Plug Program",
+    "a": "Matt Vena",
+    "slug": "the-squat-plug-program-copy",
+    "diff": [
+      "Intermediate",
+      "Advanced"
+    ],
+    "equip": null,
+    "tag": "Squat focused program to help plug your leg weakness.",
+    "dpw": 1,
+    "weeks": 0,
+    "ok": true,
+    "c": [
+      "strength"
+    ],
+    "src": "local",
+    "name": "the-squat-plug-program-copy",
+    "url": ""
+  },
+  {
+    "t": "The Wayjacked Machine",
+    "a": "Geoffrey Verity Schofield",
+    "slug": "the-wayjacked-machine",
+    "diff": [
+      "Beginner",
+      "Intermediate"
+    ],
+    "equip": null,
+    "tag": "Science-backed muscle-building for new lifters—train smart, grow strong, get big!",
+    "dpw": 1,
+    "weeks": 0,
+    "ok": true,
+    "c": [
+      "hyper"
+    ],
+    "src": "local",
+    "name": "the-wayjacked-machine",
+    "url": ""
+  },
+  {
+    "t": "Total Body Sculpt",
+    "a": "Team Boostcamp",
+    "slug": "total-body-sculpt",
+    "diff": [
+      "Beginner",
+      "Intermediate"
+    ],
+    "equip": null,
+    "tag": "3x per week program build strength to help you sculpt lean muscle, and move with control and confidence.",
+    "dpw": 2,
+    "weeks": 0,
+    "ok": true,
+    "c": [
+      "hyper"
+    ],
+    "src": "local",
+    "name": "total-body-sculpt",
+    "url": ""
+  },
+  {
+    "t": "Train Like Toji Fushiguro",
+    "a": "Paris Demers",
+    "slug": "train-like-toji-fushiguro",
+    "diff": [
+      "Intermediate"
+    ],
+    "equip": null,
+    "tag": "Become a jacked athlete like Toji by following this 4 day/week athletic bodybuilding hybrid program!",
+    "dpw": 1,
+    "weeks": 0,
+    "ok": true,
+    "c": [
+      "endurance"
+    ],
+    "src": "local",
+    "name": "train-like-toji-fushiguro",
+    "url": ""
+  },
+  {
+    "t": "Transition to Olympic Weightlifting",
+    "a": "Oleksiy Torokhtiy",
+    "slug": "transition-to-olympic-weightlifting",
+    "diff": [
+      "Intermediate"
+    ],
+    "equip": null,
+    "tag": "If you have experience in general weight training, and want to switch to Olympic Weightlifting",
+    "dpw": 1,
+    "weeks": 0,
+    "ok": true,
+    "c": [
+      "strength"
+    ],
+    "src": "local",
+    "name": "transition-to-olympic-weightlifting",
+    "url": ""
+  },
+  {
+    "t": "TSA 9 Week Intermediate Approach",
+    "a": "The Strength Athlete",
+    "slug": "tsa-9-week-intermediate-approach",
+    "diff": [
+      "Intermediate"
+    ],
+    "equip": null,
+    "tag": "Designed for intermediate lifters to peak into competition or be re-run multiple times in offseason.",
+    "dpw": 4,
+    "weeks": 9,
+    "ok": true,
+    "c": [
+      "strength"
+    ],
+    "src": "local",
+    "name": "tsa-9-week-intermediate-approach",
+    "url": ""
+  },
+  {
+    "t": "TSA Beginner Approach",
+    "a": "The Strength Athlete",
+    "slug": "tsa-beginner-approach",
+    "diff": [
+      "Beginner",
+      "Intermediate"
+    ],
+    "equip": null,
+    "tag": "9 week beginner powerlifting program made by Bryce Lewis and The Strength Athlete",
+    "dpw": 4,
+    "weeks": 0,
+    "ok": true,
+    "c": [
+      "strength"
+    ],
+    "src": "local",
+    "name": "tsa-beginner-approach",
+    "url": ""
+  },
+  {
+    "t": "Ultimate Hypertrophy Programs: Bridge",
+    "a": "Natural Hypertrophy",
+    "slug": "ultimate-hypertrophy-programs-bridge",
+    "diff": [
+      "Intermediate"
+    ],
+    "equip": null,
+    "tag": "Natural Hypertrophy's 4x per week program for novice lifters advancing to intermediates",
+    "dpw": 4,
+    "weeks": 12,
+    "ok": true,
+    "c": [
+      "hyper"
+    ],
+    "free": true,
+    "src": "local",
+    "name": "ultimate-hypertrophy-programs-bridge",
+    "url": ""
+  },
+  {
+    "t": "Ultimate Hypertrophy Programs: Intermediate",
+    "a": "Natural Hypertrophy",
+    "slug": "ultimate-hypertrophy-programs-intermediate",
+    "diff": [
+      "Intermediate"
+    ],
+    "equip": null,
+    "tag": "Natural Hypertrophy's 5x per week intermediate split for those who finished the Bridge program",
+    "dpw": 5,
+    "weeks": 12,
+    "ok": true,
+    "c": [
+      "hyper"
+    ],
+    "free": true,
+    "src": "local",
+    "name": "ultimate-hypertrophy-programs-intermediate",
+    "url": ""
+  },
+  {
+    "t": "Ultimate Hypertrophy Programs: Novice",
+    "a": "Natural Hypertrophy",
+    "slug": "ultimate-hypertrophy-programs-novice",
+    "diff": [
+      "Intermediate"
+    ],
+    "equip": null,
+    "tag": "Natural Hypertrophy's 3x per week full body workout split for novice lifters",
+    "dpw": 3,
+    "weeks": 12,
+    "ok": true,
+    "c": [
+      "hyper"
+    ],
+    "free": true,
+    "src": "local",
+    "name": "ultimate-hypertrophy-programs-novice",
+    "url": ""
+  }
+]

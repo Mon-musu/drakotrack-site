@@ -266,7 +266,7 @@ input[type=number]{-moz-appearance:textfield;appearance:textfield}
 .bottomnav{
   position:fixed;left:0;right:0;bottom:0;z-index:40;display:none;
   background:var(--bottomnav-bg);backdrop-filter:blur(14px);border-top:1px solid var(--border);
-  padding:8px 10px calc(8px + env(safe-area-inset-bottom));grid-template-columns:repeat(4,1fr);gap:6px;
+  padding:8px 10px calc(8px + env(safe-area-inset-bottom));grid-template-columns:repeat(5,1fr);gap:6px;
 }
 .bottomnav .nav-btn{flex-direction:column;gap:3px;padding:8px 4px;font-size:11.5px;justify-content:center;align-items:center;border-radius:10px}
 
@@ -391,6 +391,68 @@ input[type=number]{-moz-appearance:textfield;appearance:textfield}
 .mini-field input:focus{box-shadow:none}
 .mini-field span{font-size:11px;color:var(--muted);font-weight:700}
 
+/* ---------- selector de repeticiones (1–15 + AMRAP) ---------- */
+.reps-picker{position:relative;display:flex}
+.reps-toggle{
+  display:flex;align-items:center;gap:6px;justify-content:center;min-width:62px;
+  padding:9px 10px;border-radius:10px;background:var(--bg-2);
+  border:1px solid var(--control-border);color:var(--text);
+  font-weight:800;font-size:15px;font-variant-numeric:tabular-nums;
+}
+.reps-toggle:hover{border-color:var(--orange)}
+.reps-toggle[aria-expanded="true"]{border-color:var(--orange);box-shadow:0 0 0 3px rgba(255,122,0,.18)}
+.reps-arrow{font-size:10px;color:var(--muted);line-height:1}
+.reps-menu{
+  position:absolute;top:calc(100% + 6px);left:0;z-index:60;min-width:140px;
+  display:grid;grid-template-columns:repeat(3,1fr);gap:4px;padding:6px;
+  background:var(--panel);border:1px solid var(--border-strong);border-radius:12px;box-shadow:var(--shadow);
+}
+/* dentro de una fila de sesión se alinea a la derecha para no salir de pantalla */
+.ex-inputs .reps-menu{left:auto;right:0}
+.reps-opt{
+  padding:8px 6px;border-radius:8px;background:var(--panel-2);border:1px solid var(--border);
+  color:var(--text);font-weight:700;font-size:13.5px;
+}
+.reps-opt:hover{border-color:var(--orange);color:var(--accent-text)}
+.reps-opt.active{background:var(--orange-grad);border-color:transparent;color:#1a0a00}
+.reps-opt[data-value="AMRAP"]{grid-column:1/-1;font-size:12.5px;letter-spacing:.06em}
+.reps-static{font-weight:800;font-size:14px;color:var(--muted)}
+
+/* ---------- superset ---------- */
+.sup-toggle{
+  display:flex;align-items:center;gap:7px;padding:9px 11px;border-radius:10px;
+  background:var(--panel);border:1px solid var(--control-border);
+  color:var(--muted);font-size:12px;font-weight:700;cursor:pointer;white-space:nowrap;
+}
+.sup-toggle input{
+  width:16px;height:16px;min-width:16px;margin:0;padding:0;border-radius:4px;
+  accent-color:var(--orange);box-shadow:none;
+}
+.sup-toggle:hover{border-color:var(--orange)}
+.sup-toggle:has(input:checked){
+  border-color:var(--orange);background:rgba(255,122,0,.12);color:var(--accent-text);
+}
+.sup-chip{
+  display:inline-block;margin-left:6px;padding:1px 7px;border-radius:999px;vertical-align:middle;
+  background:rgba(255,122,0,.16);border:1px solid rgba(255,122,0,.45);
+  color:var(--accent-text);font-size:10px;font-weight:800;letter-spacing:.06em;
+}
+.ex-row.is-superset{border-left:3px solid var(--orange)}
+.ex-row-edit.is-superset{border-color:rgba(255,122,0,.5)}
+
+/* ---------- botón S de superset en la sesión en curso ---------- */
+.sup-btn{
+  width:36px;height:36px;flex:0 0 auto;border-radius:10px;
+  display:inline-flex;align-items:center;justify-content:center;
+  background:var(--bg-2);border:1px solid var(--control-border);
+  color:var(--muted);font-weight:900;font-size:13px;line-height:1;
+}
+.sup-btn:hover{border-color:var(--orange);color:var(--accent-text)}
+.sup-btn.active{
+  background:var(--orange-grad);border-color:transparent;color:#1a0a00;
+  box-shadow:0 4px 12px rgba(255,122,0,.35);
+}
+
 .check{position:relative;flex-shrink:0;cursor:pointer;display:inline-flex}
 .check input{position:absolute;opacity:0;width:0;height:0}
 .checkmark{
@@ -417,7 +479,7 @@ input[type=number]{-moz-appearance:textfield;appearance:textfield}
    ============================================================ */
 .editor-card{background:var(--panel);border:1px solid var(--border);border-radius:20px;padding:24px;max-width:640px}
 .ex-row-edit{
-  display:grid;grid-template-columns:1fr 84px 84px 38px;gap:8px;align-items:center;
+  display:grid;grid-template-columns:minmax(0,1fr) 84px 76px auto 38px;gap:8px;align-items:center;
   background:var(--bg-2);border:1px solid var(--border);border-radius:12px;padding:10px;margin-bottom:8px;
 }
 .ex-row-edit .mini-field{background:var(--panel)}
@@ -539,10 +601,15 @@ input[type=number]{-moz-appearance:textfield;appearance:textfield}
   .chip-name{display:none}
 }
 @media (max-width:560px){
-  /* editor: el nombre del ejercicio ocupa su propia fila a ancho completo;
-     series y repeticiones comparten fila con el botón de eliminar */
-  .ex-row-edit{grid-template-columns:1fr 1fr 34px}
-  .ex-row-edit textarea{grid-column:1/-1}
+  /* editor: el nombre ocupa su propia fila; series, repeticiones, superset
+     y el botón de eliminar se acomodan en las filas siguientes */
+  .ex-row-edit{display:flex;flex-wrap:wrap;gap:8px}
+  .ex-row-edit textarea{flex:1 1 100%}
+  .ex-row-edit .mini-field{flex:1 1 auto}
+  .ex-row-edit .reps-picker{flex:0 0 auto}
+  .ex-row-edit .reps-menu{left:auto;right:0}
+  .ex-row-edit .sup-toggle{flex:1 1 100%;justify-content:center}
+  .ex-row-edit .icon-btn{margin-left:auto}
 }
 @media (prefers-reduced-motion:reduce){
   *{animation:none!important;transition:none!important}
@@ -633,6 +700,22 @@ input[type=number]{-moz-appearance:textfield;appearance:textfield}
 }
 .consent-row a{color:var(--accent-text);font-weight:700}
 .consent-note{font-size:11.5px;line-height:1.45;color:var(--muted-2)}
+
+/* ============================================================ */
+/*  CAPTCHA DEL REGISTRO (ALTCHA, prueba de trabajo)             */
+/* ============================================================ */
+.captcha-box{
+  display:flex;flex-direction:column;gap:8px;margin:0 0 16px;padding:12px 14px;
+  background:var(--panel-2);border:1px solid var(--border-strong);border-radius:12px;
+}
+.captcha-label{font-size:12.5px;font-weight:700;color:var(--text)}
+.captcha-note{font-size:11.5px;line-height:1.45;color:var(--muted-2)}
+.captcha-box altcha-widget{
+  --altcha-max-width:none;--altcha-border-radius:10px;
+  --altcha-color-base:var(--panel);--altcha-color-base-content:var(--text);
+  --altcha-color-primary:var(--orange);--altcha-color-primary-content:#1a0c04;
+  display:block;
+}
 .site-footer{margin-top:22px;padding-top:16px;border-top:1px solid var(--border);text-align:center}
 .footer-links{display:flex;flex-wrap:wrap;gap:6px 14px;justify-content:center;margin-bottom:9px}
 .footer-links a{
@@ -718,6 +801,37 @@ input[type=number]{-moz-appearance:textfield;appearance:textfield}
   .legal{max-width:none}
 }
 
+/* ===== aviso de actualización de la APK ===== */
+.update-banner{
+  position:fixed;left:12px;right:12px;z-index:80;
+  bottom:calc(76px + env(safe-area-inset-bottom,0px));
+  display:flex;align-items:center;gap:12px;
+  padding:12px 14px;border-radius:16px;
+  border:1px solid var(--border-strong,#2a2a33);
+  background:var(--panel-2,#16161a);color:var(--text,#f4f4f6);
+  box-shadow:0 16px 40px rgba(0,0,0,.45);
+  font-family:var(--font,system-ui,-apple-system,'Segoe UI',sans-serif);
+}
+.update-text{display:flex;flex-direction:column;gap:2px;min-width:0;flex:1}
+.update-text strong{font-size:13.5px;font-weight:800;letter-spacing:-.01em}
+.update-text span{font-size:12px;color:var(--muted-2,#9a9aa4);line-height:1.35}
+.update-get{
+  flex:0 0 auto;border:0;cursor:pointer;
+  padding:9px 14px;border-radius:11px;
+  background:#ff7a00;color:#150c02;font-weight:800;font-size:12.5px;
+  font-family:inherit;
+}
+.update-get:active{transform:scale(.97)}
+.update-close{
+  flex:0 0 auto;border:0;background:transparent;cursor:pointer;
+  color:var(--muted-2,#9a9aa4);font-size:20px;line-height:1;
+  padding:2px 4px;font-family:inherit;
+}
+@media (min-width:900px){
+  .update-banner{left:auto;right:18px;bottom:18px;max-width:420px}
+}
+
+
 /* ============================================================
    SERIES INDIVIDUALES (modelo v2)
    ============================================================ */
@@ -793,3 +907,125 @@ input[type=number]{-moz-appearance:textfield;appearance:textfield}
   .resume-card .btn{width:100%}
   .session-clock{font-size:14px}
 }
+
+/* ============================================================
+   BIBLIOTECA DE EJERCICIOS
+   ============================================================ */
+.picker-filters{display:flex;gap:10px;flex-wrap:wrap;margin-top:10px}
+.picker-filters .field{flex:1 1 150px;min-width:130px;margin:0}
+.ex-pick-list{display:flex;flex-direction:column;gap:6px;max-height:46vh;overflow:auto;margin-top:10px}
+.lib-card .ex-pick-list{max-height:none}
+.ex-pick{display:flex;align-items:center;gap:6px;background:var(--bg-2);border:1px solid var(--border);border-radius:12px}
+.ex-pick-main{flex:1;min-width:0;text-align:left;background:none;border:0;color:inherit;padding:10px 12px;display:flex;flex-direction:column;gap:2px;cursor:pointer;font:inherit}
+.ex-pick-main:hover{background:var(--panel);border-radius:12px}
+.ex-pick-name{font-weight:700;font-size:14px}
+.ex-pick-meta{font-size:12px;color:var(--muted);line-height:1.35}
+.ex-pick-tools{display:flex;gap:2px;padding-right:6px;flex:0 0 auto}
+.tag-custom{font-size:10px;text-transform:uppercase;letter-spacing:.05em;color:var(--accent-text);border:1px solid var(--border);border-radius:6px;padding:1px 5px;margin-left:4px}
+
+/* Editor: fila con nombre arriba y controles debajo */
+.ex-row-edit{display:flex;flex-direction:column;align-items:stretch;gap:8px}
+.ex-row-name{display:flex;align-items:center;gap:8px;min-width:0}
+.ex-row-name textarea{flex:1;min-width:0}
+.ex-order{width:22px;height:22px;border-radius:50%;background:var(--panel);border:1px solid var(--border);display:grid;place-items:center;font-size:11px;font-weight:800;color:var(--muted);flex:0 0 auto}
+.ex-meta{font-size:11.5px;color:var(--muted);white-space:nowrap;font-weight:600}
+.ex-row-fields{display:flex;flex-wrap:wrap;gap:8px;align-items:center}
+.ex-tools{display:flex;gap:2px;margin-left:auto}
+.ex-tools .icon-btn[disabled]{opacity:.35;cursor:not-allowed}
+@media (max-width:560px){
+  .ex-meta{flex:1 1 100%;white-space:normal;padding-left:30px}
+  .ex-row-fields .sup-toggle{flex:1 1 100%;justify-content:center}
+}
+
+/* ============================================================
+   DESCANSO ENTRE SERIES
+   ============================================================ */
+.rest-slot{margin:0 0 14px}
+.rest-bar{
+  display:flex;align-items:center;gap:12px;flex-wrap:wrap;
+  background:var(--panel);border:1px solid var(--border);border-left:3px solid var(--orange);
+  border-radius:14px;padding:10px 14px;
+}
+.rest-bar.done{border-left-color:var(--green)}
+.rest-label{font-size:12px;font-weight:800;text-transform:uppercase;letter-spacing:.06em;color:var(--muted)}
+.rest-time{font-variant-numeric:tabular-nums;font-size:22px;font-weight:900;color:var(--accent-text);min-width:64px}
+.rest-progress{flex:1 1 120px;height:6px;background:var(--bg-2);border-radius:99px;overflow:hidden;min-width:80px}
+.rest-fill{height:100%;background:linear-gradient(90deg,#ffa040,#f05100);border-radius:99px;transition:width .9s linear}
+.rest-actions{display:flex;gap:6px;margin-left:auto}
+.rest-actions .btn{padding:6px 10px;font-size:12px}
+
+/* histórico por serie */
+.set-prev{margin:2px 0 0 34px;font-size:11.5px;color:var(--muted);font-weight:600}
+.set-prev::before{content:"↺ ";color:var(--muted-2)}
+
+/* superserie */
+.sup-badge{
+  display:inline-grid;place-items:center;min-width:24px;height:22px;padding:0 5px;margin-right:6px;
+  border-radius:7px;background:var(--orange);color:#1a0a00;font-size:11px;font-weight:900;vertical-align:middle;
+}
+.sup-line{margin:2px 0 8px;font-size:12px;color:var(--accent-text);font-weight:700}
+
+/* récord detectado en la serie */
+.set-pr{margin:2px 0 0 34px;font-size:11.5px;color:var(--green);font-weight:800}
+
+/* progreso por ejercicio */
+.pg-table{display:flex;flex-direction:column;gap:8px}
+.pg-row{display:grid;grid-template-columns:1fr auto auto auto;gap:12px;align-items:center;padding:10px 12px;border:1px solid var(--border);border-radius:12px;background:var(--panel)}
+@media(max-width:560px){.pg-row{grid-template-columns:1fr auto;row-gap:4px}}
+
+/* duración del aviso y tono de serie pesada */
+.rest-heavy{font-size:11px;font-weight:800;letter-spacing:.04em;text-transform:uppercase;color:var(--accent-text);border:1px solid currentColor;border-radius:999px;padding:2px 8px;white-space:nowrap}
+.rest-alert-len{background:var(--panel);color:var(--text);border:1px solid var(--border);border-radius:10px;padding:4px 6px;font:inherit;font-size:12px;font-weight:700}
+
+/* ajustes de la cuenta */
+.settings-card{background:var(--panel);border:1px solid var(--border);border-radius:16px;padding:16px 18px;margin-bottom:14px}
+.settings-card h2{font-size:15px;margin:0 0 6px}
+.settings-card > p{margin:0 0 6px}
+.seg-row{display:inline-flex;gap:6px;margin-top:12px;padding:4px;background:var(--bg-2);border:1px solid var(--border);border-radius:12px}
+.seg-btn{background:transparent;border:0;color:var(--muted);font:inherit;font-weight:700;font-size:13px;padding:8px 16px;border-radius:9px;cursor:pointer}
+.seg-btn[aria-pressed="true"]{background:var(--orange-grad);color:#1a0a00}
+.set-row{display:flex;align-items:center;justify-content:space-between;gap:16px;padding:12px 0;border-top:1px solid var(--border);cursor:pointer}
+.set-row:first-of-type{border-top:0;padding-top:4px}
+.set-text{display:flex;flex-direction:column;gap:2px;font-size:14px}
+.set-text small{font-size:12px;line-height:1.4}
+.set-check{flex:none;appearance:none;-webkit-appearance:none;width:46px;height:26px;border-radius:999px;background:var(--panel-2);border:1px solid var(--border-strong);position:relative;cursor:pointer;transition:background .15s,border-color .15s}
+.set-check::after{content:"";position:absolute;top:2px;left:2px;width:20px;height:20px;border-radius:50%;background:var(--muted);transition:transform .15s,background .15s}
+.set-check:checked{background:var(--orange);border-color:var(--orange)}
+.set-check:checked::after{transform:translateX(20px);background:#1a0a00}
+.set-check:focus-visible{outline:2px solid var(--focus);outline-offset:2px}
+
+/* sugerencias de progresión */
+.prog-card{border:1px solid var(--border);border-left:4px solid var(--muted);border-radius:14px;background:var(--panel);padding:14px 16px;margin-bottom:16px}
+.prog-card.prog-up{border-left-color:#4ade80}
+.prog-card.prog-down{border-left-color:var(--danger-text)}
+.prog-card.prog-reps{border-left-color:var(--accent-text)}
+.prog-head{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:6px}
+.prog-tag{font-size:11px;font-weight:800;letter-spacing:.05em;text-transform:uppercase;background:var(--orange-grad);color:#1a0a00;border-radius:999px;padding:3px 9px}
+.prog-text{margin:0 0 4px;font-size:14px;font-weight:600;line-height:1.45}
+.prog-line{margin:8px 0 0;font-size:13px;line-height:1.5;color:var(--muted);display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.prog-line b{color:var(--text)}
+.prog-line.prog-up b{color:#4ade80}
+.prog-line.prog-down b{color:var(--danger-text)}
+.prog-line.prog-reps b{color:var(--accent-text)}
+
+/* mejor marca en biblioteca y rutinas */
+.ex-pick-pr{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-top:4px;font-size:12px;font-weight:800;color:var(--accent-text)}
+.ex-pick-recs{font-size:11px;font-weight:600;color:var(--muted);border:1px solid var(--border);border-radius:999px;padding:1px 7px}
+.wcard-recs{margin:2px 0 0;font-size:11px;font-weight:700;color:var(--accent-text);letter-spacing:.02em}
+
+/* comparativa de 4 semanas y 1RM */
+.stats-grid.five{grid-template-columns:repeat(5,1fr)}
+.cmp-card{background:var(--panel);border:1px solid var(--border);border-radius:16px;padding:16px 18px;margin-bottom:16px}
+.cmp-card h2{font-size:16px;margin:0}
+.cmp-card .section-head{margin-bottom:10px}
+.cmp-legend,.cmp-row{display:grid;grid-template-columns:1fr 92px 92px 64px;gap:10px;align-items:center}
+.cmp-legend{padding-bottom:6px;border-bottom:1px solid var(--border)}
+.cmp-row{padding:9px 0;border-bottom:1px solid var(--border);font-size:13px}
+.cmp-row:last-of-type{border-bottom:0}
+.cmp-val{text-align:right;color:var(--muted);font-weight:600;font-variant-numeric:tabular-nums}
+.cmp-val.cmp-now{color:var(--text);font-weight:800}
+.cmp-delta{text-align:right;font-weight:800;font-size:12px;font-variant-numeric:tabular-nums}
+.cmp-delta.up{color:#4ade80}
+.cmp-delta.down{color:var(--danger-text)}
+.cmp-delta.flat{color:var(--muted)}
+@media(max-width:560px){.cmp-legend,.cmp-row{grid-template-columns:1fr 70px 70px 54px;gap:6px;font-size:12px}}

@@ -26,6 +26,11 @@ KEY_ALIAS=${KEY_ALIAS:-drakotrack}
 STORE_PASS_FILE=apk-build/keys/.storepass
 VERSION_FILE=apk-version.json
 OUT_DIR=bundle
+# Site files bundled into the APK as assets/public/*. They are only the
+# offline fallback (the shell loads server.url, so the deployed site wins),
+# but they must never be a stale hand-made copy: this list is the single
+# source of truth and the bundle is rebuilt from it on every release.
+WEB_ASSETS="index.html app.js styles.css share.js supabase.js boostcamp.js altcha.js altcha-setup.js legal.html legal.js logo.png update-check.js"
 APK_DIR=apk
 PUBLIC_BASE=${PUBLIC_BASE:-https://drakotrack.vercel.app}
 GH_REPO=${GH_REPO:-Mon-musu/drakotrack-site}
@@ -97,7 +102,8 @@ WORK=$(mktemp -d)
 trap 'rm -rf "$WORK"' EXIT
 
 # --- patch version (+ start URL tag), align, sign ----------------------------
-python3 apk-build/bump-version.py "$BASE_APK" "$WORK/patched.apk" "$NEXT_CODE" "$NEXT_NAME" --tag-apk
+python3 apk-build/bump-version.py "$BASE_APK" "$WORK/patched.apk" "$NEXT_CODE" "$NEXT_NAME" --tag-apk \
+  --web-dir . --web-files "$WEB_ASSETS"
 zipalign -p -f 4 "$WORK/patched.apk" "$WORK/aligned.apk"
 zipalign -c -p 4 "$WORK/aligned.apk" >/dev/null || die "alignment check failed"
 
@@ -120,6 +126,24 @@ grep -q "versionCode='$NEXT_CODE'" <<<"$PACKAGE_LINE" || die "versionCode not ap
 grep -q "versionName='$NEXT_NAME'" <<<"$PACKAGE_LINE" || die "versionName not applied"
 unzip -p "$OUT_APK" assets/capacitor.config.json | grep -q "apk=$NEXT_CODE" \
   || die "start URL was not tagged with the build number"
+python3 - "$OUT_APK" "$WEB_ASSETS" <<'PY'
+import sys, zipfile
+exp = sys.argv[2].split()
+with zipfile.ZipFile(sys.argv[1]) as z:
+    names = [n for n in z.namelist() if n.startswith("assets/public/")]
+    got = {n[len("assets/public/"):] for n in names}
+    generated = {"cordova.js", "cordova_plugins.js"}   # Capacitor's own placeholders
+    missing, stale = set(exp) - got, got - set(exp) - generated
+    if missing or stale:
+        raise SystemExit(
+            "bundled site does not match WEB_ASSETS (missing: %s | stale: %s)"
+            % (sorted(missing) or "none", sorted(stale) or "none"))
+    for name in exp:
+        with open(name, "rb") as fh:
+            if z.read("assets/public/" + name) != fh.read():
+                raise SystemExit("bundled %s differs from the repository copy" % name)
+print("bundled site:", len(exp), "files, identical to the repository")
+PY
 
 # --- publish the APK ---------------------------------------------------------
 TAG="apk-$NEXT_NAME"
