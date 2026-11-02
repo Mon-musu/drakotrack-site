@@ -26,6 +26,21 @@ function check(name, cond) {
   else { fail++; console.log('  FAIL ' + name); }
 }
 const g = expr => vm.runInContext(expr, ctx, { filename: 'sup' });
+
+/* Contrato de datos: se guarda una copia de cada documento que la app persiste
+   para comprobar al final que el validador del servidor conoce todos sus campos. */
+g(`(function(){
+  window.__savedDocs = [];
+  const original = saveDB;
+  saveDB = function(){
+    try{
+      const d = currentUser ? db.data[currentUser] : null;
+      if(d && Object.keys(d).length) window.__savedDocs.push(JSON.parse(JSON.stringify(d)));
+    }catch(e){}
+    return original.apply(null, arguments);
+  };
+  return true;
+})()`);
 const tick = ms => new Promise(r => setTimeout(r, ms));
 
 (async () => {
@@ -1698,7 +1713,7 @@ const tick = ms => new Promise(r => setTimeout(r, ms));
   check('app registers the service worker', /serviceWorker\.register\('sw\.js'\)/.test(fs.readFileSync(path.join(__dirname, 'app.js'), 'utf8')));
 
   // Validación del servidor: el documento que escribe la app debe pasar entero
-  const { validateData } = require('./lib/security');
+  const { validateData, DATA_KEYS } = require('./lib/security');
   g(`(function(){
     const d = dataFor(currentUser);
     if(!Array.isArray(d.exercises)) d.exercises = [];
@@ -1718,6 +1733,57 @@ const tick = ms => new Promise(r => setTimeout(r, ms));
   const withSets = tampered.sessions.find(s => (s.exercises || []).some(e => Array.isArray(e.sets)));
   if (withSets) withSets.exercises.find(e => Array.isArray(e.sets)).sets.push({ id: 'bad', number: 1, weight: -10, reps: 5, completed: true, type: 'working' });
   check('server validation still rejects a tampered document', validateData(tampered) === false);
+
+  // ===== Contrato de datos: app.js no escribe campos que el servidor ignore =====
+  const savedDocs = JSON.parse(g('JSON.stringify(window.__savedDocs)'));
+  check('the app persisted documents during the run', savedDocs.length > 0);
+  const scanUnknown = doc => {
+    const problems = [];
+    const keysOf = (obj, level, path) => {
+      if (!obj || typeof obj !== 'object' || Array.isArray(obj)) return;
+      const allowed = DATA_KEYS[level];
+      if (!allowed) { problems.push(path + ' (nivel desconocido: ' + level + ')'); return; }
+      for (const key of Object.keys(obj)) if (!allowed.has(key)) problems.push(path + '.' + key + ' ← ' + level);
+    };
+    const each = (arr, fn, path) => { if (Array.isArray(arr)) arr.forEach((item, i) => fn(item, path + '[' + i + ']')); };
+    keysOf(doc, 'profile', 'data');
+    each(doc.workouts, (w, p) => {
+      keysOf(w, 'workout', p);
+      each(w.exercises, (e, pe) => keysOf(e, 'workoutExercise', pe), p + '.exercises');
+    }, 'data.workouts');
+    each(doc.sessions, (sess, p) => {
+      keysOf(sess, 'session', p);
+      each(sess.exercises, (e, pe) => {
+        keysOf(e, 'sessionExercise', pe);
+        each(e.sets, (st, ps) => keysOf(st, 'set', ps), pe + '.sets');
+      }, p + '.exercises');
+      each(sess.records, (r, pr) => { keysOf(r, 'sessionRecord', pr); keysOf(r.previous, 'best', pr + '.previous'); }, p + '.records');
+      keysOf(sess.summary, 'summary', p + '.summary');
+      each(sess.summary && sess.summary.records, (r, pr) => { keysOf(r, 'summaryRecord', pr); keysOf(r.previous, 'best', pr + '.previous'); }, p + '.summary.records');
+      keysOf(sess.rest, 'rest', p + '.rest');
+    }, 'data.sessions');
+    each(doc.prs, (x, p) => keysOf(x, 'pr', p), 'data.prs');
+    each(doc.weights, (x, p) => keysOf(x, 'weight', p), 'data.weights');
+    each(doc.records, (x, p) => { keysOf(x, 'historyRecord', p); keysOf(x.previous, 'best', p + '.previous'); }, 'data.records');
+    each(doc.exercises, (x, p) => keysOf(x, 'ownExercise', p), 'data.exercises');
+    keysOf(doc.prefs, 'prefs', 'data.prefs');
+    keysOf(doc.profile, 'plan', 'data.profile');
+    keysOf(doc.consent, 'consent', 'data.consent');
+    return problems;
+  };
+  const contractProblems = [...new Set(savedDocs.flatMap(scanUnknown))];
+  check('the contract check inspects every saved document',
+    savedDocs.every(doc => typeof scanUnknown(doc) === 'object'));
+  check('every field app.js writes is known to the server validator'
+    + (contractProblems.length ? ' → ' + contractProblems.slice(0, 6).join(' | ') : ''),
+    contractProblems.length === 0);
+  const rejectedSaved = savedDocs.filter(doc => !validateData(doc));
+  check('every document app.js saves passes the server validator', rejectedSaved.length === 0);
+  const probe = JSON.parse(JSON.stringify(savedDocs[savedDocs.length - 1]));
+  probe.prefs = Object.assign({}, probe.prefs || {}, { campoInventado: true });
+  const probeProblems = scanUnknown(probe);
+  check('the contract check reports a genuinely new field',
+    probeProblems.some(p => /campoInventado/.test(p)));
 
   console.log(`\nRESULT: ${pass} passed, ${fail} failed`);
   process.exit(fail ? 1 : 0);

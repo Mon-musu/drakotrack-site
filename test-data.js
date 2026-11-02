@@ -61,6 +61,7 @@ const makeModernProfile = () => ({
   exercises: [{ id: 'custom:press-inclinado', name: 'Press inclinado', group: 'chest', equip: 'dumbbell', aliases: ['inclinado', 'banca inclinada'] }],
   prefs: { theme: 'dark', restAlerts: true, restSound: false, restVibrate: true, restAlertSeconds: 2, notifyRecords: true },
   profile: { goal: 'muscle', level: 'intermediate', days: 4, at: '2026-10-28', skipped: false },
+  achievements: { 'primera-sesion': '2026-10-28', 'racha-4': '2026-10-28' },
   photo: null, hiddenLib: ['lib-push'],
   consent: { version: '2026-10-28', at: ISO, terms: true, age16: true, health: true },
 });
@@ -87,6 +88,8 @@ ok(security.validateData({ ...makeModernProfile(), profile: { skipped: true, at:
 ok(security.validateData({ ...makeModernProfile(), photo: 'data:image/jpeg;base64,' + 'A'.repeat(2000) }), 'foto de progreso');
 ok(security.validateData({ ...makeModernProfile(), weights: [] }), 'sin registros de peso');
 ok(security.validateData({ ...makeModernProfile(), records: [] }), 'sin historial de récords');
+ok(security.validateData({ ...makeModernProfile(), achievements: {} }), 'logros vacíos');
+ok(security.validateData({ ...makeModernProfile(), achievements: undefined }), 'perfil antiguo sin logros');
 
 /* --------------------------------------------- B. entrenamientos válidos */
 ok(security.validateData({ workouts: [makeWorkout({ exercises: [{ id: uid(22), name: 'Sentadilla', sets: 3, reps: 5 }] })] }), 'entrenamiento tradicional');
@@ -142,6 +145,10 @@ bad({ prefs: { restAlerts: 'sí' } }, 'preferencia con tipo incorrecto');
 bad({ prefs: { desconocida: true } }, 'preferencia desconocida');
 bad({ prefs: { restAlertSeconds: 99 } }, 'aviso de descanso fuera de rango');
 bad({ profile: { days: 12 } }, 'días de plan fuera de rango');
+bad({ achievements: { 'primera-sesion': 'ayer' } }, 'logro con fecha inválida');
+bad({ achievements: { 'con espacios': '2026-10-28' } }, 'logro con identificador inválido');
+bad({ achievements: [] }, 'logros en formato de lista');
+bad({ achievements: Object.fromEntries(Array.from({ length: 201 }, (_, i) => ['logro-' + i, '2026-10-28'])) }, 'demasiados logros');
 bad({ profile: { goal: '<script>' } }, 'objetivo malformado');
 bad({ photo: 'data:text/html;base64,SGVsbG8=' }, 'foto que no es imagen');
 bad({ hiddenLib: ['lib push'] }, 'biblioteca con identificador inválido');
