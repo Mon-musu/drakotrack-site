@@ -135,6 +135,24 @@ completo, desde `begin;` hasta `commit;`; pegar `psql "$SUPABASE_DB_URL" -f …`
 ahí da un error de sintaxis, porque el editor ejecuta SQL y no entiende de
 variables de entorno ni de banderas.
 
+
+## Quitar el captcha ALTCHA
+
+El captcha de registro se eliminó de la app. Sus dos funciones
+(`altcha_register` y `altcha_consume`) se crearon a mano en el proyecto de
+Supabase y nunca estuvieron en este repositorio, así que ésta es la única
+migración pensada para aplicarse ya sobre la base en uso:
+
+```bash
+psql "$SUPABASE_DB_URL" -v ON_ERROR_STOP=1 -f supabase/migrations/20261102_drop_altcha.sql
+```
+
+Las busca por nombre y borra todas sus versiones, así que no hace falta conocer
+la firma exacta; si ya no existen, no hace nada y se puede reaplicar. Sólo borra
+funciones: la tabla interna donde se guardaban los retos, si existe, queda
+intacta. El `.down.sql` vuelve a crear un equivalente funcional, para el caso de
+volver a una versión de la app que todavía pida el captcha.
+
 Pueden ir en cualquier orden: cada una toca la tabla de la otra solo dentro de un
 bloque `do` guardado con `to_regclass`, y las dos crean la misma política
 `profiles_linked_read`. Si aplicás `trainer_index` primero, volvé a correrlo
