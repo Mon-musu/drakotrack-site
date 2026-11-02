@@ -511,7 +511,7 @@ async function saveRecoveredPassword(){
   const p2 = $('#rec-pass2') ? $('#rec-pass2').value : '';
   const box = $('#rec-err');
   const fail = m => { if(box){ box.textContent = m; box.classList.remove('hidden'); } };
-  if(p1.length < 12) return fail('La contraseña debe tener al menos 12 caracteres.');
+  if(p1.length < 8) return fail('La contraseña debe tener al menos 8 caracteres.');
   if(p1 !== p2) return fail('Las contraseñas no coinciden.');
   const err = await DrakoSB.updatePasswordFromToken(window.__recToken, p1);
   if(err) return fail(err);
@@ -532,7 +532,7 @@ async function saveRecoveredPassword(){
       <p class="modal-body">${intro} Tus entrenamientos, récords e historial no se ven afectados.</p>
       <div class="form">
         <label class="field"><span>Contraseña actual</span><input type="password" id="cp-old" autocomplete="current-password"></label>
-        <label class="field"><span>Nueva contraseña</span><input type="password" id="cp-new" autocomplete="new-password" placeholder="Mínimo 12 caracteres"></label>
+        <label class="field"><span>Nueva contraseña</span><input type="password" id="cp-new" autocomplete="new-password" placeholder="Mínimo 8 caracteres"></label>
         <label class="field"><span>Repite la contraseña nueva</span><input type="password" id="cp-new2" autocomplete="new-password"></label>
       </div>
       <div id="cp-err" class="auth-err hidden"></div>
@@ -548,7 +548,7 @@ async function saveRecoveredPassword(){
     const cur = $('#cp-old') ? $('#cp-old').value : '';
     const p1 = $('#cp-new') ? $('#cp-new').value : '';
     const p2 = $('#cp-new2') ? $('#cp-new2').value : '';
-    if(p1.length < 12) return fail('La contraseña nueva debe tener al menos 12 caracteres.');
+    if(p1.length < 8) return fail('La contraseña nueva debe tener al menos 8 caracteres.');
     if(p1 !== p2) return fail('Las contraseñas nuevas no coinciden.');
     if(btn) btn.disabled = true;
     try{
@@ -1194,8 +1194,8 @@ function ctEq(a, b){
 /* ---------------- Acceso (cuenta) ---------------- */
 async function signup(user, pass){
   const u = user.trim().toLowerCase();
-  if(!/^[a-z0-9_-]{3,20}$/.test(u)) return 'El usuario debe tener entre 3 y 20 caracteres: letras sin tilde, números, guiones o guiones bajos.';
-  if(pass.length < 12) return 'La contraseña debe tener al menos 12 caracteres.';
+  if(!u) return 'Escribe un nombre de usuario.';
+  if(pass.length < 8) return 'La contraseña debe tener al menos 8 caracteres.';
   if(db.users[u]) return 'Ese usuario ya está en uso.';
   if(!(crypto && crypto.subtle)) return 'Esta app necesita un contexto seguro (HTTPS) para crear cuentas.';
   const salt = randomSalt();
@@ -4746,7 +4746,7 @@ document.addEventListener('submit', async e => {
       /* Cuenta en la nube (por defecto): se crea directamente en Supabase */
       const mail = u.trim().toLowerCase();
       if(!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(mail)){ showAuthError('Introduce un correo válido.'); return; }
-      if(p.length < 12){ showAuthError('La contraseña debe tener al menos 12 caracteres.'); return; }
+      if(p.length < 8){ showAuthError('La contraseña debe tener al menos 8 caracteres.'); return; }
       const btn = $('#auth-submit'); btn.disabled = true;
       const proof = await captchaProof();
       if(proof.error){ btn.disabled = false; showAuthError(proof.error); return; }
@@ -4939,7 +4939,7 @@ window.addEventListener('hashchange', () => { render(); focusMain(); });
     openModal(`
       <h3>Elige una contraseña nueva</h3>
       <div class="form">
-        <label class="field"><span>Nueva contraseña</span><input type="password" id="rec-pass" autocomplete="new-password" placeholder="Mínimo 12 caracteres"></label>
+        <label class="field"><span>Nueva contraseña</span><input type="password" id="rec-pass" autocomplete="new-password" placeholder="Mínimo 8 caracteres"></label>
         <label class="field"><span>Repite la contraseña</span><input type="password" id="rec-pass2" autocomplete="new-password"></label>
       </div>
       <div id="rec-err" class="auth-err hidden"></div>

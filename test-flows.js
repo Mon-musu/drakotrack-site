@@ -98,6 +98,17 @@ const tick = ms => new Promise(r => setTimeout(r, ms));
   g("logout()");
   await tick(100);
 
+  // ===== sin restricción de formato en el usuario, 8 caracteres de contraseña =====
+  const freeName = await g("signup('Marco Entrenador','ocho1234')");
+  check('signup accepts any non-empty username', freeName === null && g('currentUser') === 'marco entrenador');
+  check('an 8-character password is enough', !!g("db.users['marco entrenador']"));
+  const tooShort = await g("signup('otro_usuario','siete12')");
+  check('a 7-character password is still rejected', /al menos 8/.test(tooShort));
+  const noName = await g("signup('   ','ocho1234')");
+  check('an empty username is rejected', /nombre de usuario/.test(noName));
+  g("logout()");
+  await tick(100);
+
   // real signup via UI
   window.document.querySelector('#auth-pass').value = 'local-pass-2026';
   submit();
@@ -411,7 +422,7 @@ const tick = ms => new Promise(r => setTimeout(r, ms));
     document.querySelector('#cp-new2').value = '123';
   })()`);
   await g('saveChangePass()');
-  check('short new password rejected', /al menos 12/.test(window.document.querySelector('#cp-err').textContent || ''));
+  check('short new password rejected', /al menos 8/.test(window.document.querySelector('#cp-err').textContent || ''));
   // successful change
   const hashBefore = g("db.users['tester_01'].h");
   g(`(function(){

@@ -47,7 +47,7 @@ module.exports = async function handler(req, res) {
     }
     const body = await readJson(req, 16 * 1024);
     if (action === 'signup' || action === 'signin') {
-      if (!validEmail(body.email) || typeof body.password !== 'string' || body.password.length < (action === 'signup' ? 12 : 1) || body.password.length > 256 || (action === 'signup' && !validConsent(body.consent))) return json(res, 400, { error: 'invalid_input', message: 'Correo, contraseña o consentimiento no válidos.' });
+      if (!validEmail(body.email) || typeof body.password !== 'string' || body.password.length < (action === 'signup' ? 8 : 1) || body.password.length > 256 || (action === 'signup' && !validConsent(body.consent))) return json(res, 400, { error: 'invalid_input', message: 'Correo, contraseña o consentimiento no válidos.' });
       if (action === 'signup') {
         /* Captcha obligatorio: se verifica antes de crear nada y se consume una sola vez. */
         if (typeof body.altcha !== 'string' || body.altcha.length < 32 || body.altcha.length > altcha.MAX_PAYLOAD_CHARS) {
@@ -81,7 +81,7 @@ module.exports = async function handler(req, res) {
       return json(res, 200, { ok: true });
     }
     if (action === 'reset') {
-      if (typeof body.access_token !== 'string' || body.access_token.length > 8192 || typeof body.password !== 'string' || body.password.length < 12 || body.password.length > 256) return json(res, 400, { error: 'invalid_input', message: 'Enlace o contraseña no válidos.' });
+      if (typeof body.access_token !== 'string' || body.access_token.length > 8192 || typeof body.password !== 'string' || body.password.length < 8 || body.password.length > 256) return json(res, 400, { error: 'invalid_input', message: 'Enlace o contraseña no válidos.' });
       const response = await sb.auth('/user', { method: 'PUT', headers: { Authorization: `Bearer ${body.access_token}` }, body: { password: body.password } });
       if (!response.ok) return json(res, response.status === 429 ? 429 : 400, { error: 'reset_failed', message: 'No se pudo cambiar la contraseña. Solicita un enlace nuevo.' });
       clearCookies(res);
@@ -91,7 +91,7 @@ module.exports = async function handler(req, res) {
       const session = await sb.authenticatedSession(req);
       if (!session) { clearCookies(res); return json(res, 401, { error: 'unauthorized' }); }
       const { accessToken, user } = session;
-      if (typeof body.current_password !== 'string' || !body.current_password.length || body.current_password.length > 256 || typeof body.password !== 'string' || body.password.length < 12 || body.password.length > 256) return json(res, 400, { error: 'invalid_input', message: 'Contraseña no válida.' });
+      if (typeof body.current_password !== 'string' || !body.current_password.length || body.current_password.length > 256 || typeof body.password !== 'string' || body.password.length < 8 || body.password.length > 256) return json(res, 400, { error: 'invalid_input', message: 'Contraseña no válida.' });
       const check = await sb.signIn(user.email, body.current_password);
       if (!check.response.ok || !check.data || check.data.user.id !== user.id) return json(res, 403, { error: 'reauthentication_failed', message: 'La contraseña actual no es correcta.' });
       const response = await sb.auth('/user', { method: 'PUT', headers: { Authorization: `Bearer ${check.data.access_token}` }, body: { current_password: body.current_password, password: body.password } });
