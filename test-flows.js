@@ -1697,6 +1697,28 @@ const tick = ms => new Promise(r => setTimeout(r, ms));
   check('service worker revalidates in the background', /cache\.put\(request, response\.clone\(\)\)/.test(swSource));
   check('app registers the service worker', /serviceWorker\.register\('sw\.js'\)/.test(fs.readFileSync(path.join(__dirname, 'app.js'), 'utf8')));
 
+  // Validación del servidor: el documento que escribe la app debe pasar entero
+  const { validateData } = require('./lib/security');
+  g(`(function(){
+    const d = dataFor(currentUser);
+    if(!Array.isArray(d.exercises)) d.exercises = [];
+    d.exercises.push({ id: 'custom:press-militar', name: 'Press militar', group: 'shoulders', equip: 'barbell', aliases: ['militar'] });
+    d.prefs.theme = 'dark'; d.prefs.restAlerts = false; d.prefs.restAlertSeconds = 2;
+    d.profile = { goal: 'muscle', level: 'beginner', days: 3, at: '2026-11-02', skipped: false };
+    saveDB();
+    return true;
+  })()`);
+  const appDoc = JSON.parse(g('JSON.stringify(dataFor(currentUser))'));
+  const failingFields = Object.keys(appDoc).filter(k => !validateData({ [k]: appDoc[k] }));
+  check('the document the app writes passes server validation' + (failingFields.length ? ' [' + failingFields.join(', ') + ']' : ''), failingFields.length === 0);
+  check('the real document carries sets, records and prefs',
+    appDoc.sessions.some(s => (s.exercises || []).some(e => Array.isArray(e.sets) && e.sets.length))
+    && Array.isArray(appDoc.records) && !!appDoc.prefs && appDoc.exercises.length > 0);
+  const tampered = JSON.parse(JSON.stringify(appDoc));
+  const withSets = tampered.sessions.find(s => (s.exercises || []).some(e => Array.isArray(e.sets)));
+  if (withSets) withSets.exercises.find(e => Array.isArray(e.sets)).sets.push({ id: 'bad', number: 1, weight: -10, reps: 5, completed: true, type: 'working' });
+  check('server validation still rejects a tampered document', validateData(tampered) === false);
+
   console.log(`\nRESULT: ${pass} passed, ${fail} failed`);
   process.exit(fail ? 1 : 0);
 })().catch(e => { console.error('CRASH', e); process.exit(2); });

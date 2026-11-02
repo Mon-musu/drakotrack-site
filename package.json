@@ -4,7 +4,7 @@
   "description": "DrakoTrack — workout tracking app",
   "main": "app.js",
   "scripts": {
-    "test": "node test-flows.js && node test-security.js",
+    "test": "node test-flows.js && node test-data.js && node test-security.js",
     "test:api": "node test-security.js",
     "audit:deps": "npm audit --omit=dev"
   },
