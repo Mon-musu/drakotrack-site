@@ -16,7 +16,7 @@ const dom = new JSDOM(html, {
 const { window } = dom;
 const ctx = dom.getInternalVMContext();
 
-for (const f of ['supabase.js', 'boostcamp.js', 'share.js', 'app.js']) {
+for (const f of ['sync.js', 'supabase.js', 'boostcamp.js', 'share.js', 'app.js']) {
   vm.runInContext(fs.readFileSync(path.join(__dirname, f), 'utf8'), ctx, { filename: f });
 }
 

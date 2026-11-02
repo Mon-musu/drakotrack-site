@@ -101,6 +101,9 @@
         <div class="sb-status hidden" id="sb-status" role="status"></div>
         <button type="button" class="hidden" id="sb-push" data-action="sb-push">Subir copia a la nube</button>
         <button type="button" class="hidden" id="sb-restore" data-action="sb-pull">Restaurar copia de la nube</button>
+        <button type="button" class="hidden" id="sb-conflicts" data-action="open-sync-conflicts">Revisar cambios en conflicto</button>
+        <button type="button" class="hidden" id="sb-history" data-action="open-sync-history">Recuperar una versión anterior</button>
+        <button type="button" class="hidden" id="sb-local-backup" data-action="restore-local-backup">Recuperar copia de antes de sincronizar</button>
         <button type="button" class="hidden" id="sb-export" data-action="sb-export">Descargar mis datos (JSON)</button>
         <button type="button" data-action="open-change-pass">Cambiar contraseña</button>
         <button type="button" data-action="open-settings">Ajustes</button>
@@ -136,10 +139,11 @@
 <div id="modal-root"></div>
 <div id="toast-root"></div>
 
-<script src="supabase.js?v=3"></script>
+<script src="sync.js?v=1"></script>
+<script src="supabase.js?v=4"></script>
 <script src="boostcamp.js?v=3"></script>
 <script src="share.js?v=4"></script>
-<script src="app.js?v=34"></script>
+<script src="app.js?v=35"></script>
 <script src="update-check.js?v=1" defer></script>
 </body>
 </html>

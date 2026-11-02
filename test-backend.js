@@ -50,40 +50,59 @@ const done = () => { console.log(`PHASE ${phase}: ${pass} passed, ${fail} failed
     if (!sa) return done();
 
     const authA = { Authorization: 'Bearer ' + sa.access_token };
-    const authB = { Authorization: 'Bearer ' + sb.access_token };
-    const docA = { workouts: [{ id: 'w1', name: 'A solo para A', exercises: [] }], sessions: [{ id: 's1', finished: true, date: '2026-10-25' }], prs: [], weights: [{ id: 'p1', date: '2026-10-25', weight: 80 }], photo: null, hiddenLib: [] };
+    const authB = { Authorization: 'Bearer ' + (sb ? sb.access_token : '') };
+    const docA = { workouts: [{ id: 'w1', name: 'A solo para A', exercises: [] }], sessions: [], prs: [], weights: [{ id: 'p1', date: '2026-10-25', weight: 80 }], photo: null, hiddenLib: [] };
+    const rpc = (token, name, body) => fetch(SB + '/rest/v1/rpc/' + name, { method: 'POST', headers: hdr({ Authorization: 'Bearer ' + token }), body: JSON.stringify(body) });
 
-    // upsert A's doc
-    let res = await fetch(SB + '/rest/v1/app_data', { method: 'POST', headers: hdr(Object.assign({ Prefer: "resolution=merge-duplicates,return=minimal" }, authA)), body: JSON.stringify([{ user_id: sa.user.id, data: docA }]) });
-    check('upsert A (' + res.status + ')', res.ok || res.status === 201);
+    // Guardado con control de revisión (la única puerta de escritura)
+    let res = await rpc(sa.access_token, 'dt_save_app_data', { p_data: docA, p_base_rev: null, p_op_id: 'backend-op-1' });
+    let out = await res.json().catch(() => ({}));
+    check('RPC save A (' + res.status + ')', res.ok && out.ok === true && out.rev === 1);
 
-    // A reads own row
-    res = await fetch(SB + '/rest/v1/app_data?user_id=eq.' + sa.user.id + '&select=data,updated_at', { headers: hdr(authA) });
+    // La tabla ya no acepta escrituras directas con el token del usuario
+    res = await fetch(SB + '/rest/v1/app_data', { method: 'POST', headers: hdr(Object.assign({ Prefer: 'resolution=merge-duplicates,return=minimal' }, authA)), body: JSON.stringify([{ user_id: sa.user.id, data: { hacked: true } }]) });
+    check('direct table write rejected (' + res.status + ')', !res.ok);
+
+    // Una revisión vieja no sobrescribe
+    res = await rpc(sa.access_token, 'dt_save_app_data', { p_data: docA, p_base_rev: 0, p_op_id: 'backend-op-2' });
+    out = await res.json().catch(() => ({}));
+    check('stale revision is a conflict', out.ok === false && out.rev === 1);
+
+    // Con la revisión correcta sí guarda, y el reintento no duplica
+    res = await rpc(sa.access_token, 'dt_save_app_data', { p_data: docA, p_base_rev: 1, p_op_id: 'backend-op-3' });
+    out = await res.json().catch(() => ({}));
+    check('save with correct revision (' + out.rev + ')', out.ok === true && out.rev === 2);
+    res = await rpc(sa.access_token, 'dt_save_app_data', { p_data: docA, p_base_rev: 2, p_op_id: 'backend-op-3' });
+    out = await res.json().catch(() => ({}));
+    check('replay is idempotent', out.ok === true && out.replay === true && out.rev === 2);
+
+    // A lee su fila
+    res = await fetch(SB + '/rest/v1/app_data?user_id=eq.' + sa.user.id + '&select=data,updated_at,rev', { headers: hdr(authA) });
     let rows = await res.json().catch(() => []);
     check('A reads own row', res.ok && rows.length === 1 && rows[0].data.workouts[0].name === 'A solo para A');
-    check('updated_at present', !!(rows[0] && rows[0].updated_at));
+    check('updated_at and rev present', !!(rows[0] && rows[0].updated_at) && rows[0].rev === 2);
 
-    // B tries to read A's row → empty (RLS)
+    // B no ve ni escribe la fila de A
     res = await fetch(SB + '/rest/v1/app_data?user_id=eq.' + sa.user.id + '&select=user_id,data', { headers: hdr(authB) });
     rows = await res.json().catch(() => []);
     check('RLS: B cannot see A row (' + JSON.stringify(rows) + ')', Array.isArray(rows) && rows.length === 0);
 
-    // B tries to write into A's row → rejected by with check
-    res = await fetch(SB + '/rest/v1/app_data', { method: 'POST', headers: hdr(Object.assign({ Prefer: "resolution=merge-duplicates,return=minimal" }, authB)), body: JSON.stringify([{ user_id: sa.user.id, data: { hacked: true } }]) });
-    check('RLS: B cannot write A row (status ' + res.status + ')', !res.ok);
+    res = await rpc(sb.access_token, 'dt_save_app_data', { p_data: { workouts: [{ id: 'x', name: 'B', exercises: [] }] }, p_base_rev: null, p_op_id: 'backend-op-b' });
+    out = await res.json().catch(() => ({}));
+    check('RLS: B saves into its own row only', out.ok === true && out.rev === 1);
+    res = await fetch(SB + '/rest/v1/app_data?user_id=eq.' + sa.user.id + '&select=data,rev', { headers: hdr(authA) });
+    rows = await res.json().catch(() => []);
+    check('A row untouched by B', rows[0] && rows[0].rev === 2 && rows[0].data.workouts[0].name === 'A solo para A');
 
-    // anon (no session) reads nothing
+    // anon (sin sesión) no lee nada
     res = await fetch(SB + '/rest/v1/app_data?select=user_id', { headers: hdr() });
     rows = await res.json().catch(() => []);
     check('anon without session sees no rows', res.ok && Array.isArray(rows) && rows.length === 0);
 
-    // update A doc (second write merges)
-    docA.weights.push({ id: 'p2', date: '2026-10-25', weight: 81.5 });
-    res = await fetch(SB + '/rest/v1/app_data', { method: 'POST', headers: hdr(Object.assign({ Prefer: "resolution=merge-duplicates,return=minimal" }, authA)), body: JSON.stringify([{ user_id: sa.user.id, data: docA }]) });
-    check('second upsert ok (' + res.status + ')', res.ok || res.status === 201);
-    res = await fetch(SB + '/rest/v1/app_data?user_id=eq.' + sa.user.id + '&select=data', { headers: hdr(authA) });
+    // El historial conserva versiones anteriores
+    res = await rpc(sa.access_token, 'dt_app_data_history', { p_limit: 10 });
     rows = await res.json().catch(() => []);
-    check('doc roundtrip keeps arrays', rows.length === 1 && rows[0].data.weights.length === 2 && rows[0].data.workouts.length === 1);
+    check('history keeps previous revisions', res.ok && Array.isArray(rows) && rows.length >= 1);
 
     return done();
   }

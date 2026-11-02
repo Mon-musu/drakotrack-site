@@ -216,55 +216,65 @@ function response() {
 }
 async function call(req) {
   const res = response();
-  await dataHandler({ headers: { origin: 'https://drakotrack.vercel.app' }, query: {}, ...req }, res);
+  await dataHandler({ headers: { origin: 'https://drakotrack.vercel.app' }, query: { action: 'profile' }, ...req }, res);
   return res;
 }
 
 (async () => {
   const origHasServerKey = sb.hasServerKey;
   const origRest = sb.rest;
+  const origRpc = sb.rpcAuthed;
   const origSession = sb.authenticatedSession;
 
-  const writes = [];
+  let restCalls = [];
+  let rpcCalls = [];
   sb.hasServerKey = () => true;
   sb.rest = async (path, options = {}) => {
-    writes.push({ path, options });
+    restCalls.push({ path, options });
     return { ok: true, json: async () => [] };
+  };
+  sb.rpcAuthed = async (name, body = {}) => {
+    rpcCalls.push({ name, body });
+    if (name === 'dt_save_app_data') return { ok: true, json: async () => ({ ok: true, rev: 1, replay: false }) };
+    return { ok: true, json: async () => ({ ok: true }) };
   };
   sb.authenticatedSession = async () => ({ user: { id: USER_ID, email: 'user@drakotrack.test' }, accessToken: 'access-token' });
 
   try {
     let res = await call({ method: 'PUT', body: { data: makeModernProfile() } });
-    assert.equal(res.statusCode, 204, 'PUT guarda un perfil válido');
-    assert.equal(writes.length, 1, 'una sola escritura');
-    assert.equal(writes[0].path, '/app_data', 'escribe en la tabla de datos');
-    assert.equal(writes[0].options.body[0].user_id, USER_ID, 'usa el usuario de la sesión');
-    passed += 3;
+    assert.equal(res.statusCode, 200, 'PUT guarda un perfil válido');
+    assert.equal(rpcCalls.length, 1, 'una sola escritura');
+    assert.equal(rpcCalls[0].name, 'dt_save_app_data', 'la escritura pasa por la función atómica');
+    assert.equal(rpcCalls[0].body.p_data.workouts.length, 1, 'se envía el documento validado');
+    assert.equal(rpcCalls[0].body.p_base_rev, null, 'la primera copia no tiene revisión previa');
+    passed += 4;
 
-    writes.length = 0;
+    rpcCalls = [];
     res = await call({ method: 'PUT', body: { data: { ...makeModernProfile(), weights: [{ date: '2026-10-28', weight: -3 }] } } });
     assert.equal(res.statusCode, 400, 'PUT rechaza un peso negativo');
     assert.equal(JSON.parse(res.body).error, 'invalid_data', 'error de validación');
-    assert.equal(writes.length, 0, 'no se escribe nada inválido');
+    assert.equal(rpcCalls.length, 0, 'no se escribe nada inválido');
     passed += 3;
 
-    writes.length = 0;
+    rpcCalls = [];
     res = await call({ method: 'PUT', body: { data: { ...makeModernProfile(), user_id: 'otro-usuario' } } });
     assert.equal(res.statusCode, 400, 'PUT rechaza un user_id inyectado');
-    assert.equal(writes.length, 0, 'sin escritura cuando se intenta cambiar de cuenta');
+    assert.equal(rpcCalls.length, 0, 'sin escritura cuando se intenta cambiar de cuenta');
     passed += 2;
 
-    writes.length = 0;
+    rpcCalls = [];
     res = await call({ method: 'PUT', body: { data: makeModernProfile(), user_id: 'otro-usuario' } });
-    assert.equal(res.statusCode, 204, 'el user_id de la petición se ignora');
-    assert.equal(writes[0].options.body[0].user_id, USER_ID, 'solo se guarda en la cuenta autenticada');
-    passed += 2;
+    assert.equal(res.statusCode, 200, 'el user_id de la petición se ignora');
+    assert.equal(rpcCalls[0].body.p_data.user_id, undefined, 'solo se guarda el documento, sin campo de propiedad');
+    assert.equal(Object.keys(rpcCalls[0].body).includes('user_id'), false, 'el id de usuario no viaja en la petición');
+    passed += 3;
 
-    writes.length = 0;
+    restCalls = [];
     res = await call({ method: 'GET' });
     assert.equal(res.statusCode, 200, 'GET responde 200');
-    assert.ok(writes[0].path.startsWith(`/app_data?user_id=eq.${USER_ID}`), 'GET filtra por el usuario de la sesión');
-    passed += 2;
+    assert.ok(restCalls[0].path.startsWith(`/app_data?user_id=eq.${USER_ID}`), 'GET filtra por el usuario de la sesión');
+    assert.ok(restCalls[0].path.includes('rev'), 'GET pide también la revisión');
+    passed += 3;
 
     res = await call({ method: 'PUT', body: { data: { workoutNote: 'x'.repeat(1024) } } });
     assert.equal(res.statusCode, 400, 'PUT rechaza campos desconocidos en el perfil');
@@ -287,6 +297,7 @@ async function call(req) {
   } finally {
     sb.hasServerKey = origHasServerKey;
     sb.rest = origRest;
+    sb.rpcAuthed = origRpc;
     sb.authenticatedSession = origSession;
   }
 

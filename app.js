@@ -334,7 +334,7 @@ function setTheme(v){
 /* ---------------- Estado y almacenamiento ---------------- */
 let db = loadDB();
 let currentUser = localStorage.getItem(SESSION_KEY) || null;
-const state = { sessionId:null, editor:null, prExercise:null, onb:null, authMode:'login', sb:{ status:'idle', last:null, timer:null } };
+const state = { sessionId:null, editor:null, prExercise:null, onb:null, authMode:'login', sb:{ status:'idle', last:null, timer:null, retry:null, attempts:0, applying:false } };
 
 function loadDB(){
   try{
@@ -344,7 +344,9 @@ function loadDB(){
   }catch(e){ return { users:{}, data:{} }; }
 }
 let _storageWarned = false;
-function saveDB(){
+/* Escribe el documento sin tocar la nube. Se usa también al aplicar una
+   combinación remota, para no reenviar lo que acaba de llegar. */
+function persistLocal(){
   try{
     localStorage.setItem(DB_KEY, JSON.stringify(db));
   }catch(err){
@@ -353,58 +355,167 @@ function saveDB(){
       toast('El almacenamiento está lleno o no disponible — los últimos cambios no se guardaron.', 'error');
     }
   }
+}
+function saveDB(){
+  persistLocal();
   scheduleCloudSync();
 }
 
-/* ---------------- Cuenta en la nube (Supabase) ---------------- */
+/* ---------------- Cuenta en la nube (Supabase) ----------------
+   Cada guardado viaja con la revisión del servidor sobre la que se construyó.
+   Si otro dispositivo guardó antes, el servidor responde 409 y aquí se combinan
+   los cambios por identificador estable en vez de reemplazar el perfil entero.
+   Los pendientes viven en localStorage: sobreviven a cerrar la aplicación. */
 function isCloud(){
   return !!(window.DrakoSB && DrakoSB.hasSession() && DrakoSB.email() === currentUser);
 }
-function scheduleCloudSync(){
-  if(!isCloud()) return;
-  if(state.sb.timer) clearTimeout(state.sb.timer);
-  state.sb.timer = setTimeout(() => pushNow(false), 1500);
+const syncStore = {
+  get(key){ try{ return localStorage.getItem(key); }catch(e){ return null; } },
+  set(key, value){ try{ localStorage.setItem(key, value); }catch(e){} },
+  remove(key){ try{ localStorage.removeItem(key); }catch(e){} },
+};
+const cloudSync = window.DrakoSync.createEngine({
+  storage: syncStore,
+  remote: {
+    load: () => DrakoSB.loadData(),
+    save: (doc, baseRev, opId) => DrakoSB.saveData(doc, baseRev, opId),
+  },
+});
+function syncState(){ return currentUser ? cloudSync.state(currentUser) : null; }
+function syncConflicts(){ const st = syncState(); return st && Array.isArray(st.conflicts) ? st.conflicts : []; }
+function syncPending(){ const st = syncState(); return !!(st && st.dirty); }
+
+/* Aplica un documento que viene del servidor. Guarda antes la copia local en
+   el espacio de seguridad del motor (una sola, se reemplaza). */
+function applyRemoteDoc(doc){
+  if(!currentUser || !doc || typeof doc !== 'object') return false;
+  const account = currentUser;
+  cloudSync.backup(account, db.data[account] || {});
+  state.sb.applying = true;
+  db.data[account] = doc;
+  try{ migrateAllData(); }finally{ state.sb.applying = false; }
+  persistLocal();
+  render();
+  return true;
 }
-async function pushNow(notify){
+
+function scheduleCloudSync(){
+  if(!isCloud() || state.sb.applying) return;
+  cloudSync.markDirty(currentUser);
+  if(state.sb.timer) clearTimeout(state.sb.timer);
+  state.sb.timer = setTimeout(() => { state.sb.timer = null; runSync(false); }, 1500);
+  renderHeader();
+}
+function syncFailed(notify){
+  state.sb.status = 'offline';
+  state.sb.attempts = (state.sb.attempts || 0) + 1;
+  const delay = Math.min(30000, Math.pow(2, state.sb.attempts) * 2000);
+  if(state.sb.retry) clearTimeout(state.sb.retry);
+  state.sb.retry = setTimeout(() => { state.sb.retry = null; if(isCloud()) runSync(false); }, delay);
+  if(notify) toast('No se pudo sincronizar ahora. Tus cambios están guardados en este dispositivo y se enviarán solos al volver la conexión.', 'error');
+  renderHeader();
+  return false;
+}
+function notifySyncResult(result){
+  const conflicts = syncConflicts().length;
+  if(conflicts) toast('Se combinaron tus datos. Hay ' + conflicts + ' cambio(s) en los que dos dispositivos no coinciden: revísalos cuando puedas.', 'info');
+  else if(result.status === 'merged') toast('Se combinaron los cambios de tus dispositivos.');
+  else if(result.status === 'pulled') toast('Datos actualizados desde tus otros dispositivos.');
+  else if(result.status === 'kept-local') toast('El servidor no devolvió la copia; tus datos locales siguen intactos. Se reintentará.', 'info');
+  else if(result.status === 'pushed' || result.status === 'replayed') toast('Copia guardada en la nube.');
+  else if(result.status === 'offline') toast('Sin conexión: tus cambios quedan guardados aquí.', 'info');
+  else if(syncPending()) toast('Quedan cambios pendientes de sincronizar.', 'info');
+  else toast('Todo sincronizado.');
+}
+async function runSync(notify){
   if(!isCloud()){ if(notify) toast('No hay sesión de nube activa.', 'error'); return false; }
   if(state.sb.timer){ clearTimeout(state.sb.timer); state.sb.timer = null; }
+  if(state.sb.retry){ clearTimeout(state.sb.retry); state.sb.retry = null; }
+  const account = currentUser;
+  state.sb.status = 'syncing';
+  renderHeader();
+  let result;
+  try{
+    result = await cloudSync.sync(account, dataFor(account));
+  }catch(err){
+    return syncFailed(notify);
+  }
+  if(currentUser !== account) return false;
+  if(result.data) applyRemoteDoc(result.data);
+  /* Si hubo que combinar, se intenta subir el resultado una vez más para no
+     dejar pendiente lo que ya está resuelto. Un segundo choque se muestra. */
+  if(result.needsPush && currentUser === account){
+    try{
+      result = await cloudSync.sync(account, dataFor(account));
+    }catch(err){
+      return syncFailed(notify);
+    }
+    if(currentUser !== account) return false;
+    if(result.data) applyRemoteDoc(result.data);
+  }
+  const st = cloudSync.state(account) || {};
+  if((st.conflicts || []).length) state.sb.status = 'conflict';
+  else { state.sb.status = 'ok'; state.sb.last = Date.now(); state.sb.attempts = 0; }
+  /* Si se guardó algo mientras la petición estaba en vuelo, el estado no puede
+     decir «todo sincronizado»: se marca pendiente y se envía en el próximo tick. */
+  if(!st.dirty && st.digest && currentUser === account){
+    try{
+      if(JSON.stringify(cloudSync.digest(dataFor(account))) !== JSON.stringify(st.digest)){
+        cloudSync.markDirty(account);
+        state.sb.status = 'ok';
+        scheduleCloudSync();
+      }
+    }catch(e){ /* nunca romper la sincronización por una comprobación extra */ }
+  }
+  if(result.status === 'pushed' || result.status === 'replayed') noteBackupDone();
+  if(notify) notifySyncResult(result);
+  renderHeader();
+  return state.sb.status !== 'offline';
+}
+function pushNow(notify){ return runSync(notify); }
+
+/* Restauración manual: es destructiva, así que deja siempre una copia local
+   antes de reemplazar y no hace nada si el servidor no devuelve datos. */
+async function pullRemote(notify){
+  if(!isCloud()) return false;
+  const account = currentUser;
   state.sb.status = 'syncing';
   renderHeader();
   try{
-    await DrakoSB.saveData(db.data[currentUser]);
+    const result = await cloudSync.forcePull(account, dataFor(account));
+    if(currentUser !== account) return false;
+    if(result.status === 'empty'){
+      state.sb.status = 'ok';
+      if(notify) toast('Todavía no hay copia en la nube de esta cuenta.', 'info');
+      renderHeader();
+      return false;
+    }
+    applyRemoteDoc(result.data);
     state.sb.status = 'ok';
     state.sb.last = Date.now();
-    noteBackupDone();
-    if(notify) toast('Copia subida a la nube.');
+    if(notify) toast('Copia restaurada desde la nube. La versión anterior quedó guardada en este dispositivo.', 'info');
     renderHeader();
     return true;
   }catch(err){
-    state.sb.status = 'error';
-    if(notify) toast('No se pudo subir la copia: ' + (err && err.message || 'sin conexión'), 'error');
-    renderHeader();
-    return false;
+    return syncFailed(notify);
   }
 }
-async function pullRemote(notify){
-  if(!isCloud()) return false;
-  try{
-    const row = await DrakoSB.loadData();
-    if(row && row.data && typeof row.data === 'object' && Object.keys(row.data).length){
-      if(!Array.isArray(row.data.hiddenLib)) row.data.hiddenLib = [];
-      db.data[currentUser] = row.data;
-      migrateAllData();
-      saveDB();
-      state.sb.status = 'ok';
-      state.sb.last = Date.now();
-      if(notify){ toast('Copia restaurada desde la nube.'); render(); }
-      return true;
-    }
-    if(notify) toast('Todavía no hay copia en la nube de esta cuenta.', 'info');
-    return false;
-  }catch(err){
-    if(notify) toast('No se pudo restaurar: ' + (err && err.message || 'sin conexión'), 'error');
-    return false;
-  }
+async function restoreLocalBackup(){
+  if(!currentUser) return;
+  const backup = cloudSync.restoreBackup(currentUser);
+  if(!backup || !backup.data){ toast('No hay ninguna copia local anterior guardada.', 'info'); return; }
+  const when = new Date(backup.at).toLocaleString('es', { day:'numeric', month:'short', hour:'2-digit', minute:'2-digit' });
+  confirmModal('¿Recuperar la copia anterior?',
+    'Se restaurará en este dispositivo la copia que había antes de la última sincronización (guardada el ' + when + '). Después se combinará con lo que haya en la nube, sin borrar nada del otro lado.',
+    'Recuperar', () => {
+      closeModal();
+      cloudSync.backup(currentUser, dataFor(currentUser));
+      db.data[currentUser] = backup.data;
+      persistLocal();
+      cloudSync.markDirty(currentUser);
+      render();
+      runSync(true).then(() => { if(currentUser) render(); });
+    });
 }
 /* ------- Recordatorio quincenal de copia de seguridad ------- */
 const BACKUP_REMINDER_KEY = 'draktrack_backup_due';
@@ -481,11 +592,6 @@ async function enterCloud(mail){
   const candidates = Object.keys(db.data).filter(k => k !== mail && docHasContent(db.data[k]));
   let remote = null;    try{ remote = await DrakoSB.loadData(); }catch(e){}
   const remoteEmpty = !remote || !remote.data || !Object.keys(remote.data).length;
-  if(remote && remote.data && remote.data.workouts !== undefined){
-    if(!Array.isArray(remote.data.hiddenLib)) remote.data.hiddenLib = [];
-    db.data[mail] = remote.data;
-    saveDB();
-  }
   render();
   if(candidates.length && remoteEmpty){
     let best = candidates[0];
@@ -498,13 +604,98 @@ async function enterCloud(mail){
       'Subir datos', () => {
         closeModal();
         db.data[mail] = db.data[best];
-        saveDB();
-        pushNow(false).then(() => toast('Datos subidos a la nube.'));
+        persistLocal();
+        cloudSync.markDirty(mail);
+        runSync(false).then(() => { if(currentUser) render(); });
         render();
       });
-  } else if(docHasContent(db.data[mail])){
-    pushNow(false);
+  } else {
+    /* Nunca se reemplaza lo local a ciegas: si la nube ya tiene datos y este
+       dispositivo también, el motor los combina por identificador estable. */
+    await runSync(false);
   }
+  render();
+}
+/* ---- Cambios en conflicto y versiones anteriores (controles del menú) ---- */
+const SYNC_LABELS = { workouts:'entrenamiento', sessions:'sesión', records:'registro', prs:'récord', weights:'peso corporal', exercises:'ejercicio' };
+function describeSyncConflict(c){
+  if(!c) return '';
+  const label = c.label ? '«' + c.label + '»' : 'un elemento';
+  if(c.kind === 'set') return 'Una serie de ' + label + ' cambió en los dos dispositivos.';
+  if(c.kind === 'deleted-remote') return 'El ' + (SYNC_LABELS[c.collection] || 'elemento') + ' ' + label + ' se borró en el otro dispositivo, pero aquí tiene cambios.';
+  if(c.kind === 'deleted-local') return 'El ' + (SYNC_LABELS[c.collection] || 'elemento') + ' ' + label + ' se borró en este dispositivo, pero el otro lo modificó.';
+  if(c.collection === 'photo') return 'La foto de progreso cambió en los dos dispositivos.';
+  if(c.collection === 'consent') return 'El consentimiento cambió en los dos dispositivos.';
+  if(c.collection === 'prefs') return 'Una preferencia cambió en los dos dispositivos.';
+  if(c.collection === 'profile') return 'Un dato de tu perfil cambió en los dos dispositivos.';
+  return 'El ' + (SYNC_LABELS[c.collection] || 'elemento') + ' ' + label + ' cambió en los dos dispositivos.';
+}
+function openSyncConflicts(){
+  const list = syncConflicts();
+  if(!list.length){ toast('No hay cambios en conflicto.', 'info'); return; }
+  openModal(`
+    <h3>Cambios en dos dispositivos</h3>
+    <p class="modal-body">Estos elementos se cambiaron a la vez aquí y en otro dispositivo. Se conservaron las dos versiones: elige con cuál quedarte. Nada se borra hasta que decidas.</p>
+    <div class="modal-body">${list.map(c => `
+      <div class="consent-note" style="margin-bottom:12px">
+        <p><b>${esc(describeSyncConflict(c))}</b></p>
+        <div class="modal-actions" style="margin-top:8px">
+          <button type="button" class="btn btn-ghost" data-action="conflict-keep" data-key="${esc(c.key)}">Conservar la mía</button>
+          ${c.remote !== null && c.remote !== undefined
+            ? `<button type="button" class="btn btn-primary" data-action="conflict-theirs" data-key="${esc(c.key)}">Usar la del otro dispositivo</button>`
+            : '<span class="muted">La otra versión quedó en el historial de la nube.</span>'}
+        </div>
+      </div>`).join('')}</div>
+    <div class="modal-actions"><button class="btn btn-ghost" type="button" data-action="close-modal">Cerrar</button></div>`);
+}
+function resolveSyncConflict(key, choice){
+  if(!currentUser || !key) return;
+  const result = cloudSync.resolveConflict(currentUser, key, choice, dataFor(currentUser));
+  if(result && result.data) db.data[currentUser] = result.data;
+  persistLocal();
+  render();
+  if(result && result.remaining) openSyncConflicts();
+  else closeModal();
+  toast('Listo. El cambio se enviará al otro dispositivo.', 'info');
+  runSync(false).then(() => {
+    if(!currentUser) return;
+    render();
+    if(syncConflicts().length && !(result && result.remaining)) openSyncConflicts();
+  });
+}
+function formatSyncStamp(iso){
+  try{ return new Date(iso).toLocaleString('es', { day:'numeric', month:'short', hour:'2-digit', minute:'2-digit' }); }
+  catch(e){ return 'fecha desconocida'; }
+}
+async function openVersionHistory(){
+  if(!isCloud()){ toast('Necesitas una cuenta en la nube para ver versiones anteriores.', 'info'); return; }
+  toast('Buscando versiones anteriores…');
+  let items = [];
+  try{ items = await DrakoSB.dataHistory(); }
+  catch(e){ toast('No se pudieron leer las versiones anteriores. Revisa tu conexión.', 'error'); return; }
+  if(!items.length){ toast('Todavía no hay versiones anteriores de esta cuenta.', 'info'); return; }
+  openModal(`
+    <h3>Versiones anteriores</h3>
+    <p class="modal-body">La nube guarda las últimas 10 copias de tu cuenta. Recuperar una crea una versión nueva: tus otros dispositivos la reciben y nada se borra de golpe.</p>
+    <div class="modal-body">${items.map(item => `
+      <div class="consent-note" style="display:flex;justify-content:space-between;align-items:center;gap:12px;margin-bottom:8px">
+        <span>${esc(formatSyncStamp(item.saved_at))}${item.bytes ? ' · ' + Math.round(item.bytes / 1024) + ' KB' : ''}</span>
+        <button type="button" class="btn btn-ghost" data-action="restore-version" data-rev="${item.rev}">Recuperar</button>
+      </div>`).join('')}</div>
+    <div class="modal-actions"><button class="btn btn-ghost" type="button" data-action="close-modal">Cerrar</button></div>`);
+}
+async function restoreServerVersion(rev){
+  if(!isCloud() || !Number.isInteger(rev)) return;
+  confirmModal('¿Recuperar esta versión?',
+    'Se guardará como una versión nueva de tu cuenta. La copia de este dispositivo se conserva y se combinará con la recuperada.',
+    'Recuperar', async () => {
+      closeModal();
+      const err = await DrakoSB.restoreVersion(rev);
+      if(err){ toast(err, 'error'); return; }
+      await runSync(false);
+      toast('Versión recuperada. Revisa tus datos y sincroniza los otros dispositivos.', 'info');
+      if(currentUser) render();
+    });
 }
 async function saveRecoveredPassword(){
   const p1 = $('#rec-pass') ? $('#rec-pass').value : '';
@@ -1343,17 +1534,27 @@ function renderHeader(){
   const cloud = isCloud();
   $('#user-menu-head').textContent = 'Cuenta: ' + shown + (cloud ? ' (nube)' : ' (solo este dispositivo)');
   const sbStatus = $('#sb-status'), sbPush = $('#sb-push'), sbRestore = $('#sb-restore'), sbExport = $('#sb-export');
+  const sbConflicts = $('#sb-conflicts'), sbHistory = $('#sb-history'), sbLocal = $('#sb-local-backup');
+  const st = cloud ? (cloudSync.state(currentUser) || {}) : null;
+  const conflicts = st && Array.isArray(st.conflicts) ? st.conflicts.length : 0;
+  const pending = !!(st && st.dirty);
+  const hasBackup = !!(st && st.backup && st.backup.data);
   if(sbStatus){
     if(cloud){
       sbStatus.classList.remove('hidden');
       if(state.sb.status === 'syncing') sbStatus.textContent = '☁️ Sincronizando…';
-      else if(state.sb.status === 'error') sbStatus.textContent = '⚠ Sin conexión — se reintentará al guardar';
-      else if(state.sb.last) sbStatus.textContent = '☁️ Copia guardada · ' + new Date(state.sb.last).toLocaleTimeString('es', { hour:'2-digit', minute:'2-digit' });
+      else if(state.sb.status === 'offline') sbStatus.textContent = '⚠ Sin conexión — tus cambios están guardados aquí.';
+      else if(conflicts) sbStatus.textContent = '⚠ ' + conflicts + ' cambio(s) en dos dispositivos: necesitan tu decisión.';
+      else if(pending) sbStatus.textContent = '☁️ Cambios pendientes de subir';
+      else if(st && st.rev !== null && state.sb.last) sbStatus.textContent = '☁️ Todo sincronizado · ' + new Date(state.sb.last).toLocaleTimeString('es', { hour:'2-digit', minute:'2-digit' });
       else sbStatus.textContent = '☁️ Cuenta en la nube activa';
     } else sbStatus.classList.add('hidden');
   }
   if(sbPush) sbPush.classList.toggle('hidden', !cloud);
   if(sbRestore) sbRestore.classList.toggle('hidden', !cloud);
+  if(sbHistory) sbHistory.classList.toggle('hidden', !cloud);
+  if(sbConflicts) sbConflicts.classList.toggle('hidden', !conflicts);
+  if(sbLocal) sbLocal.classList.toggle('hidden', !hasBackup);
   if(sbExport) sbExport.classList.remove('hidden');
   $('#top-date').textContent = new Date().toLocaleDateString('es', { weekday:'long', month:'long', day:'numeric' });
 }
@@ -3957,9 +4158,17 @@ document.addEventListener('click', e => {
     return;
   }
   if(a === 'sb-push'){ pushNow(true); return; }
+  if(a === 'open-sync-conflicts'){ openSyncConflicts(); return; }
+  if(a === 'open-sync-history'){ openVersionHistory(); return; }
+  if(a === 'restore-local-backup'){ restoreLocalBackup(); return; }
+  if(a === 'conflict-keep' || a === 'conflict-theirs'){
+    resolveSyncConflict(el.dataset.key, a === 'conflict-theirs' ? 'theirs' : 'mine');
+    return;
+  }
+  if(a === 'restore-version'){ restoreServerVersion(Number(el.dataset.rev)); return; }
   if(a === 'sb-export'){ exportCloudJSON(); return; }
   if(a === 'sb-pull'){
-    confirmModal('¿Restaurar copia de la nube?', 'Se reemplazarán los datos actuales de este dispositivo por la última copia guardada en la nube. Esta acción no se puede deshacer.', 'Restaurar', () => {
+    confirmModal('¿Restaurar copia de la nube?', 'Se reemplazarán los datos actuales de este dispositivo por la última copia guardada en la nube. Antes se guarda una copia local por si quieres volver atrás.', 'Restaurar', () => {
       closeModal();
       pullRemote(true);
     });
@@ -4894,12 +5103,18 @@ window.addEventListener('hashchange', () => { render(); focusMain(); });
     render();
     DrakoSB.refresh().then(ok => {
       if(!ok) return;
-      pullRemote(false).then(() => { if(currentUser) render(); });
+      runSync(false).then(() => { if(currentUser) render(); });
     });
   } else {
     render();
   }
 })();
+
+/* Si el dispositivo estuvo sin conexión, al volver la red se reintenta solo:
+   los cambios pendientes ya están guardados en localStorage. */
+window.addEventListener('online', () => {
+  if(isCloud()) runSync(false);
+});
 
 /* ---------------- PWA: registro del service worker ---------------- */
 /* Solo en contextos seguros (https o localhost): la app sigue funcionando

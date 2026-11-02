@@ -74,13 +74,48 @@ window.DrakoSB = (function () {
     if (!hasSession()) return null;
     const { response, data } = await request('/data/profile', { method: 'GET' });
     if (!response.ok) throw new Error((data && data.message) || 'No se pudo leer la copia guardada.');
-    return data && data.data ? { data: data.data, updated_at: data.updated_at } : null;
+    if (!data || data.data === null || data.data === undefined) return null;
+    return {
+      data: data.data,
+      updated_at: data.updated_at || null,
+      rev: Number.isInteger(data.rev) ? data.rev : 0,
+    };
   }
-  async function saveData(data) {
+  /* Guarda indicando sobre qué revisión se construyó el cambio. El servidor
+     responde 409 si otro dispositivo guardó antes; ese error se propaga con
+     .status para que el motor combine en vez de pisar. */
+  async function saveData(doc, baseRev, opId) {
     if (!hasSession()) return false;
-    const { response, data: result } = await request('/data/profile', { method: 'PUT', body: { data } });
-    if (!response.ok) throw new Error((result && result.message) || 'No se pudo guardar la copia.');
-    return true;
+    const body = { data: doc };
+    if (baseRev !== undefined && baseRev !== null) body.base_rev = baseRev;
+    if (opId) body.op_id = opId;
+    const { response, data: result } = await request('/data/profile', { method: 'PUT', body });
+    if (response.status === 409) {
+      const conflict = new Error('conflict');
+      conflict.status = 409;
+      conflict.rev = result && Number.isInteger(result.rev) ? result.rev : null;
+      throw conflict;
+    }
+    if (!response.ok) {
+      const error = new Error((result && result.message) || 'No se pudo guardar la copia.');
+      error.status = response.status;
+      throw error;
+    }
+    return { rev: result && Number.isInteger(result.rev) ? result.rev : 0, replay: !!(result && result.replay) };
+  }
+  async function dataHistory() {
+    if (!hasSession()) return [];
+    const { response, data } = await request('/data/history', { method: 'GET' });
+    if (!response.ok) throw new Error((data && data.message) || 'No se pudieron leer las versiones anteriores.');
+    return data && Array.isArray(data.items) ? data.items : [];
+  }
+  async function restoreVersion(rev) {
+    if (!hasSession()) return 'No hay sesión activa en la nube.';
+    try {
+      const { response, data } = await request('/data/restore', { method: 'PUT', body: { rev } });
+      if (!response.ok) return authError(response, data, 'No se pudo recuperar esa versión.');
+      return null;
+    } catch (_) { return 'Sin conexión con el servidor.'; }
   }
   async function deleteAccount() {
     if (!hasSession()) return 'No hay sesión activa en la nube.';
@@ -91,6 +126,6 @@ window.DrakoSB = (function () {
       return null;
     } catch (_) { return 'Sin conexión con el servidor.'; }
   }
-  return { signIn, signUp, recover, updatePasswordFromToken, changePassword, signOut, loadData, saveData, deleteAccount, refresh,
+  return { signIn, signUp, recover, updatePasswordFromToken, changePassword, signOut, loadData, saveData, dataHistory, restoreVersion, deleteAccount, refresh,
     session: () => current ? { user: current } : null, email, userId, hasSession, loadSession, setSession };
 })();

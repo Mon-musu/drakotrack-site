@@ -173,6 +173,47 @@ Después de aplicarla, y después de cualquier migración que toque `app_data`:
 ./scripts/reindex-sessions.sh --user <uuid>   # una cuenta
 ```
 
+## Revisión y escritura atómica — `20261104_app_data_revision.sql`
+
+`app_data` sigue siendo la fuente de verdad, pero ya no se escribe con un
+upsert. La migración agrega:
+
+| Objeto | Para qué |
+| --- | --- |
+| `app_data.rev` | Revisión monótona por cuenta. Las filas existentes entran en `0`. |
+| `app_data.last_op_id` | Identificador de la última operación aplicada. |
+| `app_data_history` | Las **10** últimas versiones por cuenta (trigger, retención fija). |
+| `dt_save_app_data(data, base_rev, op_id)` | Escritura condicional y atómica; `409` cuando la revisión no coincide. |
+| `dt_delete_app_data()` | Borrado de la copia del usuario autenticado. |
+| `dt_app_data_history(limit)` | Metadatos de las versiones recuperables de la propia cuenta. |
+| `dt_restore_app_data(rev)` | Recupera una versión como revisión nueva. |
+
+Todas las funciones son `SECURITY DEFINER`, derivan la cuenta de `auth.uid()`
+(nunca de un parámetro) y fijan `search_path`. La comprobación de revisión y la
+escritura ocurren en la misma transacción con `SELECT … FOR UPDATE`, así que dos
+peticiones simultáneas se serializan: la segunda ve la revisión ya incrementada.
+
+**Endurecimiento.** `authenticated` pierde `insert`, `update` y `delete` sobre
+`app_data`; conserva `select` (con las políticas RLS existentes, que no se
+tocan). La única puerta de escritura es `dt_save_app_data()`. Un `PATCH` directo
+por PostgREST devuelve error de permisos en lugar de saltarse la revisión.
+
+**Historial.** El trigger `app_data_archive` guarda la versión anterior antes de
+reemplazarla y borra las que sobran: 10 por cuenta, sin crecer con el uso. Si la
+cuenta se borra en cascada no se archiva nada, para no conservar datos de una
+cuenta suprimida.
+
+**Compatibilidad.** No se reescribe `data` ni se borran filas; el historial
+arranca vacío. Un cliente anterior a este cambio sigue leyendo, pero sus
+escrituras directas dejan de funcionar: al recargar la app usa la API nueva.
+
+**Verificación.** El SQL está revisado y cubierto por pruebas en Node con un
+servidor falso que aplica la misma regla (revisión, conflicto, reintento
+idempotente), pero **no se ha ejecutado contra un Postgres real**: en este
+entorno no hay base de datos ni credenciales. Aplicarlo primero en un proyecto de
+prueba y correr `node test-backend.js signup` / `verify` con
+`SUPABASE_PUBLISHABLE_KEY` es el paso que falta.
+
 ## Comprobar que el índice cuadra
 
 ```sql

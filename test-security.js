@@ -61,7 +61,7 @@ async function call(handler, req) {
   security.isSameOrigin = () => true;
   let res = await call(authHandler, { method: 'POST', query: { action: 'signin' }, headers: { origin: 'https://drakotrack.vercel.app' }, body: {} });
   assert.equal(res.statusCode, 503, 'auth API fails closed when server Supabase key missing');
-  res = await call(dataHandler, { method: 'PUT', headers: { origin: 'https://drakotrack.vercel.app' }, body: {} });
+  res = await call(dataHandler, { method: 'PUT', query: { action: 'profile' }, headers: { origin: 'https://drakotrack.vercel.app' }, body: {} });
   assert.equal(res.statusCode, 503, 'data API fails closed when server Supabase key missing');
   res = await call(accountHandler, { method: 'DELETE', headers: { origin: 'https://drakotrack.vercel.app' } });
   assert.equal(res.statusCode, 503, 'account API fails closed when server Supabase key missing');
@@ -69,7 +69,7 @@ async function call(handler, req) {
 
   res = await call(authHandler, { method: 'POST', query: { action: 'signin' }, headers: { origin: 'https://evil.example' }, body: {} });
   assert.equal(res.statusCode, 403, 'auth API rejects cross-origin POST before auth upstream');
-  res = await call(dataHandler, { method: 'PUT', headers: { origin: 'https://evil.example' }, body: {} });
+  res = await call(dataHandler, { method: 'PUT', query: { action: 'profile' }, headers: { origin: 'https://evil.example' }, body: {} });
   assert.equal(res.statusCode, 403, 'data API rejects cross-origin write before auth upstream');
   security.isSameOrigin = origIsSameOrigin;
 

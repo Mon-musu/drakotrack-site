@@ -30,7 +30,7 @@ OUT_DIR=bundle
 # offline fallback (the shell loads server.url, so the deployed site wins),
 # but they must never be a stale hand-made copy: this list is the single
 # source of truth and the bundle is rebuilt from it on every release.
-WEB_ASSETS="index.html app.js styles.css share.js supabase.js boostcamp.js legal.html legal.js logo.png update-check.js"
+WEB_ASSETS="index.html app.js sync.js styles.css share.js supabase.js boostcamp.js legal.html legal.js logo.png update-check.js"
 APK_DIR=apk
 PUBLIC_BASE=${PUBLIC_BASE:-https://drakotrack.vercel.app}
 GH_REPO=${GH_REPO:-Mon-musu/drakotrack-site}

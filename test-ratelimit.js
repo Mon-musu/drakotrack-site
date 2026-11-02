@@ -20,6 +20,7 @@ function ok(condition, name) {
 
 let nowMs = Date.UTC(2026, 10, 2, 12, 0, 0);
 let restCalls = [];
+let rpcCalls = [];
 let signInCalls = 0;
 let signUpCalls = 0;
 let sessionUser = { id: 'user-a', email: 'a@example.com' };
@@ -27,6 +28,13 @@ let sessionUser = { id: 'user-a', email: 'a@example.com' };
 sb.hasServerKey = () => true;
 sb.authenticatedSession = async () => (sessionUser ? { accessToken: 'access-token', user: sessionUser } : null);
 sb.rest = async (path, options) => { restCalls.push({ path, options }); return { ok: true, status: 204, json: async () => [] }; };
+sb.rpcAuthed = async (name, body = {}) => {
+  rpcCalls.push({ name, body });
+  if (name === 'dt_save_app_data') return { ok: true, json: async () => ({ ok: true, rev: 1, replay: false }) };
+  if (name === 'dt_app_data_history') return { ok: true, json: async () => [] };
+  if (name === 'dt_restore_app_data') return { ok: true, json: async () => ({ ok: true, rev: 2, restored: 1 }) };
+  return { ok: true, json: async () => ({ ok: true }) };
+};
 sb.auth = async () => ({ ok: true, status: 200, json: async () => ({}) });
 sb.signIn = async () => {
   signInCalls += 1;
@@ -51,6 +59,7 @@ function fresh() {
   rateLimit.__test.reset();
   rateLimit.__test.setClock(() => nowMs);
   restCalls = [];
+  rpcCalls = [];
   signInCalls = 0;
   signUpCalls = 0;
   sessionUser = { id: 'user-a', email: 'a@example.com' };
@@ -79,7 +88,7 @@ const signIn = (options = {}) => call(authHandler, request({ action: 'signin', b
 const signUp = (options = {}) => call(authHandler, request({ action: 'signup', body: credentials(), ...options }));
 const recover = (options = {}) => call(authHandler, request({ action: 'recover', body: { email: 'a@example.com' }, ...options }));
 const readData = (options = {}) => call(dataHandler, request({ method: 'GET', action: 'profile', ...options }));
-const writeData = (options = {}) => call(dataHandler, request({ method: 'PUT', action: 'profile', body: validDocument, ...options }));
+const writeData = (options = {}) => call(dataHandler, request({ method: 'PUT', action: 'profile', body: { ...validDocument, base_rev: 0 }, ...options }));
 const deleteData = (options = {}) => call(dataHandler, request({ method: 'DELETE', action: 'profile', ...options }));
 const deleteAccount = (options = {}) => call(accountHandler, request({ method: 'DELETE', action: 'delete', ...options }));
 
@@ -153,9 +162,9 @@ function bodyOf(res) {
   fresh();
   const writeCodes = [];
   for (let i = 0; i < 61; i += 1) writeCodes.push((await writeData({ ip: '198.51.100.2' })).statusCode);
-  ok(writeCodes.slice(0, 60).every(code => code === 204) && writeCodes[60] === 429,
+  ok(writeCodes.slice(0, 60).every(code => code === 200) && writeCodes[60] === 429,
     'la escritura de datos permite 60 sincronizaciones por minuto');
-  ok(restCalls.length === 60, 'la escritura bloqueada no llega a Supabase');
+  ok(rpcCalls.length === 60, 'la escritura bloqueada no llega a Supabase');
 
   fresh();
   const deleteCodes = [];
@@ -211,7 +220,7 @@ function bodyOf(res) {
   ok((await deleteAccount()).statusCode === 401, 'borrar la cuenta sin sesión sigue dando 401');
   res = await call(authHandler, request({ action: 'change-password', body: { password: 'nueva1234', current_password: 'vieja1234' } }));
   ok(res.statusCode === 401, 'cambiar la contraseña sin sesión sigue dando 401');
-  ok(restCalls.length === 0, 'ninguna operación protegida llegó a Supabase sin sesión');
+  ok(restCalls.length === 0 && rpcCalls.length === 0, 'ninguna operación protegida llegó a Supabase sin sesión');
 
   // ---- 7. el uso legítimo no se bloquea antes de tiempo ---------------------
   fresh();
@@ -222,14 +231,14 @@ function bodyOf(res) {
   fresh();
   const burst = [];
   for (let i = 0; i < 45; i += 1) burst.push((await writeData({ ip: '198.51.100.21' })).statusCode);
-  ok(burst.every(code => code === 204), 'una sesión de entrenamiento con muchas series sincroniza sin bloqueos');
+  ok(burst.every(code => code === 200), 'una sesión de entrenamiento con muchas series sincroniza sin bloqueos');
 
   fresh();
   sessionUser = { id: 'user-a', email: 'a@example.com' };
   for (let i = 0; i < 61; i += 1) await writeData({ ip: '198.51.100.22' });
   sessionUser = { id: 'user-b', email: 'b@example.com' };
   res = await writeData({ ip: '198.51.100.22' });
-  ok(res.statusCode === 204, 'agotar el límite de un usuario no bloquea a otro en la misma IP');
+  ok(res.statusCode === 200, 'agotar el límite de un usuario no bloquea a otro en la misma IP');
 
   // ---- 8. los errores del almacén fallan cerrado ---------------------------
   fresh();
@@ -240,7 +249,7 @@ function bodyOf(res) {
   ok(Number(res.headers['retry-after']) >= 1, 'el 503 invita a reintentar más tarde');
   ok(signInCalls === 0, 'con el almacén caído no se ejecuta la operación protegida');
   res = await writeData({ ip: '198.51.100.30' });
-  ok(res.statusCode === 503 && restCalls.length === 0, 'tampoco se escribe en Supabase si el almacén falla');
+  ok(res.statusCode === 503 && restCalls.length === 0 && rpcCalls.length === 0, 'tampoco se escribe en Supabase si el almacén falla');
 
   // el límite global por IP se aplica antes que el de la operación concreta
   fresh();
