@@ -47,7 +47,7 @@ async function rest(path, options = {}) {
 }
 /* RPC con la clave publicable (rol anon). Solo para funciones SQL que el
    proyecto concede explícitamente a `anon` y que no exponen datos de usuarios
-   (p. ej. el registro de retos ALTCHA). Devuelve null si falla. */
+   y que no exponen datos de usuarios. Devuelve null si falla. */
 async function rpc(name, body) {
   if (!hasServerKey()) throw new Error('Supabase public key is not configured on the server');
   const response = await fetch(`${URL}/rest/v1/rpc/${encodeURIComponent(name)}`, {

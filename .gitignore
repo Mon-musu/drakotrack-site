@@ -19,3 +19,10 @@ apk/*.apk
 .deploy-stage/
 .vercel/
 artifacts/
+
+# Árboles locales de despliegue y artefactos de build
+deploy/
+chunks/
+bundle/
+*.idsig
+drakotrack-sync.bundle

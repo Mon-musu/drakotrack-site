@@ -7,20 +7,18 @@
    ============================================================ */
 'use strict';
 
-const VERSION = 'drakotrack-v3';
+const VERSION = 'drakotrack-v4';
 /* Se cachea el shell por URL exacta (con su ?v=), así una versión nueva
    entra como entrada nueva y la vieja se borra al activar. */
 const SHELL = [
   './',
   './index.html',
-  './styles.css?v=23',
-  './app.js?v=33',
-  './supabase.js?v=2',
+  './styles.css?v=24',
+  './app.js?v=34',
+  './supabase.js?v=3',
   './boostcamp.js?v=3',
   './share.js?v=4',
   './update-check.js?v=1',
-  './altcha.js',
-  './altcha-setup.js?v=1',
   './legal.html',
   './legal.js',
   './logo.png',

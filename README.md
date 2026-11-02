@@ -5,7 +5,7 @@ with Supabase for cloud accounts. Ships on the web and as a sideloaded Android A
 
 - **Web / app UI**: `index.html`, `app.js`, `styles.css`, `share.js`, `boostcamp.js`
 - **Cloud client**: `supabase.js` (talks only to the same-origin API — no tokens in the browser)
-- **API** (Vercel functions): `api/` — cookie sessions, ALTCHA signup captcha, rate limiting, `lib/security.js`
+- **API** (Vercel functions): `api/` — cookie sessions, rate limiting, `lib/security.js`
 - **Programs**: `programs/` catalogue plus `apk/version.json`, the update feed (the APK binary lives in GitHub release assets)
 - **Android**: a thin Capacitor shell that loads the live site — see [RELEASE.md](RELEASE.md)
 
@@ -13,7 +13,7 @@ with Supabase for cloud accounts. Ships on the web and as a sideloaded Android A
 
 ```bash
 npm ci
-npm test        # app flows + profile/API + captcha assertions
+npm test        # app flows + profile/API assertions
 ```
 
 ## Deploying the site
@@ -21,11 +21,11 @@ npm test        # app flows + profile/API + captcha assertions
 The published tree is staged in `.deploy-stage/` and deployed with the Vercel CLI:
 
 ```bash
-cp -f app.js index.html styles.css vercel.json supabase.js boostcamp.js share.js legal.html legal.js altcha.js altcha-setup.js update-check.js .deploy-stage/
+cp -f app.js index.html styles.css vercel.json supabase.js boostcamp.js share.js legal.html legal.js update-check.js .deploy-stage/
 cd .deploy-stage && npx vercel deploy --prod --yes --token="$VERCEL_TOKEN"
 ```
 
-Environment variables (`SUPABASE_URL`, `SUPABASE_PUBLISHABLE_KEY`, `ALTCHA_HMAC_SECRET`)
+Environment variables (`SUPABASE_URL`, `SUPABASE_PUBLISHABLE_KEY`)
 live in the Vercel project, never in this repository.
 
 ## Android APK

@@ -701,21 +701,6 @@ input[type=number]{-moz-appearance:textfield;appearance:textfield}
 .consent-row a{color:var(--accent-text);font-weight:700}
 .consent-note{font-size:11.5px;line-height:1.45;color:var(--muted-2)}
 
-/* ============================================================ */
-/*  CAPTCHA DEL REGISTRO (ALTCHA, prueba de trabajo)             */
-/* ============================================================ */
-.captcha-box{
-  display:flex;flex-direction:column;gap:8px;margin:0 0 16px;padding:12px 14px;
-  background:var(--panel-2);border:1px solid var(--border-strong);border-radius:12px;
-}
-.captcha-label{font-size:12.5px;font-weight:700;color:var(--text)}
-.captcha-note{font-size:11.5px;line-height:1.45;color:var(--muted-2)}
-.captcha-box altcha-widget{
-  --altcha-max-width:none;--altcha-border-radius:10px;
-  --altcha-color-base:var(--panel);--altcha-color-base-content:var(--text);
-  --altcha-color-primary:var(--orange);--altcha-color-primary-content:#1a0c04;
-  display:block;
-}
 .site-footer{margin-top:22px;padding-top:16px;border-top:1px solid var(--border);text-align:center}
 .footer-links{display:flex;flex-wrap:wrap;gap:6px 14px;justify-content:center;margin-bottom:9px}
 .footer-links a{

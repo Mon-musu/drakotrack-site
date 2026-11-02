@@ -22,16 +22,11 @@ window.DrakoSB = (function () {
   }
   function authError(response, data, generic) {
     if (response.status === 429) return 'Demasiados intentos — espera un minuto y vuelve a intentarlo.';
-    if (data && data.error === 'captcha_required') return 'Completa la verificación «No soy un robot» para crear la cuenta.';
-    if (data && data.error === 'captcha_failed') return 'La verificación «No soy un robot» caducó o no es válida. Vuelve a verificarla.';
     return (data && data.message) || generic || 'No se pudo completar la solicitud.';
   }
-  /* `captcha` es la prueba ALTCHA (cadena base64) que emite el widget ya verificado. */
-  async function signUp(mail, pass, consent, captcha) {
+  async function signUp(mail, pass, consent) {
     try {
-      const body = { email: mail, password: pass, consent };
-      if (typeof captcha === 'string' && captcha) body.altcha = captcha;
-      const { response, data } = await request('/auth/signup', { body });
+      const { response, data } = await request('/auth/signup', { body: { email: mail, password: pass, consent } });
       if (!response.ok) return authError(response, data, 'No se pudo crear la cuenta.');
       setSession(data);
       return null;

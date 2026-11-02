@@ -5,13 +5,6 @@ const authHandler = require('./api/auth/[action]');
 const dataHandler = require('./api/data/[action]');
 const accountHandler = require('./api/account/[action]');
 const sb = require('./api/_lib/supabase');
-const { solveChallenge } = require('altcha-lib');
-const { deriveKey } = require('altcha-lib/algorithms/pbkdf2');
-
-/* Secreto HMAC de prueba: en producción viene de la variable de entorno
-   ALTCHA_HMAC_SECRET, nunca del repositorio. */
-process.env.ALTCHA_HMAC_SECRET = 'test-hmac-secret-' + 'a'.repeat(40);
-const altcha = require('./api/_lib/altcha');
 
 function response() {
   return {
@@ -80,19 +73,8 @@ async function call(handler, req) {
   assert.equal(res.statusCode, 403, 'data API rejects cross-origin write before auth upstream');
   security.isSameOrigin = origIsSameOrigin;
 
-  /* ---------------- Captcha ALTCHA del registro ---------------- */
-  const originalRpc = sb.rpc;
+  /* ---------------- El registro ya no pide captcha ---------------- */
   const originalSignUp = sb.signUp;
-  const consumed = new Set();
-  sb.rpc = async (name, body) => {
-    if (name === 'altcha_register') return true;
-    if (name === 'altcha_consume') {
-      if (consumed.has(body.p_id)) return false;
-      consumed.add(body.p_id);
-      return true;
-    }
-    return null;
-  };
   sb.hasServerKey = () => true;
   security.isSameOrigin = () => true;
   let signupCalls = 0;
@@ -101,58 +83,24 @@ async function call(handler, req) {
     return { response: { ok: true, status: 200 }, data: { user: { id: '11111111-2222-3333-4444-555555555555', email: 'nuevo@drakotrack.test' }, access_token: 'at', refresh_token: 'rt', expires_in: 3600 } };
   };
 
-  res = await call(authHandler, { method: 'GET', query: { action: 'challenge' } });
-  assert.equal(res.statusCode, 200, 'issues a captcha challenge');
-  const challenge = JSON.parse(res.body);
-  assert.equal(challenge.parameters.algorithm, 'PBKDF2/SHA-256', 'challenge uses the signed PoW algorithm');
-  assert.equal(challenge.parameters.cost, altcha.COST, 'challenge carries the server-side cost');
-  assert.ok(typeof challenge.signature === 'string' && challenge.signature.length >= 32, 'challenge is HMAC signed');
-  const challengeId = challenge.parameters.data && challenge.parameters.data.challengeId;
-  assert.match(String(challengeId), /^[A-Za-z0-9_-]{16,128}$/, 'challenge embeds its server-side id');
-  assert.equal(res.headers['cache-control'], 'private, no-store', 'challenge is never cached');
-
-  const solution = await solveChallenge({ challenge, deriveKey });
-  assert.ok(solution, 'challenge can be solved by a real client');
-  const proof = Buffer.from(JSON.stringify({ challenge, solution }), 'utf8').toString('base64');
-
-  const signupBody = { email: 'nuevo@drakotrack.test', password: 'correct-horse-battery', consent: valid.consent, altcha: proof };
+  const signupBody = { email: 'nuevo@drakotrack.test', password: 'correct-horse-battery', consent: valid.consent };
   res = await call(authHandler, { method: 'POST', query: { action: 'signup' }, headers: { origin: 'https://drakotrack.vercel.app' }, body: signupBody });
-  assert.equal(res.statusCode, 201, 'signup accepts a valid captcha proof');
-  assert.equal(signupCalls, 1, 'signup reaches Supabase only after captcha verification');
+  assert.equal(res.statusCode, 201, 'signup creates the account without a captcha');
+  assert.equal(signupCalls, 1, 'signup reaches Supabase on the first attempt');
+  assert.equal(JSON.parse(res.body).user.email, 'nuevo@drakotrack.test', 'signup returns the safe user');
 
-  res = await call(authHandler, { method: 'POST', query: { action: 'signup' }, headers: { origin: 'https://drakotrack.vercel.app' }, body: signupBody });
-  assert.equal(res.statusCode, 400, 'replayed captcha proof is rejected');
-  assert.equal(JSON.parse(res.body).error, 'captcha_failed');
-  assert.equal(signupCalls, 1, 'replayed proof never creates an account');
+  res = await call(authHandler, { method: 'POST', query: { action: 'signup' }, headers: { origin: 'https://drakotrack.vercel.app' }, body: { ...signupBody, altcha: 'stale-proof' } });
+  assert.equal(res.statusCode, 201, 'a leftover captcha field is ignored, not rejected');
 
-  res = await call(authHandler, { method: 'POST', query: { action: 'signup' }, headers: { origin: 'https://drakotrack.vercel.app' }, body: { ...signupBody, altcha: undefined } });
-  assert.equal(res.statusCode, 400, 'signup without captcha is rejected');
-  assert.equal(JSON.parse(res.body).error, 'captcha_required');
-  assert.equal(signupCalls, 1, 'missing captcha never creates an account');
-
-  const tampered = JSON.parse(Buffer.from(proof, 'base64').toString('utf8'));
-  tampered.challenge.parameters.cost = 1;
-  res = await call(authHandler, { method: 'POST', query: { action: 'signup' }, headers: { origin: 'https://drakotrack.vercel.app' }, body: { ...signupBody, altcha: Buffer.from(JSON.stringify(tampered)).toString('base64') } });
-  assert.equal(res.statusCode, 400, 'tampered challenge (lower cost) is rejected');
-  assert.equal(signupCalls, 1, 'tampered proof never creates an account');
-
-  res = await call(authHandler, { method: 'POST', query: { action: 'signup' }, headers: { origin: 'https://drakotrack.vercel.app' }, body: { ...signupBody, altcha: 'not-a-proof' } });
-  assert.equal(res.statusCode, 400, 'malformed captcha payload is rejected');
-
-  res = await call(authHandler, { method: 'POST', query: { action: 'challenge' } });
-  assert.equal(res.statusCode, 405, 'challenge endpoint only answers GET');
-
-  const savedSecret = process.env.ALTCHA_HMAC_SECRET;
-  delete process.env.ALTCHA_HMAC_SECRET;
   res = await call(authHandler, { method: 'GET', query: { action: 'challenge' } });
-  assert.equal(res.statusCode, 503, 'captcha fails closed when its secret is missing');
-  assert.equal(JSON.parse(res.body).error, 'captcha_not_configured');
-  process.env.ALTCHA_HMAC_SECRET = savedSecret;
+  assert.equal(res.statusCode, 404, 'the captcha challenge endpoint is gone');
 
-  sb.rpc = originalRpc;
+  res = await call(authHandler, { method: 'POST', query: { action: 'signup' }, headers: { origin: 'https://drakotrack.vercel.app' }, body: { ...signupBody, password: 'short' } });
+  assert.equal(res.statusCode, 400, 'short passwords are still rejected');
+
   sb.signUp = originalSignUp;
   sb.hasServerKey = origHasServerKey;
   security.isSameOrigin = origIsSameOrigin;
 
-  console.log('security tests: 19 profile/API assertions + 17 captcha assertions passed');
+  console.log('security tests: 19 profile/API assertions + 5 signup assertions passed');
 })().catch(error => { console.error(error); process.exitCode = 1; });

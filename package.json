@@ -14,8 +14,6 @@
   "type": "commonjs",
   "dependencies": {
     "@vercel/firewall": "1.2.6",
-    "altcha": "3.5.0",
-    "altcha-lib": "2.8.0",
     "jsdom": "^30.1.3"
   }
 }

@@ -142,52 +142,25 @@ const tick = ms => new Promise(r => setTimeout(r, ms));
       && !window.document.querySelector('#consent-terms').checked;
   })());
 
-  // ===== captcha ALTCHA: solo al crear cuenta en la nube =====
+  // ===== el registro en la nube ya no pide captcha =====
   const captchaBox = () => window.document.querySelector('#captcha-box');
   g("setAuthMode('signup')");
-  check('captcha section shown when creating a cloud account', captchaBox() && !captchaBox().classList.contains('hidden'));
-  g("setAuthMode('signup-local')");
-  check('captcha hidden for device-only accounts', captchaBox().classList.contains('hidden'));
-  g("setAuthMode('login')");
-  check('captcha hidden on login', captchaBox().classList.contains('hidden'));
-
-  // sin el widget cargado, el registro se bloquea con un mensaje claro
+  check('signup no longer renders a captcha widget', !captchaBox());
+  check('no ALTCHA script is loaded', !window.document.querySelector('script[src*="altcha"]'));
   g(`(function(){
     window.__signupArgs = null;
-    DrakoSB.signUp = async (m, p, c, proof) => { window.__signupArgs = { proof }; return 'stop-for-test'; };
+    DrakoSB.signUp = async (m, p, c, proof) => { window.__signupArgs = { proof: proof === undefined ? null : proof }; return 'stop-for-test'; };
   })()`);
-  g("setAuthMode('signup')");
   window.document.querySelector('#auth-user').value = 'cloud@drakotrack.test';
   window.document.querySelector('#auth-pass').value = 'cloud-pass-2026';
   window.document.querySelector('#consent-terms').checked = true;
   window.document.querySelector('#consent-age').checked = true;
   submit();
   await tick(200);
-  check('signup blocked when the captcha widget is unavailable', /anti-bots/.test(errText()) && g('window.__signupArgs') === null);
-
-  // con el widget listo se monta solo y la prueba viaja en la petición
-  g(`(function(){
-    if(!customElements.get('altcha-widget')){
-      customElements.define('altcha-widget', class extends HTMLElement {
-        constructor(){ super(); this._state = 'unverified'; }
-        getState(){ return this._state; }
-        verify(){ this._state = 'verified'; return Promise.resolve({ payload: 'proof-' + 'x'.repeat(40) }); }
-        reset(){ this._state = 'unverified'; }
-      });
-    }
-    document.dispatchEvent(new Event('altcha-ready'));
-  })()`);
-  g("setAuthMode('signup')");
-  check('captcha widget mounts inside the signup form', !!window.document.querySelector('#captcha-box altcha-widget'));
-  submit();
-  await tick(300);
   const sent = g('window.__signupArgs');
-  check('cloud signup sends the ALTCHA proof', !!sent && /^proof-/.test(sent.proof));
-  check('captcha is described as cookie-free', /cookies/.test(captchaBox().textContent || ''));
-  const csp = (window.document.querySelector('meta[http-equiv="Content-Security-Policy"]') || {}).content || '';
-  check('CSP allows the ALTCHA worker (blob + data fallback)',
-    /worker-src[^;]*blob:/.test(csp) && /worker-src[^;]*data:/.test(csp)
-    && /child-src[^;]*blob:/.test(csp));
+  check('cloud signup needs no captcha proof', !!sent && sent.proof === null);
+  check('the form never asks for an anti-bot check',
+    !/anti-bots|No soy un robot/i.test(window.document.querySelector('#auth-form').textContent || ''));
   g("setAuthMode('login')");
 
   // login wrong password = generic error

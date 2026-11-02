@@ -4664,64 +4664,6 @@ document.addEventListener('change', e => {
   }
 });
 
-/* ---------------- CAPTCHA del registro (ALTCHA, prueba de trabajo) ---------------- */
-/* El reto lo firma el servidor en /api/auth/challenge y se verifica allí; el
-   navegador solo resuelve el reto. Sin cookies, sin rastreo, sin terceros. */
-const captcha = { state: 'unverified', payload: null, widget: null };
-
-function mountCaptcha(){
-  if(captcha.widget) return captcha.widget;
-  const box = $('#captcha-box');
-  if(!box) return null;
-  if(!window.customElements || !customElements.get('altcha-widget')) return null;
-  const el = document.createElement('altcha-widget');
-  el.id = 'altcha-widget';
-  el.setAttribute('challenge', '/api/auth/challenge');
-  el.setAttribute('name', 'altcha');
-  el.setAttribute('language', 'es-es');
-  el.setAttribute('auto', 'off');
-  el.addEventListener('statechange', e => {
-    const detail = (e && e.detail) || {};
-    let next = detail.state;
-    if(!next && typeof el.getState === 'function') next = el.getState();
-    captcha.state = next || 'unverified';
-    captcha.payload = captcha.state === 'verified' ? (detail.payload || captcha.payload) : null;
-  });
-  box.appendChild(el);
-  captcha.widget = el;
-  return el;
-}
-/* Spanish widget strings are registered by altcha-setup.js; mount once it is ready. */
-document.addEventListener('altcha-ready', () => { if(state.authMode === 'signup') mountCaptcha(); });
-
-/* El web component expone verify() cuando ya se ha conectado al DOM: esperamos
-   ese momento (unos milisegundos) antes de darlo por no disponible. */
-async function captchaReady(el){
-  for(let i = 0; i < 20 && typeof el.verify !== 'function'; i++) await new Promise(r => setTimeout(r, 50));
-  return typeof el.verify === 'function';
-}
-
-async function captchaProof(){
-  const el = mountCaptcha();
-  if(!el || !(await captchaReady(el))) return { error: 'La verificación anti-bots no se pudo cargar. Recarga la página e inténtalo de nuevo.' };
-  try{
-    let payload = captcha.state === 'verified' ? captcha.payload : null;
-    if(!payload){
-      const result = await el.verify();
-      if(result && result.payload){ payload = result.payload; captcha.state = 'verified'; captcha.payload = payload; }
-    }
-    if(!payload) return { error: 'Completa la verificación «No soy un robot» para crear la cuenta.' };
-    return { payload };
-  }catch(_){
-    return { error: 'No se pudo completar la verificación anti-bots. Inténtalo de nuevo.' };
-  }
-}
-function resetCaptcha(){
-  captcha.state = 'unverified'; captcha.payload = null;
-  const el = captcha.widget;
-  if(el && typeof el.reset === 'function'){ try{ el.reset(); }catch(_){} }
-}
-
 document.addEventListener('submit', async e => {
   const form = e.target;
   if(form.id === 'auth-form'){
@@ -4748,14 +4690,11 @@ document.addEventListener('submit', async e => {
       if(!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(mail)){ showAuthError('Introduce un correo válido.'); return; }
       if(p.length < 8){ showAuthError('La contraseña debe tener al menos 8 caracteres.'); return; }
       const btn = $('#auth-submit'); btn.disabled = true;
-      const proof = await captchaProof();
-      if(proof.error){ btn.disabled = false; showAuthError(proof.error); return; }
-      const err = await DrakoSB.signUp(mail, p, consent, proof.payload);
+      const err = await DrakoSB.signUp(mail, p, consent);
       btn.disabled = false;
       if(typeof err === 'string' && err){ showAuthError(err); return; }
       $('#auth-err').classList.add('hidden');
       form.reset();
-      resetCaptcha();
       toast('¡Cuenta en la nube creada! Tus datos se respaldan y puedes restaurarlos.');
       await enterCloud(mail);
       saveConsent(consent);
@@ -4825,10 +4764,6 @@ function setAuthMode(mode){
   const consentBox = $('#consent-box');
   const isSignup = mode === 'signup' || mode === 'signup-local';
   if(consentBox) consentBox.classList.toggle('hidden', !isSignup);
-  /* El captcha solo aplica a las cuentas en la nube (las locales no salen del dispositivo). */
-  const captchaBox = $('#captcha-box');
-  if(captchaBox) captchaBox.classList.toggle('hidden', mode !== 'signup');
-  if(mode === 'signup') mountCaptcha();
   if(!isSignup){
     const c1 = $('#consent-terms'), c2 = $('#consent-age');
     if(c1) c1.checked = false;

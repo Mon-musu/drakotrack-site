@@ -1,7 +1,6 @@
 'use strict';
 const { json, readJson, isSameOrigin, readCookie, cookieSession, clearCookies, safeUser } = require('../../lib/security');
 const sb = require('../_lib/supabase');
-const altcha = require('../_lib/altcha');
 
 function validEmail(value) { return typeof value === 'string' && value.length <= 254 && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value); }
 function getAction(req) { return String(req.query && req.query.action || '').toLowerCase(); }
@@ -20,19 +19,12 @@ module.exports = async function handler(req, res) {
   res.setHeader('Referrer-Policy', 'strict-origin-when-cross-origin');
   res.setHeader('Strict-Transport-Security', 'max-age=63072000; includeSubDomains; preload');
   const action = getAction(req);
-  if (!['signup', 'signin', 'recover', 'reset', 'change-password', 'signout', 'session', 'challenge'].includes(action)) return json(res, 404, { error: 'not_found' });
-  const readOnly = action === 'session' || action === 'challenge';
+  if (!['signup', 'signin', 'recover', 'reset', 'change-password', 'signout', 'session'].includes(action)) return json(res, 404, { error: 'not_found' });
+  const readOnly = action === 'session';
   if ((readOnly && req.method !== 'GET') || (!readOnly && req.method !== 'POST')) return json(res, 405, { error: 'method_not_allowed' });
-  /* El reto llega por GET (sin cabecera Origin) y va firmado: no cambia estado. */
-  if (action !== 'session' && action !== 'challenge' && !isSameOrigin(req)) return json(res, 403, { error: 'origin_not_allowed' });
+  if (action !== 'session' && !isSameOrigin(req)) return json(res, 403, { error: 'origin_not_allowed' });
   if (!sb.hasServerKey()) return json(res, 503, { error: 'server_auth_not_configured', message: 'La autenticación de nube no está configurada en el servidor.' });
   try {
-    if (action === 'challenge') {
-      if (!altcha.isConfigured()) return json(res, 503, { error: 'captcha_not_configured' });
-      const challenge = await altcha.create();
-      if (!challenge) return json(res, 503, { error: 'captcha_not_configured' });
-      return json(res, 200, challenge);
-    }
     if (action === 'signout') {
       const access = readCookie(req, 'access');
       if (access) await sb.auth('/logout', { method: 'POST', headers: { Authorization: `Bearer ${access}` } }).catch(() => null);
@@ -48,17 +40,6 @@ module.exports = async function handler(req, res) {
     const body = await readJson(req, 16 * 1024);
     if (action === 'signup' || action === 'signin') {
       if (!validEmail(body.email) || typeof body.password !== 'string' || body.password.length < (action === 'signup' ? 8 : 1) || body.password.length > 256 || (action === 'signup' && !validConsent(body.consent))) return json(res, 400, { error: 'invalid_input', message: 'Correo, contraseña o consentimiento no válidos.' });
-      if (action === 'signup') {
-        /* Captcha obligatorio: se verifica antes de crear nada y se consume una sola vez. */
-        if (typeof body.altcha !== 'string' || body.altcha.length < 32 || body.altcha.length > altcha.MAX_PAYLOAD_CHARS) {
-          return json(res, 400, { error: 'captcha_required', message: 'Completa la verificación «No soy un robot» para crear la cuenta.' });
-        }
-        const proof = await altcha.verify(body.altcha);
-        if (!proof.ok) {
-          if (proof.reason === 'not_configured') return json(res, 503, { error: 'captcha_not_configured', message: 'La verificación anti-bots no está disponible ahora mismo. Inténtalo de nuevo más tarde.' });
-          return json(res, 400, { error: 'captcha_failed', message: 'La verificación «No soy un robot» no es válida o caducó. Vuelve a verificarla.' });
-        }
-      }
       const { response, data } = action === 'signup' ? await sb.signUp(body.email.trim().toLowerCase(), body.password, body.consent) : await sb.signIn(body.email.trim().toLowerCase(), body.password);
       if (!response.ok) {
         if (response.status === 429) return json(res, 429, { error: action === 'signin' ? 'invalid_credentials' : 'auth_failed', message: action === 'signin' ? 'Demasiados intentos. Espera un momento e inténtalo de nuevo.' : 'No se pudo crear la cuenta por ahora. Inténtalo de nuevo más tarde.' });

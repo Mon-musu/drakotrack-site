@@ -39,7 +39,7 @@ BRANCH="$(git rev-parse --abbrev-ref HEAD)"
 # Archivos que forman el despliegue: la web, las funciones de api/ y su código.
 DEPLOY_FILES=(
   index.html app.js styles.css share.js supabase.js boostcamp.js
-  legal.html legal.js logo.png altcha.js altcha-setup.js update-check.js
+  legal.html legal.js logo.png update-check.js
   manifest.webmanifest sw.js icons
   vercel.json package.json package-lock.json api lib programs apk/version.json
 )
