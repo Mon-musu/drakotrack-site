@@ -1,6 +1,7 @@
 'use strict';
 const { json, readJson, isSameOrigin, readCookie, cookieSession, clearCookies, safeUser } = require('../../lib/security');
 const sb = require('../_lib/supabase');
+const rateLimit = require('../_lib/rate-limit');
 
 function validEmail(value) { return typeof value === 'string' && value.length <= 254 && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value); }
 function getAction(req) { return String(req.query && req.query.action || '').toLowerCase(); }
@@ -22,8 +23,11 @@ module.exports = async function handler(req, res) {
   if (!['signup', 'signin', 'recover', 'reset', 'change-password', 'signout', 'session'].includes(action)) return json(res, 404, { error: 'not_found' });
   const readOnly = action === 'session';
   if ((readOnly && req.method !== 'GET') || (!readOnly && req.method !== 'POST')) return json(res, 405, { error: 'method_not_allowed' });
+  if (await rateLimit.enforce(req, res, 'api:ip')) return;
   if (action !== 'session' && !isSameOrigin(req)) return json(res, 403, { error: 'origin_not_allowed' });
   if (!sb.hasServerKey()) return json(res, 503, { error: 'server_auth_not_configured', message: 'La autenticación de nube no está configurada en el servidor.' });
+  const ipPolicy = { signin: 'auth:signin', signup: 'auth:signup', recover: 'auth:recover', reset: 'auth:reset', session: 'auth:session', signout: 'auth:signout' }[action];
+  if (ipPolicy && await rateLimit.enforce(req, res, ipPolicy)) return;
   try {
     if (action === 'signout') {
       const access = readCookie(req, 'access');
@@ -71,6 +75,7 @@ module.exports = async function handler(req, res) {
     if (action === 'change-password') {
       const session = await sb.authenticatedSession(req);
       if (!session) { clearCookies(res); return json(res, 401, { error: 'unauthorized' }); }
+      if (await rateLimit.enforce(req, res, 'auth:change-password', { userId: session.user.id })) return;
       const { accessToken, user } = session;
       if (typeof body.current_password !== 'string' || !body.current_password.length || body.current_password.length > 256 || typeof body.password !== 'string' || body.password.length < 8 || body.password.length > 256) return json(res, 400, { error: 'invalid_input', message: 'Contraseña no válida.' });
       const check = await sb.signIn(user.email, body.current_password);

@@ -1,6 +1,7 @@
 'use strict';
 const { json, readJson, isSameOrigin, cookieSession, validateData } = require('../../lib/security');
 const sb = require('../_lib/supabase');
+const rateLimit = require('../_lib/rate-limit');
 const query = userId => `?user_id=eq.${encodeURIComponent(userId)}`;
 
 module.exports = async function handler(req, res) {
@@ -8,6 +9,7 @@ module.exports = async function handler(req, res) {
   res.setHeader('Vary', 'Origin, Cookie');
   res.setHeader('X-Content-Type-Options', 'nosniff');
   if (!['GET', 'PUT', 'DELETE'].includes(req.method)) return json(res, 405, { error: 'method_not_allowed' });
+  if (await rateLimit.enforce(req, res, 'api:ip')) return;
   if (req.method !== 'GET' && !isSameOrigin(req)) return json(res, 403, { error: 'origin_not_allowed' });
   if (!sb.hasServerKey()) return json(res, 503, { error: 'server_auth_not_configured' });
   try {
@@ -16,6 +18,8 @@ module.exports = async function handler(req, res) {
     if (session.refreshed) cookieSession(res, session.refreshed);
     const accessToken = session.accessToken;
     const user = session.user;
+    const policy = req.method === 'GET' ? 'data:read' : req.method === 'PUT' ? 'data:write' : 'data:delete';
+    if (await rateLimit.enforce(req, res, policy, { userId: user.id })) return;
     if (req.method === 'GET') {
       const response = await sb.rest(`/app_data${query(user.id)}&select=data,updated_at`, { accessToken, headers: { Accept: 'application/json' } });
       if (!response.ok) return json(res, 502, { error: 'data_unavailable' });
