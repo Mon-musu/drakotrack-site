@@ -187,6 +187,37 @@ const tick = ms => new Promise(r => setTimeout(r, ms));
   const err3 = await g(`login('tester_01','local-pass-2026')`);
   check('correct password ok', err3 === null);
 
+  // ===== la pestaña "Iniciar sesión" (abre por defecto) deja entrar =====
+  g('currentUser = null; localStorage.removeItem(SESSION_KEY);');
+  g("setAuthMode('login')");
+  window.document.querySelector('#auth-user').value = 'tester_01';
+  window.document.querySelector('#auth-pass').value = 'local-pass-2026';
+  submit();
+  await tick(600);
+  check('default login tab signs a device account in', g('currentUser') === 'tester_01');
+  check('login tab does not demand picking a mode first', !/Elige iniciar sesión/.test(errText()));
+
+  // un correo en esa misma pestaña se resuelve contra la nube
+  g('currentUser = null; localStorage.removeItem(SESSION_KEY);');
+  g("setAuthMode('login')");
+  g(`(function(){
+    window.__origSignIn = DrakoSB.signIn;
+    window.__signInArgs = null;
+    DrakoSB.signIn = async (m, p) => { window.__signInArgs = { m, p }; return 'stop-for-test'; };
+  })()`);
+  window.document.querySelector('#auth-user').value = 'Entrenador@DrakoTrack.test';
+  window.document.querySelector('#auth-pass').value = 'cloud-pass-2026';
+  submit();
+  await tick(400);
+  const signInArgs = g('window.__signInArgs');
+  check('an email on the login tab goes to the cloud sign-in', !!signInArgs && signInArgs.m === 'entrenador@drakotrack.test');
+  g('DrakoSB.signIn = window.__origSignIn;');
+
+  g("login('tester_01','local-pass-2026')");
+  await tick(400);
+  window.render();
+  await tick(50);
+
   const mainHtml = () => window.document.querySelector('#main').innerHTML;
   const libStart = () => window.document.querySelectorAll('#main [data-action="start-session"]').length;
   check('library renders 6 cards with start buttons', libStart() === 6);

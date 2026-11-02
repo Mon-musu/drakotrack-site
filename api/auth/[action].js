@@ -60,10 +60,18 @@ module.exports = async function handler(req, res) {
         }
       }
       const { response, data } = action === 'signup' ? await sb.signUp(body.email.trim().toLowerCase(), body.password, body.consent) : await sb.signIn(body.email.trim().toLowerCase(), body.password);
-      if (!response.ok) return json(res, response.status === 429 ? 429 : 400, { error: action === 'signin' ? 'invalid_credentials' : 'auth_failed', message: action === 'signin' ? 'Correo o contraseña incorrectos.' : 'No se pudo crear la cuenta. Revisa los datos e inténtalo de nuevo.' });
-      if (!data || !safeUser(data.user)) return json(res, 400, { error: 'confirmation_required', message: 'No se pudo iniciar la sesión. Comprueba la configuración de confirmación del correo.' });
-      if (data.access_token && data.refresh_token) cookieSession(res, data);
+      if (!response.ok) {
+        if (response.status === 429) return json(res, 429, { error: action === 'signin' ? 'invalid_credentials' : 'auth_failed', message: action === 'signin' ? 'Demasiados intentos. Espera un momento e inténtalo de nuevo.' : 'No se pudo crear la cuenta por ahora. Inténtalo de nuevo más tarde.' });
+        if (action === 'signin' && response.status === 400) {
+          const bodyText = (await response.text().catch(() => '')) || '';
+          if (bodyText.includes('Invalid login') || bodyText.includes('Invalid password') || bodyText.includes('Invalid user')) return json(res, 401, { error: 'invalid_credentials', message: 'Correo o contraseña incorrectos.' });
+          return json(res, 400, { error: 'auth_server_error', message: 'No se pudo completar el inicio de sesión por un problema temporal del servidor.' });
+        }
+        return json(res, 400, { error: action === 'signup' ? 'auth_failed' : 'auth_server_error', message: action === 'signup' ? 'No se pudo crear la cuenta. Revisa los datos e inténtalo de nuevo.' : 'No se pudo completar la operación de autenticación.' });
+      }
+      if (!data || typeof data.user !== 'object' || !data.user.id) return json(res, 400, { error: 'confirmation_required', message: 'No se pudo iniciar la sesión. Comprueba la configuración de confirmación del correo.' });
       if (!data.access_token || !data.refresh_token) return json(res, 400, { error: 'confirmation_required', message: 'No se pudo iniciar la sesión. Comprueba la configuración de confirmación del correo.' });
+      cookieSession(res, data);
       return json(res, action === 'signup' ? 201 : 200, { user: safeUser(data.user) });
     }
     if (action === 'recover') {

@@ -4726,10 +4726,13 @@ document.addEventListener('submit', async e => {
   const form = e.target;
   if(form.id === 'auth-form'){
     e.preventDefault();
-    const mode = state.authMode;
+    let mode = state.authMode;
     const u = $('#auth-user').value;
     const p = $('#auth-pass').value;
-    if(!currentUser && mode !== 'signup' && mode !== 'signup-local' && mode !== 'cloud' && mode !== 'forgot'){
+    /* La pestaña "Iniciar sesión" es la que abre por defecto. Quien tiene cuenta
+       en la nube escribe ahí su correo, así que un correo entra por Supabase. */
+    if(mode === 'login' && /^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(u.trim())) mode = 'cloud';
+    if(!currentUser && mode !== 'login' && mode !== 'signup' && mode !== 'signup-local' && mode !== 'cloud' && mode !== 'forgot'){
       showAuthError('Elige iniciar sesión o crear una cuenta antes de continuar.');
       return;
     }
@@ -4850,7 +4853,7 @@ function setAuthMode(mode){
     if(note) note.innerHTML = 'La cuenta local vive <b>solo en este dispositivo</b>: si pierdes el navegador pierdes los datos. Te avisaremos cada dos semanas para hacer una copia.';
   } else if(mode === 'login'){
     submit.textContent = 'Iniciar sesión';
-    userLabel.textContent = 'Usuario'; userInput.placeholder = 'p. ej. entrenador_marco'; userInput.autocomplete = 'username';
+    userLabel.textContent = 'Usuario o correo'; userInput.placeholder = 'tu@correo.com o entrenador_marco'; userInput.autocomplete = 'username';
     passField.classList.remove('hidden'); cloudExtra.classList.add('hidden');
     if(note) note.innerHTML = 'Las cuentas locales viven solo en este dispositivo. Con <b>Nube</b> tus datos se guardan en Supabase y puedes restaurarlos desde cualquier dispositivo o si olvidas tu contraseña.';
   } else if(mode === 'cloud'){
