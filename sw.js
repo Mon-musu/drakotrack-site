@@ -7,15 +7,15 @@
    ============================================================ */
 'use strict';
 
-const VERSION = 'drakotrack-v5';
+const VERSION = 'drakotrack-v6';
 /* Se cachea el shell por URL exacta (con su ?v=), así una versión nueva
    entra como entrada nueva y la vieja se borra al activar. */
 const SHELL = [
   './',
   './index.html',
-  './styles.css?v=24',
-  './sync.js?v=1',
-  './app.js?v=35',
+  './styles.css?v=25',
+  './sync.js?v=2',
+  './app.js?v=36',
   './supabase.js?v=4',
   './boostcamp.js?v=3',
   './share.js?v=4',

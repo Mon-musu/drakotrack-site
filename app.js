@@ -399,11 +399,17 @@ function applyRemoteDoc(doc){
   return true;
 }
 
+/* Encola una sincronización sin marcar cambios: sirve para reintentar lo que
+   quedó pendiente cuando una petición en vuelo terminó después de un guardado. */
+function queueSync(delay){
+  if(!isCloud() || state.sb.applying) return;
+  if(state.sb.timer) clearTimeout(state.sb.timer);
+  state.sb.timer = setTimeout(() => { state.sb.timer = null; runSync(false); }, delay == null ? 1500 : delay);
+}
 function scheduleCloudSync(){
   if(!isCloud() || state.sb.applying) return;
   cloudSync.markDirty(currentUser);
-  if(state.sb.timer) clearTimeout(state.sb.timer);
-  state.sb.timer = setTimeout(() => { state.sb.timer = null; runSync(false); }, 1500);
+  queueSync();
   renderHeader();
 }
 function syncFailed(notify){
@@ -468,6 +474,15 @@ async function runSync(notify){
     }catch(e){ /* nunca romper la sincronización por una comprobación extra */ }
   }
   if(result.status === 'pushed' || result.status === 'replayed') noteBackupDone();
+  /* Si tras la respuesta siguen habiendo cambios pendientes (se registró una
+     serie mientras la petición viajaba), se reintenta con la versión nueva.
+     Acotado para que no se convierta en un bucle de sincronizaciones. */
+  if(currentUser === account && syncPending()){
+    state.sb.follow = (state.sb.follow || 0) + 1;
+    if(state.sb.follow <= 4) queueSync(1200);
+  } else {
+    state.sb.follow = 0;
+  }
   if(notify) notifySyncResult(result);
   renderHeader();
   return state.sb.status !== 'offline';
@@ -866,6 +881,38 @@ function clampNum(v, max, fallback){
   if(!isFinite(n)) return fallback;
   return Math.min(Math.max(n, 0), max);
 }
+/* Incrementos de peso habituales en el gimnasio. El preferido se guarda en
+   d.prefs.weightStep y solo se usa al pulsar + o −, nunca al escribir. */
+const WEIGHT_STEPS = [0.5, 1, 1.25, 2.5, 5];
+const DEFAULT_WEIGHT_STEP = 0.5;
+function weightStep(){
+  const d = currentUser ? dataFor(currentUser) : null;
+  const raw = d && d.prefs ? Number(d.prefs.weightStep) : NaN;
+  return WEIGHT_STEPS.includes(raw) ? raw : DEFAULT_WEIGHT_STEP;
+}
+function setWeightStep(v){
+  const n = Number(v);
+  if(!WEIGHT_STEPS.includes(n)) return weightStep();
+  const d = currentUser ? dataFor(currentUser) : null;
+  if(!d) return n;
+  if(!d.prefs || typeof d.prefs !== 'object') d.prefs = {};
+  d.prefs.weightStep = n;
+  saveDB();
+  return n;
+}
+/* Dos decimales sobre centésimas enteras: 60 + 1,25 = 61,25 y no 61.250000001. */
+function roundKg(v){
+  const n = Number(v);
+  if(v === '' || v === null || v === undefined || !isFinite(n)) return '';
+  return Math.round(Math.min(Math.max(n, 0), LIMITS.kg) * 100) / 100;
+}
+function adjustWeight(current, dir, step){
+  const base = current === '' || current === null || current === undefined ? 0 : Number(current);
+  const delta = Number(step) > 0 ? Number(step) : weightStep();
+  const next = roundKg((isFinite(base) ? base : 0) + (dir < 0 ? -delta : delta));
+  /* Un peso nunca queda negativo: al bajar desde 0 el campo queda vacío. */
+  return next === 0 ? '' : next;
+}
 
 /* ============================================================
    MODELO DE SERIES INDIVIDUALES (v2)
@@ -916,6 +963,26 @@ function normalizeSet(st, i){
 function renumberSets(ex){
   if(!hasSets(ex)) return;
   ex.sets.forEach((st, i) => { st.number = i + 1; });
+}
+/* Lápida de una serie borrada: se guarda una copia con su hora para que una
+   sincronización antigua no la resucite y para poder recuperarla si el otro
+   dispositivo la había modificado. Campo opcional: las sesiones antiguas
+   siguen funcionando igual. */
+const MAX_SET_TOMBSTONES = 30;
+function recordSetTombstone(ex, set){
+  if(!ex || !set || !set.id) return;
+  if(!ex.setTombstones || typeof ex.setTombstones !== 'object') ex.setTombstones = {};
+  ex.setTombstones[set.id] = Object.assign({}, set, { at: Date.now() });
+  const keys = Object.keys(ex.setTombstones);
+  if(keys.length > MAX_SET_TOMBSTONES){
+    keys.sort((a,b) => (Number(ex.setTombstones[a].at) || 0) - (Number(ex.setTombstones[b].at) || 0));
+    keys.slice(0, keys.length - MAX_SET_TOMBSTONES).forEach(k => { delete ex.setTombstones[k]; });
+  }
+}
+function forgetSetTombstone(ex, setId){
+  if(!ex || !ex.setTombstones || !setId) return;
+  delete ex.setTombstones[setId];
+  if(!Object.keys(ex.setTombstones).length) delete ex.setTombstones;
 }
 /* Migración compatible: no reescribe los resultados antiguos. */
 function migrateSessionData(s){
@@ -2028,7 +2095,14 @@ function ringSVG(pct){
    ============================================================ */
 const DEFAULT_REST_SECONDS = 90;
 let _restClock = null;
-function stopRestClock(){ if(_restClock){ clearInterval(_restClock); _restClock = null; } }
+/* Cada barra de descanso recibe una generación: un intervalo antiguo que
+   sobreviva a un cambio de pantalla no puede tocar el temporizador nuevo ni
+   sobrescribir su estado. */
+let _restGen = 0;
+function stopRestClock(){
+  _restGen++;
+  if(_restClock){ clearInterval(_restClock); _restClock = null; }
+}
 function fmtClock(sec){
   const s = Math.max(0, Math.round(sec));
   const m = Math.floor(s / 60), r = s % 60;
@@ -2045,8 +2119,20 @@ function restSecondsFor(s, ex, st){
   }
   return DEFAULT_REST_SECONDS;
 }
+/* El tiempo restante se calcula siempre con marcas de tiempo reales; el
+   intervalo solo repinta la pantalla. En pausa se cuenta desde el resto
+   guardado en milisegundos. */
+function restPaused(s){ return !!(s && s.rest && s.rest.pausedAt && isFinite(s.rest.remainingMs)); }
+function restState(s){
+  if(!s || !s.rest) return 'stopped';
+  if(restPaused(s)) return 'paused';
+  if(restRemaining(s) > 0) return 'running';
+  return 'done';
+}
 function restRemaining(s){
-  if(!s || !s.rest || !isFinite(s.rest.endsAt)) return 0;
+  if(!s || !s.rest) return 0;
+  if(restPaused(s)) return Math.max(0, Math.ceil(Number(s.rest.remainingMs) / 1000));
+  if(!isFinite(s.rest.endsAt)) return 0;
   return Math.max(0, Math.ceil((s.rest.endsAt - Date.now()) / 1000));
 }
 /* ============================================================
@@ -2191,12 +2277,62 @@ function toggleRestAlerts(){
   render();
 }
 function startRestTimer(s, seconds, ex, st){
-  if(!s || s.finished) return;
+  if(!s || s.finished) return null;
   const duration = Math.max(5, Math.min(600, Math.round(Number(seconds) || DEFAULT_REST_SECONDS)));
-  s.rest = { startedAt: Date.now(), duration, endsAt: Date.now() + duration * 1000, exId: ex ? ex.id : null, setId: st ? st.id : null, heavy: isHeavySet(currentUser ? dataFor(currentUser) : null, ex, st) };
+  const startedAt = Date.now();
+  /* Un solo descanso por sesión: al empezar otro se reemplaza el anterior, así
+     que nunca conviven dos temporizadores. */
+  s.rest = {
+    startedAt, duration,
+    endsAt: startedAt + duration * 1000,
+    remainingMs: null, pausedAt: null, notifiedAt: null,
+    exId: ex ? ex.id : null, setId: st ? st.id : null,
+    heavy: isHeavySet(currentUser ? dataFor(currentUser) : null, ex, st),
+  };
   s.lastSavedAt = nowIso();
   saveDB();
   renderRestBar(s);
+  return s.rest;
+}
+/* Pausar guarda el tiempo restante exacto en milisegundos; reanudar calcula un
+   fin nuevo a partir de ese resto. Ni bloquear el móvil ni cambiar de pantalla
+   regalan ni roban segundos. */
+function pauseRestTimer(s){
+  if(!s || !s.rest || restPaused(s)) return false;
+  const end = isFinite(s.rest.endsAt) ? s.rest.endsAt : Date.now();
+  s.rest.remainingMs = Math.max(0, end - Date.now());
+  s.rest.pausedAt = Date.now();
+  s.rest.endsAt = null;
+  s.rest.notifiedAt = null;
+  s.lastSavedAt = nowIso();
+  saveDB();
+  renderRestBar(s);
+  return true;
+}
+function resumeRestTimer(s){
+  if(!s || !s.rest || !restPaused(s)) return false;
+  const leftMs = Math.max(1000, Number(s.rest.remainingMs) || 0);
+  const totalMs = Math.max(leftMs, (Number(s.rest.duration) || 0) * 1000);
+  s.rest.startedAt = Date.now() - (totalMs - leftMs);
+  s.rest.duration = Math.max(5, Math.round(totalMs / 1000));
+  s.rest.endsAt = Date.now() + leftMs;
+  s.rest.remainingMs = null;
+  s.rest.pausedAt = null;
+  s.rest.notifiedAt = null;
+  s.lastSavedAt = nowIso();
+  saveDB();
+  renderRestBar(s);
+  return true;
+}
+function resetRestTimer(s, seconds){
+  if(!s) return null;
+  const duration = Math.max(5, Math.min(600, Math.round(Number(seconds) || (s.rest && s.rest.duration) || DEFAULT_REST_SECONDS)));
+  return startRestTimer(s, duration, null, null);
+}
+function startRestForCurrent(s, seconds){
+  if(!s || s.finished) return null;
+  const ex = (s.exercises || []).find(e => e && e.id === s.currentExerciseId) || (s.exercises || [])[0] || null;
+  return startRestTimer(s, seconds || restSecondsFor(s, ex, null), ex, null);
 }
 /* Grupos de superserie: ejercicios CONSECUTIVOS marcados como superset.
    Cada grupo recibe una letra (A, B, C…) y sus miembros se numeran A1, A2… */
@@ -2215,6 +2351,36 @@ function supersetGroups(s){
 function supersetGroupOf(s, exId){
   return supersetGroups(s).find(g => g.members.some(m => m.id === exId)) || null;
 }
+function sessionExerciseIndex(s, exId){
+  if(!s || !Array.isArray(s.exercises)) return -1;
+  return s.exercises.findIndex(e => e && e.id === exId);
+}
+function sessionNextExercise(s, exId){
+  if(!s || !Array.isArray(s.exercises)) return null;
+  const idx = sessionExerciseIndex(s, exId);
+  if(idx < 0 || idx >= s.exercises.length - 1) return null;
+  return { ex: s.exercises[idx + 1], idx: idx + 1 };
+}
+function sessionPrevExercise(s, exId){
+  if(!s || !Array.isArray(s.exercises)) return null;
+  const idx = sessionExerciseIndex(s, exId);
+  if(idx <= 0) return null;
+  return { ex: s.exercises[idx - 1], idx: idx - 1 };
+}
+/* Progreso de un ejercicio para el navegador compacto: series hechas y
+   pendientes, sin tocar nada de lo ya registrado. */
+function sessionExerciseStats(ex){
+  if(!ex) return { done: 0, pending: 0, total: 0, doneAll: false };
+  if(!hasSets(ex)) return { done: ex.done ? 1 : 0, pending: ex.done ? 0 : 1, total: 1, doneAll: !!ex.done };
+  const done = ex.sets.filter(st => st.completed).length;
+  return { done, pending: ex.sets.length - done, total: ex.sets.length, doneAll: ex.sets.length > 0 && done === ex.sets.length };
+}
+function sessionExerciseStatus(ex){
+  const st = sessionExerciseStats(ex);
+  if(st.doneAll) return { key: 'done', label: 'Terminado' };
+  if(st.done > 0) return { key: 'partial', label: st.done + '/' + st.total + ' hechas' };
+  return { key: 'pending', label: 'Pendiente' };
+}
 /* Al completar una serie: dentro de una superserie solo se descansa al
    terminar el último ejercicio del grupo; en el resto, descanso inmediato. */
 function maybeStartRest(s, ex, st){
@@ -2229,31 +2395,52 @@ function maybeStartRest(s, ex, st){
   }
   startRestTimer(s, restSecondsFor(s, ex, st), ex, st);
 }
+/* Barra de descanso: estado siempre visible (detenido, en curso, en pausa o
+   completado) y controles para iniciar, pausar, reanudar, ajustar, reiniciar y
+   saltar. Todo se calcula con restRemaining(), nunca con el intervalo. */
 function renderRestBar(s){
   stopRestClock();
   const slot = $('#rest-slot');
   if(!slot || !s) return;
-  if(!s.rest){ slot.innerHTML = ''; return; }
   const sid = esc(s.id);
+  const locked = !!s.finished || s.status === 'completed' || s.status === 'cancelled';
+  if(!s.rest){
+    if(locked){ slot.innerHTML = ''; return; }
+    slot.innerHTML = '<div class="rest-bar idle" role="group" aria-label="Descanso">'
+      + '<span class="rest-label">Descanso</span>'
+      + '<span class="rest-state">Detenido</span>'
+      + '<span class="rest-actions"><button class="btn btn-ghost btn-sm" data-action="rest-start" data-sid="' + sid + '" type="button">Iniciar descanso</button></span>'
+      + '</div>';
+    return;
+  }
   const left = restRemaining(s);
-  if(left <= 0){
+  const status = restState(s);
+  if(status === 'done'){
     notifyRestEnd(s);
     slot.innerHTML = '<div class="rest-bar done" role="status">'
       + '<span class="rest-label">Descanso completado</span>'
       + (s.rest.heavy ? '<span class="rest-heavy">Serie pesada</span>' : '')
-      + '<span class="rest-actions">' + restAlertsBtn() + restAlertLengthSelect() + '<button class="btn btn-ghost btn-sm" data-action="rest-skip" data-sid="' + sid + '" type="button">Cerrar</button></span>'
+      + '<span class="rest-actions">' + restAlertsBtn() + restAlertLengthSelect()
+      + '<button class="btn btn-ghost btn-sm" data-action="rest-reset" data-sid="' + sid + '" type="button">Reiniciar</button>'
+      + '<button class="btn btn-ghost btn-sm" data-action="rest-skip" data-sid="' + sid + '" type="button">Cerrar</button></span>'
       + '</div>';
     return;
   }
+  const paused = status === 'paused';
   const pct = Math.min(100, Math.max(0, Math.round((1 - left / Math.max(1, s.rest.duration)) * 100)));
-  slot.innerHTML = '<div class="rest-bar" role="timer" aria-live="polite">'
+  slot.innerHTML = '<div class="rest-bar' + (paused ? ' paused' : '') + '" role="timer" aria-live="polite">'
     + '<span class="rest-label">Descanso</span>'
+    + '<span class="rest-state">' + (paused ? 'En pausa' : 'En curso') + '</span>'
     + (s.rest.heavy ? '<span class="rest-heavy">Serie pesada</span>' : '')
     + '<span class="rest-time" id="rest-time">' + fmtClock(left) + '</span>'
     + '<div class="rest-progress"><div class="rest-fill" id="rest-fill" style="width:' + pct + '%"></div></div>'
     + '<span class="rest-actions">' + restAlertsBtn() + restAlertLengthSelect()
     + '<button class="btn btn-ghost btn-sm" data-action="rest-minus" data-sid="' + sid + '" type="button" aria-label="Quitar 15 segundos de descanso">−15 s</button>'
     + '<button class="btn btn-ghost btn-sm" data-action="rest-plus" data-sid="' + sid + '" type="button" aria-label="Añadir 15 segundos de descanso">+15 s</button>'
+    + (paused
+        ? '<button class="btn btn-primary btn-sm" data-action="rest-resume" data-sid="' + sid + '" type="button">Reanudar</button>'
+        : '<button class="btn btn-ghost btn-sm" data-action="rest-pause" data-sid="' + sid + '" type="button">Pausar</button>')
+    + '<button class="btn btn-ghost btn-sm" data-action="rest-reset" data-sid="' + sid + '" type="button">Reiniciar</button>'
     + '<button class="btn btn-ghost btn-sm" data-action="rest-skip" data-sid="' + sid + '" type="button">Saltar</button>'
     + '</span></div>';
   const lenSel = slot.querySelector('[data-action="rest-alert-len"]');
@@ -2262,7 +2449,11 @@ function renderRestBar(s){
     toast('Duración del aviso: ' + restAlertSeconds() + ' s.', 'info');
     renderRestBar(s);
   });
+  if(paused) return;   /* en pausa no hay nada que repintar cada segundo */
+  const gen = _restGen;
   _restClock = setInterval(() => {
+    /* Un intervalo de otra pantalla o de otro descanso no pinta nada aquí. */
+    if(gen !== _restGen || !s.rest){ stopRestClock(); return; }
     const rem = restRemaining(s);
     const t = $('#rest-time');
     const fill = $('#rest-fill');
@@ -2286,16 +2477,25 @@ function setRow(s, e, st, locked, prev){
   <div class="set-item ${st.completed ? 'done' : ''}" data-set-item="${esc(st.id)}">
     <div class="set-row">
       <span class="set-n">${st.number}</span>
-      <label class="set-field"><span class="sr-only">Peso de la serie ${st.number}</span>
-        <input type="number" inputmode="decimal" min="0" step="0.5" placeholder="kg" value="${esc(st.weight)}"
-          data-session="${esc(s.id)}" data-ex="${esc(e.id)}" data-set="${esc(st.id)}" data-field="weight" ${dis}></label>
-      <label class="set-field"><span class="sr-only">Repeticiones de la serie ${st.number}</span>
-        <input type="number" inputmode="numeric" min="0" placeholder="rep" value="${esc(st.reps)}"
-          data-session="${esc(s.id)}" data-ex="${esc(e.id)}" data-set="${esc(st.id)}" data-field="reps" ${dis}></label>
+      <div class="set-field-wrap">
+        <button type="button" class="set-adj" data-action="adj-set" data-dir="-1" data-field="weight" data-sid="${esc(s.id)}" data-ex="${esc(e.id)}" data-set="${esc(st.id)}" aria-label="Bajar peso serie ${st.number}" ${dis}>−</button>
+        <label class="set-field"><span class="sr-only">Peso de la serie ${st.number}</span>
+          <input type="number" inputmode="decimal" min="0" step="0.25" placeholder="kg" value="${esc(st.weight)}"
+            data-session="${esc(s.id)}" data-ex="${esc(e.id)}" data-set="${esc(st.id)}" data-field="weight" ${dis}></label>
+        <button type="button" class="set-adj" data-action="adj-set" data-dir="1" data-field="weight" data-sid="${esc(s.id)}" data-ex="${esc(e.id)}" data-set="${esc(st.id)}" aria-label="Subir peso serie ${st.number}" ${dis}>+</button>
+      </div>
+      <div class="set-field-wrap">
+        <button type="button" class="set-adj" data-action="adj-set" data-dir="-1" data-field="reps" data-sid="${esc(s.id)}" data-ex="${esc(e.id)}" data-set="${esc(st.id)}" aria-label="Bajar repeticiones serie ${st.number}" ${dis}>−</button>
+        <label class="set-field"><span class="sr-only">Repeticiones de la serie ${st.number}</span>
+          <input type="number" inputmode="numeric" min="0" placeholder="rep" value="${esc(st.reps)}"
+            data-session="${esc(s.id)}" data-ex="${esc(e.id)}" data-set="${esc(st.id)}" data-field="reps" ${dis}></label>
+        <button type="button" class="set-adj" data-action="adj-set" data-dir="1" data-field="reps" data-sid="${esc(s.id)}" data-ex="${esc(e.id)}" data-set="${esc(st.id)}" aria-label="Subir repeticiones serie ${st.number}" ${dis}>+</button>
+      </div>
       <button type="button" class="set-check ${st.completed ? 'on' : ''}" data-action="toggle-set"
         data-sid="${esc(s.id)}" data-ex="${esc(e.id)}" data-set="${esc(st.id)}"
-        aria-pressed="${st.completed ? 'true' : 'false'}" aria-label="Serie ${st.number}: ${st.completed ? 'completada' : 'pendiente'}" ${dis}>${st.completed ? '✓' : '○'}</button>
+        aria-pressed="${st.completed ? 'true' : 'false'}" aria-label="Serie ${st.number}: ${st.completed ? 'completada' : 'pendiente'}" ${dis}>${st.completed ? '✓' : '✓'}</button>
       <span class="set-tools">
+        <button type="button" class="icon-btn" data-action="copy-prev-set" data-sid="${esc(s.id)}" data-ex="${esc(e.id)}" data-set="${esc(st.id)}" aria-label="Copiar valores de la serie anterior" title="Copiar anterior" ${dis}>⎘</button>
         <button type="button" class="icon-btn" data-action="duplicate-set" data-sid="${esc(s.id)}" data-ex="${esc(e.id)}" data-set="${esc(st.id)}" aria-label="Duplicar serie ${st.number}" title="Duplicar" ${dis}>⧉</button>
         <button type="button" class="icon-btn danger" data-action="delete-set" data-sid="${esc(s.id)}" data-ex="${esc(e.id)}" data-set="${esc(st.id)}" aria-label="Eliminar serie ${st.number}" title="Eliminar" ${dis}>✕</button>
       </span>
@@ -2399,6 +2599,20 @@ function renderSession(main, sid){
   }));
   const hist = histAll.slice(0,5);
 
+  // Calcular estadísticas generales
+  let totalSets = 0, doneSetsTotal = 0;
+  (s.exercises || []).forEach(ex => {
+    if(hasSets(ex)){
+      totalSets += ex.sets.length;
+      doneSetsTotal += ex.sets.filter(st => st.completed).length;
+    } else {
+      totalSets += 1;
+      if(ex.done) doneSetsTotal += 1;
+    }
+  });
+  const currentExId = s.currentExerciseId || ((s.exercises && s.exercises[0]) ? s.exercises[0].id : null);
+  const currentEx = currentExId ? s.exercises.find(e => e.id === currentExId) : (s.exercises && s.exercises[0]);
+
   main.innerHTML = `
     <div class="session-head">
       <button class="btn btn-ghost btn-sm" data-action="back" type="button">← Entrenamientos</button>
@@ -2417,8 +2631,51 @@ function renderSession(main, sid){
     </div>
 
     <div class="progress-bar"><div class="progress-fill" id="pfill" style="width:${pct}%"></div></div>
+    <div class="session-summary-bar">
+      <span>Series: ${doneSetsTotal}/${totalSets}</span>
+      <span>Ejercicios: ${s.exercises.filter((e,i)=>{ if(hasSets(e)) return e.sets.every(st=>st.completed); return e.done; }).length}/${s.exercises.length}</span>
+      ${locked ? '' : `<label class="weight-step-pick"><span>Incremento</span>
+        <select data-action="weight-step" aria-label="Incremento de peso en kg">
+          ${WEIGHT_STEPS.map(n => `<option value="${n}" ${n === weightStep() ? 'selected' : ''}>${n} kg</option>`).join('')}
+        </select></label>`}
+    </div>
 
     <div id="rest-slot" class="rest-slot"></div>
+
+    ${!locked && s.exercises && s.exercises.length ? `
+    <section class="session-nav" aria-label="Navegación entre ejercicios">
+      <div class="session-nav-row">
+        <button class="btn btn-ghost btn-sm" data-action="session-prev-ex" data-sid="${esc(s.id)}" type="button" aria-label="Ejercicio anterior" ${sessionPrevExercise(s, currentExId) ? '' : 'disabled'}>←</button>
+        <select class="session-ex-select" data-action="session-jump-ex" data-sid="${esc(s.id)}" aria-label="Elegir ejercicio">
+          ${(s.exercises||[]).map((e,idx)=>{
+            const st = sessionExerciseStats(e);
+            return `<option value="${esc(e.id)}" ${e.id===currentExId?'selected':''}>${idx+1}. ${esc(e.name)} · ${st.done}/${st.total} hechas${st.doneAll?' ✓':''}</option>`;
+          }).join('')}
+        </select>
+        <button class="btn btn-ghost btn-sm" data-action="session-next-ex" data-sid="${esc(s.id)}" type="button" aria-label="Ejercicio siguiente" ${sessionNextExercise(s, currentExId) ? '' : 'disabled'}>→</button>
+      </div>
+      <div class="session-nav-chips" role="list" aria-label="Estado de cada ejercicio">
+        ${(s.exercises||[]).map((e,idx)=>{
+          const st = sessionExerciseStats(e);
+          const status = sessionExerciseStatus(e);
+          const grp = supersetGroupOf(s, e.id);
+          const badge = grp ? grp.letter + (grp.members.findIndex(m => m.id === e.id) + 1) : String(idx + 1);
+          return `<button type="button" class="ex-chip is-${status.key}${e.id===currentExId?' is-current':''}" role="listitem"
+            data-action="session-goto-ex" data-sid="${esc(s.id)}" data-ex="${esc(e.id)}"
+            aria-current="${e.id===currentExId?'true':'false'}"
+            aria-label="${esc((idx + 1) + '. ' + e.name + ': ' + status.label)}">
+            <span class="ex-chip-badge">${esc(badge)}</span>
+            <span class="ex-chip-name">${esc(e.name)}</span>
+            <span class="ex-chip-count">${st.done}/${st.total}</span>
+          </button>`;
+        }).join('')}
+      </div>
+      <div class="session-nav-foot">
+        <button class="btn btn-ghost btn-sm" data-action="session-focus-current" data-sid="${esc(s.id)}" type="button">Ir al ejercicio actual</button>
+      </div>
+      ${currentEx ? `<div class="current-ex-info"><strong>${esc(currentEx.name)}</strong> ${hasSets(currentEx) ? `· Serie ${(currentEx.sets.findIndex(st=>!st.completed)+1>0?currentEx.sets.findIndex(st=>!st.completed)+1:currentEx.sets.length)}/${currentEx.sets.length}` : ''} ${currentEx.target ? `· Objetivo: ${esc(currentEx.target)}` : (currentEx.targetReps ? `· Objetivo: ${currentEx.targetSets||''}×${currentEx.targetReps} rep` : '')}</div>` : ''}
+    </section>
+    ` : ''}
 
     ${locked && s.summary ? `<section class="summary-card">${summaryHTML(s)}</section>` : ''}
 
@@ -2460,6 +2717,7 @@ function renderSession(main, sid){
   startSessionClock(s);
   renderRestBar(s);
 }
+
 function refreshSessionProgress(sid){
   const s = getSession(sid);
   if(!s) return;
@@ -4227,12 +4485,39 @@ document.addEventListener('click', e => {
     toast('Superserie: «' + s.exercises[i].name + '» + «' + s.exercises[i + 1].name + '».', 'info');
     return;
   }
+  if(a === 'rest-start'){
+    const s = getSession(el.dataset.sid);
+    if(!s || s.finished) return;
+    startRestForCurrent(s);
+    return;
+  }
+  if(a === 'rest-pause'){
+    const s = getSession(el.dataset.sid);
+    if(s) pauseRestTimer(s);
+    return;
+  }
+  if(a === 'rest-resume'){
+    const s = getSession(el.dataset.sid);
+    if(s) resumeRestTimer(s);
+    return;
+  }
+  if(a === 'rest-reset'){
+    const s = getSession(el.dataset.sid);
+    if(s) resetRestTimer(s);
+    return;
+  }
   if(a === 'rest-plus' || a === 'rest-minus'){
     const s = getSession(el.dataset.sid);
     if(!s || !s.rest) return;
     const delta = (a === 'rest-plus' ? 15 : -15) * 1000;
-    s.rest.endsAt = Math.max(Date.now() + 1000, s.rest.endsAt + delta);
-    s.rest.duration = Math.max(5, Math.round((s.rest.endsAt - s.rest.startedAt) / 1000));
+    if(restPaused(s)){
+      /* En pausa se ajusta el resto guardado, no una hora de fin que no existe. */
+      s.rest.remainingMs = Math.max(1000, Math.min(599000, Number(s.rest.remainingMs) + delta));
+      s.rest.duration = Math.max(Number(s.rest.duration) || 0, Math.ceil(Number(s.rest.remainingMs) / 1000));
+    } else {
+      s.rest.endsAt = Math.max(Date.now() + 1000, s.rest.endsAt + delta);
+      s.rest.duration = Math.max(5, Math.round((s.rest.endsAt - s.rest.startedAt) / 1000));
+    }
     saveDB();
     renderRestBar(s);
     return;
@@ -4246,12 +4531,51 @@ document.addEventListener('click', e => {
     renderRestBar(s);
     return;
   }
+  if(a === 'session-prev-ex' || a === 'session-next-ex'){
+    const s = getSession(el.dataset.sid);
+    if(!s || s.finished) return;
+    const cur = s.currentExerciseId || ((s.exercises && s.exercises[0]) ? s.exercises[0].id : null);
+    const target = a === 'session-prev-ex' ? sessionPrevExercise(s, cur) : sessionNextExercise(s, cur);
+    if(target && target.ex){ s.currentExerciseId = target.ex.id; s.lastSavedAt = nowIso(); saveDB(); render(); }
+    return;
+  }
+  if(a === 'session-goto-ex'){
+    const s = getSession(el.dataset.sid);
+    if(!s || s.finished) return;
+    const ex = (s.exercises || []).find(x => x && x.id === el.dataset.ex);
+    if(!ex) return;
+    /* Se guarda antes de moverse: ningún cambio pendiente se pierde al navegar. */
+    s.currentExerciseId = ex.id;
+    s.lastSavedAt = nowIso();
+    saveDB();
+    render();
+    const block = document.querySelector('[data-ex-block="' + ex.id + '"]');
+    if(block && block.scrollIntoView) block.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    return;
+  }
+  if(a === 'session-focus-current'){
+    const s = getSession(el.dataset.sid);
+    if(!s) return;
+    const id = s.currentExerciseId || ((s.exercises && s.exercises[0]) ? s.exercises[0].id : null);
+    const block = id ? document.querySelector('[data-ex-block="' + id + '"]') : null;
+    if(block && block.scrollIntoView) block.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    return;
+  }
+  if(a === 'session-jump-ex'){
+    const s = getSession(el.dataset.sid);
+    if(!s || s.finished) return;
+    let sel = el.value;
+    if(el.tagName !== 'SELECT' && el.querySelector('select')) sel = el.querySelector('select').value;
+    if(sel){ s.currentExerciseId = sel; s.lastSavedAt = nowIso(); saveDB(); render(); }
+    return;
+  }
   if(a === 'finish-session'){
     const s = getSession(el.dataset.id);
     if(!s || s.finished) return;
     const pending = (s.exercises || []).some(e => hasSets(e) ? e.sets.some(st => !st.completed) : !e.done);
     if(pending){
-      confirmModal('¿Terminar el entrenamiento?', 'Hay series o ejercicios sin marcar. Se guardará la sesión con lo realizado; lo no marcado no cuenta como hecho.', 'Terminar', () => finalizeSession(s));
+      const pendingList = (s.exercises || []).filter(e => hasSets(e) ? e.sets.some(st => !st.completed) : !e.done).map(e=>e.name).slice(0,3).join(', ');
+      confirmModal('¿Terminar el entrenamiento?', 'Hay series o ejercicios sin marcar (' + pendingList + (pendingList && (s.exercises||[]).filter(e=>hasSets(e)?e.sets.some(st=>!st.completed):!e.done).length>3?', ...':'') + '). Se guardará la sesión con lo realizado; lo no marcado no cuenta como hecho.', 'Terminar', () => finalizeSession(s));
     } else {
       finalizeSession(s);
     }
@@ -4340,6 +4664,51 @@ document.addEventListener('click', e => {
     render();
     return;
   }
+  if(a === 'adj-set'){
+    const s = getSession(el.dataset.sid);
+    if(!s || s.finished) return;
+    const ex = s.exercises.find(x => x.id === el.dataset.ex);
+    const st = ex && hasSets(ex) ? ex.sets.find(x => x.id === el.dataset.set) : null;
+    if(!st) return;
+    const dir = Number(el.dataset.dir) || 0;
+    const field = el.dataset.field;
+    if(field === 'weight'){
+      /* Incremento configurable y sin derivas decimales (1,25 kg exacto). */
+      st.weight = adjustWeight(st.weight, dir, weightStep());
+    } else if(field === 'reps'){
+      const step = 1;
+      const cur = st.reps === '' || st.reps == null ? 0 : Number(st.reps);
+      let next = cur + dir * step;
+      if(next < 0) next = 0;
+      st.reps = Math.min(LIMITS.reps, Math.round(next));
+      if(st.reps === 0 && dir < 0) st.reps = '';
+    }
+    s.lastSavedAt = nowIso();
+    saveDB();
+    render();
+    return;
+  }
+  if(a === 'copy-prev-set'){
+    const s = getSession(el.dataset.sid);
+    if(!s || s.finished) return;
+    const ex = s.exercises.find(x => x.id === el.dataset.ex);
+    if(!ex || !hasSets(ex)) return;
+    const idx = ex.sets.findIndex(x => x.id === el.dataset.set);
+    if(idx <= 0){ toast('No hay serie anterior en este ejercicio.', 'info'); return; }
+    const prevSt = ex.sets[idx - 1];
+    const st = ex.sets[idx];
+    st.weight = prevSt.weight === undefined || prevSt.weight === null ? '' : prevSt.weight;
+    st.reps = prevSt.reps === undefined || prevSt.reps === null ? '' : prevSt.reps;
+    st.type = prevSt.type || st.type;
+    st.rir = prevSt.rir;
+    st.rpe = prevSt.rpe;
+    st.restSeconds = prevSt.restSeconds;
+    s.lastSavedAt = nowIso();
+    saveDB();
+    render();
+    toast('Valores copiados de la serie anterior.', 'info');
+    return;
+  }
   if(a === 'duplicate-set'){
     const s = getSession(el.dataset.sid);
     if(!s || s.finished) return;
@@ -4365,7 +4734,12 @@ document.addEventListener('click', e => {
     const ex = s.exercises.find(x => x.id === el.dataset.ex);
     if(!ex || !hasSets(ex)) return;
     if(ex.sets.length <= 1){ toast('Cada ejercicio necesita al menos una serie.', 'error'); return; }
-    ex.sets = ex.sets.filter(x => x.id !== el.dataset.set);
+    const doomed = ex.sets.find(x => x.id === el.dataset.set);
+    if(!doomed) return;
+    ex.sets = ex.sets.filter(x => x.id !== doomed.id);
+    /* La serie borrada deja lápida: una sincronización antigua no la resucita y,
+       si el otro dispositivo la había cambiado, su versión no se descarta. */
+    recordSetTombstone(ex, doomed);
     renumberSets(ex);
     ex.done = ex.sets.length > 0 && ex.sets.every(x => x.completed);
     saveDB();
@@ -4721,7 +5095,7 @@ document.addEventListener('click', e => {
         } else if(f === 'weight' || f === 'reps' || f === 'restSeconds'){
           const cap = f === 'weight' ? LIMITS.kg : f === 'reps' ? LIMITS.reps : 600;
           const n = Number(t.value);
-          st[f] = t.value === '' ? '' : (isFinite(n) && n >= 0 ? Math.min(cap, n) : '');
+          st[f] = t.value === '' ? '' : (isFinite(n) && n >= 0 ? (f === 'weight' ? roundKg(n) : Math.min(cap, n)) : '');
           saveDB();
         }
       }
@@ -4792,6 +5166,22 @@ document.addEventListener('click', e => {
 
 document.addEventListener('change', e => {
   const t = e.target;
+  if(t && t.dataset && t.dataset.action === 'weight-step'){
+    setWeightStep(t.value);
+    toast('Incremento de peso: ' + weightStep() + ' kg.', 'info');
+    render();
+    return;
+  }
+  if(t && t.dataset && t.dataset.action === 'session-jump-ex'){
+    const s = getSession(t.dataset.sid);
+    if(s && !s.finished && t.value){
+      s.currentExerciseId = t.value;
+      s.lastSavedAt = nowIso();
+      saveDB();
+      render();
+    }
+    return;
+  }
   if(t.id === 'exp-group' || t.id === 'exp-equip' || t.id === 'lib-group' || t.id === 'lib-equip'){
     refreshExerciseList(t.id.indexOf('exp-') === 0 ? 'modal' : 'lib');
     return;

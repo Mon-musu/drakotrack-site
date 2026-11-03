@@ -156,19 +156,87 @@
     return map;
   }
 
-  function mergeSets(localSets, remoteSets, baseSets, keyPrefix, conflicts, sessionId, exerciseId) {
-    const l = byKey(localSets, setKey);
-    const r = byKey(remoteSets, setKey);
+  /* Lápida (tombstone) de una serie: la copia de lo borrado, con su hora.
+     Se guarda dentro del ejercicio para que una sincronización antigua no
+     resucite la serie y para poder recuperarla si el otro dispositivo la
+     había modificado. Es un campo opcional: las sesiones antiguas siguen
+     combinándose igual. */
+  const MAX_TOMBSTONES = 40;
+  function tombstonesOf(ex) {
+    return isObj(ex) && isObj(ex.setTombstones) ? ex.setTombstones : {};
+  }
+  function trimTombstones(map) {
+    const keys = Object.keys(map);
+    if (keys.length <= MAX_TOMBSTONES) return map;
+    keys.sort((a, b) => (Number(map[a] && map[a].at) || 0) - (Number(map[b] && map[b].at) || 0));
+    keys.slice(0, keys.length - MAX_TOMBSTONES).forEach(key => { delete map[key]; });
+    return map;
+  }
+  function setDeletedConflict(entry, conflicts) {
+    return conflict(Object.assign({ collection: 'sessions', label: 'Una serie' }, entry, {
+      key: 'sessions:' + entry.id + ':' + entry.exerciseId + ':' + entry.setId + ':deleted',
+    }));
+  }
+
+  /* Combina las series de un ejercicio respetando las lápidas de los dos
+     lados. Devuelve las series y las lápidas que sobreviven. */
+  function mergeExerciseSets(localEx, remoteEx, baseSets, keyPrefix, conflicts, sessionId, exerciseId) {
+    const l = byKey(localEx && localEx.sets, setKey);
+    const r = byKey(remoteEx && remoteEx.sets, setKey);
+    const lt = tombstonesOf(localEx);
+    const rt = tombstonesOf(remoteEx);
     const base = baseSets || {};
     const out = [];
+    const tombstones = {};
     const seen = new Set();
     const consider = key => {
       if (seen.has(key)) return;
       seen.add(key);
       const lv = l.get(key), rv = r.get(key);
+      const localTomb = lt[key], remoteTomb = rt[key];
       const baseHash = base[keyPrefix + '::' + key];
+      const lh = lv ? hash(stable(lv)) : null;
+      const rh = rv ? hash(stable(rv)) : null;
+
+      /* 1. Borrada en los dos dispositivos: sigue borrada. */
+      if (localTomb && remoteTomb) { tombstones[key] = localTomb; return; }
+
+      /* 2. Borrada aquí y modificada allí: no se resucita sola, pero la
+            versión del otro dispositivo se conserva para poder decidir. */
+      if (localTomb) {
+        if (rv && !(baseHash && rh === baseHash)) {
+          pushConflict(conflicts, setDeletedConflict({
+            kind: 'set-deleted', id: sessionId, exerciseId, setId: key,
+            number: localTomb.number,
+            remote: stashable(rv) ? rv : null,
+            deleted: stashable(localTomb) ? localTomb : null,
+          }, conflicts));
+        }
+        tombstones[key] = localTomb;
+        return;
+      }
+
+      /* 3. Borrada allí y modificada aquí: se conserva el cambio y se avisa.
+            Una serie nueva de este dispositivo nunca se borra por una lápida
+            ajena que coincida por casualidad. */
+      if (remoteTomb) {
+        if (lv && baseHash && lh !== baseHash) {
+          pushConflict(conflicts, setDeletedConflict({
+            kind: 'set-deleted-remote', id: sessionId, exerciseId, setId: key,
+            number: lv.number, remote: null,
+            deleted: stashable(remoteTomb) ? remoteTomb : null,
+          }, conflicts));
+          out.push(lv);
+          return;
+        }
+        if (lv && !baseHash) { out.push(lv); return; }
+        tombstones[key] = remoteTomb;
+        return;
+      }
+
+      /* 4. Sin lápidas: combinación normal por huella de la última
+            sincronización. */
       if (lv && rv) {
-        const lh = hash(stable(lv)), rh = hash(stable(rv));
         if (lh === rh) out.push(lv);
         else if (baseHash && lh === baseHash) out.push(rv);
         else if (baseHash && rh === baseHash) out.push(lv);
@@ -180,15 +248,29 @@
             label: 'Una serie', remote: stashable(rv) ? rv : null,
           }));
         }
-      } else if (lv && !rv) {
-        if (!baseHash) out.push(lv);      /* serie nueva en este dispositivo */
-      } else if (!lv && rv) {
-        if (!baseHash) out.push(rv);      /* serie nueva en el otro dispositivo */
+      } else if (lv) {
+        /* Falta en el otro lado. Sin lápida no se puede afirmar que se borró:
+           si aquí hay cambios se conservan y se avisa del posible borrado. */
+        if (baseHash && lh !== baseHash) {
+          pushConflict(conflicts, setDeletedConflict({
+            kind: 'set-deleted-remote', id: sessionId, exerciseId, setId: key,
+            number: lv.number, remote: null, deleted: null,
+          }, conflicts));
+        }
+        if (!baseHash || lh !== baseHash) out.push(lv);
+      } else if (rv) {
+        if (baseHash && rh !== baseHash) {
+          pushConflict(conflicts, setDeletedConflict({
+            kind: 'set-deleted', id: sessionId, exerciseId, setId: key,
+            number: rv.number, remote: stashable(rv) ? rv : null, deleted: null,
+          }, conflicts));
+          out.push(rv);
+        } else if (!baseHash) out.push(rv);
       }
     };
     l.forEach((_v, key) => consider(key));
     r.forEach((_v, key) => consider(key));
-    return out;
+    return { sets: out, tombstones: trimTombstones(tombstones) };
   }
 
   function mergeSession(lv, rv, base, conflicts) {
@@ -222,11 +304,13 @@
     out.exercises = keys.map(key => {
       const baseEx = chosen.get(key) || lEx.get(key) || rEx.get(key) || {};
       const merged = clone(baseEx);
-      merged.sets = mergeSets(
-        (lEx.get(key) || {}).sets, (rEx.get(key) || {}).sets,
-        baseSets, key, conflicts, id, key,
+      const setsResult = mergeExerciseSets(
+        lEx.get(key), rEx.get(key), baseSets, key, conflicts, id, key,
       );
+      merged.sets = setsResult.sets;
       if (!merged.sets.length) delete merged.sets;
+      if (setsResult.tombstones && Object.keys(setsResult.tombstones).length) merged.setTombstones = setsResult.tombstones;
+      else delete merged.setTombstones;
       return merged;
     });
     return out;
@@ -453,7 +537,7 @@
     function raw(account) { return readAll()[account] || null; }
     function save(account, st) { const all = readAll(); all[account] = st; writeAll(all); }
     function blank() {
-      return { rev: null, digest: null, dirty: false, opId: null, conflicts: [], backup: null, lastSync: null, lastError: null };
+      return { rev: null, digest: null, dirty: false, opId: null, conflicts: [], backup: null, lastSync: null, lastError: null, revision: 0 };
     }
     function state(account) {
       const st = raw(account);
@@ -462,7 +546,30 @@
     function markDirty(account) {
       const st = Object.assign(blank(), raw(account) || {});
       st.dirty = true;
+      /* Cada cambio local sube la revisión. Una petición que ya estaba en
+         vuelo no puede dar por sincronizada esta versión nueva. */
+      st.revision = (Number(st.revision) || 0) + 1;
       if (!st.opId) st.opId = newId();
+      save(account, st);
+      return st;
+    }
+    function revisionOf(account) {
+      const current = raw(account);
+      return Number(current && current.revision) || 0;
+    }
+    /* Escribe el estado releyendo antes lo que otro guardado local haya podido
+       cambiar mientras había una petición en vuelo: la revisión más nueva y la
+       marca de pendiente mandan, nunca se pierden. */
+    function persist(account, st, keepFreshConflicts) {
+      const fresh = Object.assign(blank(), raw(account) || {});
+      st.revision = Math.max(Number(fresh.revision) || 0, Number(st.revision) || 0);
+      st.dirty = st.dirty === true || fresh.dirty === true;
+      st.opId = st.opId || fresh.opId || null;
+      /* Al resolver un conflicto la lista se recorta a propósito: en ese caso no
+         se vuelve a mezclar con la que había en el almacenamiento. */
+      st.conflicts = keepFreshConflicts === false ? (Array.isArray(st.conflicts) ? st.conflicts : []) : mergeConflicts(fresh.conflicts, st.conflicts);
+      if (!st.backup && fresh.backup) st.backup = fresh.backup;
+      if (st.lastSync == null && fresh.lastSync != null) st.lastSync = fresh.lastSync;
       save(account, st);
       return st;
     }
@@ -480,14 +587,26 @@
       return promise;
     }
 
-    async function push(account, st, doc, baseRev) {
-      const result = await remote.save(clone(doc), baseRev === undefined ? st.rev : baseRev, st.opId);
+    async function push(account, st, doc, baseRev, startRevision) {
+      /* Se congela exactamente lo que se envía: la huella debe describir lo que
+         el servidor tiene, no el documento que el usuario siguió editando. */
+      const snapshot = clone(doc);
+      const result = await remote.save(clone(snapshot), baseRev === undefined ? st.rev : baseRev, st.opId);
       st.rev = Number.isInteger(result && result.rev) ? result.rev : st.rev;
-      st.digest = digest(doc);
-      st.dirty = false;
-      st.opId = null;
+      st.digest = digest(snapshot);
       st.lastSync = now();
       st.lastError = null;
+      persist(account, st);
+      /* ¿Se guardó algo nuevo mientras la petición estaba en vuelo? Entonces
+         esta respuesta es de una versión anterior y el cambio sigue pendiente. */
+      if (revisionOf(account) !== (startRevision === undefined ? st.revision : startRevision)) {
+        st.revision = revisionOf(account);
+        st.dirty = true;
+        st.opId = st.opId || newId();
+      } else {
+        st.dirty = false;
+        st.opId = null;
+      }
       save(account, st);
       return result;
     }
@@ -497,15 +616,21 @@
     }
 
     async function sync(account, doc) {
+      /* Si ya hay una sincronización en vuelo se espera a que acabe y se vuelve
+         a intentar con el documento actual: reutilizar la respuesta vieja es
+         justo lo que dejaba cambios sin subir. */
+      const running = inflight.get(account);
+      if (running) await Promise.resolve(running).catch(() => null);
       return once(account, async () => {
         const st = Object.assign(blank(), raw(account) || {});
+        const startRevision = revisionOf(account);
         /* Primer contacto con esta cuenta en este dispositivo. */
         if (st.rev === null) {
           const first = await remote.load();
           const remoteData = first && isObj(first.data) ? first.data : null;
           if (!remoteData || !hasContent(remoteData)) {
-            await push(account, st, doc, null);
-            return { status: 'pushed', rev: st.rev, data: null, conflicts: [] };
+            await push(account, st, doc, null, startRevision);
+            return { status: 'pushed', rev: st.rev, data: null, conflicts: [], needsPush: st.dirty };
           }
           /* La respuesta de un primer guardado se perdió pero el servidor sí
              lo aplicó: el contenido coincide, así que no se repite. */
@@ -515,8 +640,8 @@
             st.dirty = false;
             st.opId = null;
             st.lastSync = now();
-            save(account, st);
-            return { status: 'replayed', rev: st.rev, data: null, conflicts: [] };
+            persist(account, st);
+            return { status: 'replayed', rev: st.rev, data: null, conflicts: [], needsPush: st.dirty };
           }
           if (!hasContent(doc)) {
             st.rev = Number.isInteger(first.rev) ? first.rev : 0;
@@ -524,27 +649,29 @@
             st.dirty = false;
             st.opId = null;
             st.lastSync = now();
-            save(account, st);
-            return { status: 'pulled', rev: st.rev, data: remoteData, conflicts: [] };
+            persist(account, st);
+            return { status: 'pulled', rev: st.rev, data: remoteData, conflicts: [], needsPush: st.dirty };
           }
           const baseRev = Number.isInteger(first.rev) ? first.rev : 0;
           const merged = merge(null, doc, remoteData);
           st.rev = baseRev;
           st.digest = digest(remoteData);
-          st.conflicts = mergeConflicts(st.conflicts, merged.conflicts);
-          st.dirty = true;
-          save(account, st);
+          persist(account, Object.assign(st, {
+            conflicts: mergeConflicts(st.conflicts, merged.conflicts),
+            dirty: true,
+            opId: st.opId || newId(),
+          }));
           return { status: 'merged', rev: baseRev, data: merged.data, conflicts: merged.conflicts, needsPush: true };
         }
 
         if (st.dirty) {
           try {
-            const result = await push(account, st, doc);
-            return { status: result && result.replay ? 'replayed' : 'pushed', rev: st.rev, data: null, conflicts: [] };
+            const result = await push(account, st, doc, undefined, startRevision);
+            return { status: result && result.replay ? 'replayed' : 'pushed', rev: st.rev, data: null, conflicts: [], needsPush: st.dirty };
           } catch (error) {
             if (!isConflictError(error)) {
               st.lastError = 'offline';
-              save(account, st);
+              persist(account, Object.assign(st, { dirty: true, opId: st.opId || newId() }));
               throw error;
             }
             /* El servidor tiene otra revisión: se combina, nunca se pisa. */
@@ -553,23 +680,35 @@
             if (!remoteData) {
               /* Respuesta vacía inesperada: no se borra nada local. */
               st.lastError = 'empty_remote';
-              save(account, st);
+              persist(account, Object.assign(st, { dirty: true, opId: st.opId || newId() }));
               return { status: 'kept-local', rev: st.rev, data: null, conflicts: [], needsPush: true };
+            }
+            if (revisionOf(account) !== startRevision) {
+              /* El documento cambió mientras se leía el servidor: esta base ya
+                 no sirve. Se deja pendiente y se reintenta con lo más reciente. */
+              persist(account, Object.assign(st, { dirty: true, opId: st.opId || newId(), lastError: null }));
+              return { status: 'retrying', rev: st.rev, data: null, conflicts: [], needsPush: true };
             }
             backup(account, doc);
             const merged = merge(st.digest, doc, remoteData);
             st.rev = Number.isInteger(current.rev) ? current.rev : st.rev;
             st.digest = digest(remoteData);
-            st.conflicts = mergeConflicts(st.conflicts, merged.conflicts);
-            st.dirty = true;
-            st.lastError = null;
-            save(account, st);
+            persist(account, Object.assign(st, {
+              conflicts: mergeConflicts(st.conflicts, merged.conflicts),
+              dirty: true, lastError: null,
+            }));
             return { status: 'merged', rev: st.rev, data: merged.data, conflicts: merged.conflicts, needsPush: true };
           }
         }
 
         /* Sin cambios locales: se adopta lo del servidor si avanzó. */
         const current = await remote.load();
+        if (revisionOf(account) !== startRevision) {
+          /* Mientras se leía el servidor se guardó algo aquí: lo leído ya no es
+             la base de nada, así que se deja pendiente en vez de pisarlo. */
+          persist(account, Object.assign(st, { dirty: true, opId: st.opId || newId(), lastError: null }));
+          return { status: 'retrying', rev: st.rev, data: null, conflicts: [], needsPush: true };
+        }
         const remoteData = current && isObj(current.data) ? current.data : null;
         const remoteRev = current && Number.isInteger(current.rev) ? current.rev : st.rev;
         if (!remoteData) return { status: 'clean', rev: st.rev, data: null, conflicts: [] };
@@ -585,15 +724,13 @@
            local que todavía no se envió: se marca pendiente en vez de darlo
            por sincronizado (nunca se muestra "todo al día" en falso). */
         if (!same(merged.data, remoteData)) {
-          st.dirty = true;
-          st.opId = st.opId || newId();
-          save(account, st);
+          persist(account, Object.assign(st, { dirty: true, opId: st.opId || newId() }));
           return { status: 'merged', rev: st.rev, data: merged.data, conflicts: merged.conflicts, needsPush: true };
         }
         st.dirty = false;
         st.opId = null;
         st.lastSync = now();
-        save(account, st);
+        persist(account, st);
         if (same(merged.data, doc)) return { status: 'clean', rev: st.rev, data: null, conflicts: [] };
         return { status: 'pulled', rev: st.rev, data: merged.data, conflicts: merged.conflicts };
       });
@@ -614,7 +751,7 @@
         st.opId = null;
         st.conflicts = [];
         st.lastSync = now();
-        save(account, st);
+        persist(account, st, false);
         return { status: 'pulled', data: remoteData, rev: st.rev };
       });
     }
@@ -633,7 +770,35 @@
       st.conflicts.splice(index, 1);
       const out = clone(doc) || {};
       const collection = entry.collection;
-      if (choice === 'theirs') {
+      /* Serie borrada en un dispositivo y modificada en el otro: se decide con
+         las dos versiones delante y nada se descarta por el camino. */
+      if (entry.kind === 'set-deleted' || entry.kind === 'set-deleted-remote') {
+        const session = (out.sessions || []).find(s => s && s.id === entry.id);
+        const exercise = session && (session.exercises || []).find(e => e && e.id === entry.exerciseId);
+        if (exercise) {
+          if (!Array.isArray(exercise.sets)) exercise.sets = [];
+          if (!isObj(exercise.setTombstones)) exercise.setTombstones = {};
+          if (choice === 'theirs' && entry.kind === 'set-deleted' && isObj(entry.remote)) {
+            /* Recuperar la serie que el otro dispositivo había cambiado. */
+            const at = exercise.sets.findIndex(set => set && set.id === entry.remote.id);
+            if (at >= 0) exercise.sets[at] = entry.remote;
+            else exercise.sets.push(entry.remote);
+            delete exercise.setTombstones[entry.setId];
+          } else if (choice === 'theirs' && entry.kind === 'set-deleted-remote') {
+            /* Aceptar el borrado hecho en el otro dispositivo. */
+            exercise.sets = exercise.sets.filter(set => set && set.id !== entry.setId);
+            exercise.setTombstones[entry.setId] = isObj(entry.deleted) ? entry.deleted : { id: entry.setId, at: now() };
+          } else if (entry.kind === 'set-deleted') {
+            /* Conservar el borrado: la lápida se queda donde estaba. */
+            exercise.setTombstones[entry.setId] = isObj(entry.deleted) ? entry.deleted : { id: entry.setId, at: now() };
+          } else {
+            /* Conservar la serie modificada aquí: la lápida ajena no vuelve. */
+            delete exercise.setTombstones[entry.setId];
+          }
+          if (!Object.keys(exercise.setTombstones).length) delete exercise.setTombstones;
+          exercise.done = exercise.sets.length > 0 && exercise.sets.every(set => set && set.completed);
+        }
+      } else if (choice === 'theirs') {
         if (entry.kind === 'set' && isObj(entry.remote)) {
           const session = (out.sessions || []).find(s => s && s.id === entry.id);
           const exercise = session && (session.exercises || []).find(e => e && e.id === entry.exerciseId);
@@ -669,14 +834,14 @@
       }
       st.dirty = true;
       if (!st.opId) st.opId = newId();
-      save(account, st);
+      persist(account, st, false);
       return { data: out, conflict: entry, remaining: st.conflicts.length };
     }
 
     function clearConflicts(account) {
       const st = Object.assign(blank(), raw(account) || {});
       st.conflicts = [];
-      save(account, st);
+      persist(account, st, false);
     }
 
     return {

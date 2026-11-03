@@ -1080,3 +1080,28 @@ input[type=number]{-moz-appearance:textfield;appearance:textfield}
   .onb-grid.days{grid-template-columns:repeat(3,minmax(0,1fr))}
   .mv-row{grid-template-columns:70px 1fr 64px 28px;gap:8px;font-size:12px}
 }
+
+/* ---- Etapa 5: navegador compacto, estado del descanso y paso de peso ---- */
+.session-nav-chips{display:flex;gap:8px;overflow-x:auto;padding:6px 2px 2px;scrollbar-width:thin;-webkit-overflow-scrolling:touch}
+.ex-chip{display:inline-flex;align-items:center;gap:6px;flex:0 0 auto;min-height:40px;padding:6px 12px;border-radius:999px;border:1px solid rgba(255,255,255,.14);background:rgba(255,255,255,.04);color:inherit;font:inherit;font-size:13px;line-height:1.2;cursor:pointer}
+.ex-chip:active{transform:scale(.98)}
+.ex-chip.is-current{border-color:#f05100;box-shadow:inset 0 0 0 1px #f05100}
+.ex-chip.is-done{opacity:.7}
+.ex-chip.is-done .ex-chip-count{color:#4ade80}
+.ex-chip.is-partial .ex-chip-count{color:#ffa040}
+.ex-chip-badge{display:inline-flex;align-items:center;justify-content:center;min-width:22px;height:22px;border-radius:6px;background:rgba(255,255,255,.09);font-size:11px;font-weight:600}
+.ex-chip-name{max-width:132px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.ex-chip-count{font-variant-numeric:tabular-nums;font-size:12px;opacity:.85}
+.session-nav-foot{display:flex;justify-content:center;margin-top:6px}
+.session-nav-row{display:flex;align-items:center;gap:8px}
+.session-ex-select{flex:1;min-width:0}
+.rest-bar .rest-state{font-size:11px;text-transform:uppercase;letter-spacing:.04em;opacity:.78;padding:2px 7px;border:1px solid currentColor;border-radius:999px}
+.rest-bar.paused .rest-fill{background:#ffa040}
+.rest-bar.paused .rest-time{color:#ffa040}
+.weight-step-pick{display:inline-flex;align-items:center;gap:6px;font-size:12px;opacity:.9}
+.weight-step-pick select{min-height:36px;padding:2px 8px;font-size:12px}
+@media (max-width:520px){
+  .session-nav-row{gap:6px}
+  .ex-chip-name{max-width:96px}
+  .weight-step-pick span{display:none}
+}
