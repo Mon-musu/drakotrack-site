@@ -149,12 +149,13 @@ release stays authoritative.
 Commit `apk-version.json` and `apk/version.json`, then deploy:
 
 ```bash
-cd .deploy-stage && npx vercel deploy --prod --yes --token="$VERCEL_TOKEN"
+./scripts/publish.sh --deploy-only
 ```
 
-In `site` mode also run `cp -r apk .deploy-stage/apk` first. In `github` mode the
-site only needs the feed, so `.deploy-stage/apk/` can be removed once the release
-is live.
+`publish.sh` stages its own tree in a temporary directory, so there is no
+`.deploy-stage/` to maintain; it uploads `apk/version.json`, the feed. In `github`
+mode that is all the site needs. In `site` mode add `apk` to `DEPLOY_FILES` so the
+binary is served next to the feed.
 
 Serving details live in `vercel.json`: `/apk/version.json` is `no-store`, and
 `/apk/*.apk` is sent as `application/vnd.android.package-archive` with

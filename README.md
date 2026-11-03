@@ -19,11 +19,12 @@ npm test        # app flows, profile/API assertions and rate limiting
 
 ## Deploying the site
 
-The published tree is staged in `.deploy-stage/` and deployed with the Vercel CLI:
+The published tree is built by `scripts/publish.sh --deploy-only`, which stages it
+in a temporary directory and uploads it with the Vercel CLI:
 
 ```bash
-cp -f app.js sync.js index.html styles.css vercel.json supabase.js boostcamp.js share.js legal.html legal.js update-check.js sw.js .deploy-stage/
-cd .deploy-stage && npx vercel deploy --prod --yes --token="$VERCEL_TOKEN"
+export VERCEL_TOKEN=...   # never commit it
+./scripts/publish.sh --deploy-only
 ```
 
 Environment variables (`SUPABASE_URL`, `SUPABASE_PUBLISHABLE_KEY`)
