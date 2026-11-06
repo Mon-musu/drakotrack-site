@@ -17,12 +17,16 @@ const HANDLERS = {
 };
 const MAX_BODY_BYTES = 2 * 1024 * 1024 + 32 * 1024;
 
+// Pages calls onRequest(); the Workers entry-point (worker.js) calls handleApi()
+// directly. Both end up in exactly the same translation code below.
 export async function onRequest(context) {
-  const { request, env, params } = context;
-  const url = new URL(request.url);
-  const segments = Array.isArray(params.path) ? params.path : [params.path].filter(Boolean);
+  const url = new URL(context.request.url);
+  const segments = Array.isArray(context.params.path) ? context.params.path : [context.params.path].filter(Boolean);
+  return handleApi(context.request, context.env, segments, url);
+}
 
-  if (segments.length !== 2 || !HANDLERS[segments[0]]) {
+export async function handleApi(request, env, segments, url) {
+  if (!Array.isArray(segments) || segments.length !== 2 || !HANDLERS[segments[0]]) {
     return json(404, { error: "not_found" });
   }
 
@@ -86,7 +90,7 @@ export async function onRequest(context) {
   try {
     await HANDLERS[segments[0]](req, res);
   } catch (error) {
-    console.error("[pages-api] unhandled_error", error && error.message);
+    console.error("[cf-api] unhandled_error", error && error.message);
     if (!res.ended) {
       res.statusCode = 500;
       res.setHeader("Content-Type", "application/json; charset=utf-8");

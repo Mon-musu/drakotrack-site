@@ -20,6 +20,22 @@ ok(/compatibility_date\s*=\s*"\d{4}-\d{2}-\d{2}"/.test(wrangler), 'wrangler decl
 ok(/pages_build_output_dir\s*=\s*"\.\/dist"/.test(wrangler), 'wrangler points Pages at dist');
 const date = (wrangler.match(/compatibility_date\s*=\s*"([^"]+)"/) || [])[1];
 ok(date >= '2025-04-01', 'compatibility date enables process.env population');
+ok(/^main\s*=\s*"worker\.js"$/m.test(wrangler), 'wrangler declares a Worker entry-point');
+ok(/\[assets\][\s\S]*directory\s*=\s*"\.\/dist"/.test(wrangler), 'Worker assets are served from dist');
+ok(/nodejs_compat/.test(wrangler), 'nodejs_compat provides process.env');
+ok(/binding\s*=\s*"STATIC"/.test(wrangler), 'assets binding has a Pages-safe name');
+ok(!/binding\s*=\s*"ASSETS"/.test(wrangler), 'assets binding avoids the name Pages reserves');
+
+ok(exists('worker.js'), 'Workers entry-point exists');
+const worker = read('worker.js');
+ok(/export\s+default/.test(worker) && /async\s+fetch\s*\(/.test(worker), 'Worker exports a fetch handler');
+ok(/handleApi/.test(worker), 'Worker reuses the shared API adapter');
+ok(/path\.startsWith\("\/api\/"\)/.test(worker), 'Worker routes /api/* before assets');
+ok(/env\.STATIC|env && env\.STATIC/.test(worker), 'Worker reads the declared assets binding');
+ok(/assets\.fetch/.test(worker), 'Worker serves the static build');
+ok(/index\.html/.test(worker), 'Worker keeps the SPA fallback');
+ok(/path\.startsWith\("\/\."\)/.test(worker) && /SENSITIVE_EXACT/.test(worker), 'Worker blocks dotfiles and configuration files');
+ok(!/Access-Control-Allow-Origin.*\*/.test(worker), 'Worker does not add wildcard CORS');
 
 ok(fs.existsSync(path.join(dist, 'index.html')), 'dist/index.html exists');
 ok(fs.existsSync(path.join(dist, 'sw.js')), 'dist/sw.js exists');
@@ -73,6 +89,7 @@ ok(/SENSITIVE_EXACT/.test(middleware), 'middleware blocks configuration files');
 ok(exists('functions/api/[[path]].js'), 'Pages API catch-all exists');
 const fn = read('functions/api/[[path]].js');
 ok(/export\s+async\s+function\s+onRequest/.test(fn), 'Pages adapter exports onRequest');
+ok(/export\s+async\s+function\s+handleApi/.test(fn), 'adapter exposes handleApi for the Worker entry-point');
 ok(/api\/auth\/\[action\]\.js/.test(fn) && /api\/data\/\[action\]\.js/.test(fn) && /api\/account\/\[action\]\.js/.test(fn), 'adapter reuses all API handlers');
 ok(/readJson\(\)|readJson/.test(fn) && /query:.*action/.test(fn), 'adapter preserves body and action semantics');
 ok(/cf-connecting-ip/.test(fn) && /x-real-ip/.test(fn), 'adapter preserves the trusted client IP');

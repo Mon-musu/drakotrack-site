@@ -88,6 +88,36 @@ npx wrangler pages dev dist --local-protocol https \
 El adaptador deduce producción del protocolo de la petición (`https:`), no de
 `NODE_ENV`, porque Wrangler sustituye `NODE_ENV` durante el build.
 
+## Dos formas de desplegar el mismo repositorio
+
+El proyecto de Cloudflare puede ser de **Workers** o de **Pages**: el mismo
+repositorio funciona en los dos, con una sola implementación de la API.
+
+| Proyecto en Cloudflare | Comando que ejecuta | Qué usa del repositorio |
+| --- | --- | --- |
+| Workers (Workers Builds) | `npx wrangler deploy` | `main = "worker.js"` y `[assets]` (binding `STATIC`) |
+| Pages | `wrangler pages deploy dist` | `pages_build_output_dir` y `functions/` |
+
+`worker.js` no duplica nada: importa `handleApi` de
+`functions/api/[[path]].js`, el mismo adaptador que usan las Functions.
+
+En Workers el reparto de tráfico es:
+
+1. `/.env`, `/.git/*`, `package.json`, `vercel.json`, `wrangler.toml` → **404 real**.
+2. `/api/*` → adaptador de la API.
+3. Un archivo de `dist/` → asset estático con las reglas de `dist/_headers`.
+4. Cualquier otra ruta (`/entreno`, `/progreso`…) → `index.html` con 200, porque
+   la app navega por hash.
+
+Nota: el binding de assets **no puede llamarse `ASSETS`**, está reservado en
+proyectos Pages; por eso se llama `STATIC` y `worker.js` lo lee de ahí.
+
+El enlace de recuperación de contraseña usa el origen de la propia petición
+(`APP_ORIGIN` es solo el respaldo), así que funciona en `workers.dev`, en
+`pages.dev`, en un dominio propio y en Vercel. Lo que sí hay que hacer en
+Supabase es añadir ese origen a **Authentication → URL Configuration**; si no
+está en la lista blanca, Supabase usa el `Site URL` y el correo vuelve allí.
+
 ## Despliegue en Cloudflare Pages
 
 Elegir **una** de las dos vías. Ninguna requiere escribir secretos en el

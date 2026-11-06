@@ -10,6 +10,8 @@
     "build:cloudflare": "node scripts/build-cloudflare.mjs",
     "preview:cloudflare": "npm run build:cloudflare && npx --yes wrangler@latest pages dev dist",
     "deploy:cloudflare": "npm run build:cloudflare && npx --yes wrangler@latest pages deploy dist",
+    "preview:worker": "npm run build:cloudflare && npx --yes wrangler@latest dev",
+    "deploy:worker": "npm run build:cloudflare && npx --yes wrangler@latest deploy",
     "audit:deps": "npm audit --omit=dev"
   },
   "keywords": [],

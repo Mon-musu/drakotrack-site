@@ -1,10 +1,20 @@
 'use strict';
-const { json, readJson, isSameOrigin, readCookie, cookieSession, clearCookies, safeUser, safeDisplayName } = require('../../lib/security');
+const { json, readJson, isSameOrigin, isProduction, readCookie, cookieSession, clearCookies, safeUser, safeDisplayName } = require('../../lib/security');
 const sb = require('../_lib/supabase');
 const rateLimit = require('../_lib/rate-limit');
 
 function validEmail(value) { return typeof value === 'string' && value.length <= 254 && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value); }
 function getAction(req) { return String(req.query && req.query.action || '').toLowerCase(); }
+/* Origen público de esta petición. El dominio cambia entre despliegues
+   (vercel.app, pages.dev, workers.dev, dominio propio), así que el enlace de
+   recuperación vuelve al mismo sitio desde el que se pidió. APP_ORIGIN es solo
+   el respaldo cuando no hay Host utilizable. Supabase acepta el redirect_to
+   únicamente si está en su lista blanca. */
+function publicOrigin(req) {
+  const host = req.headers && typeof req.headers.host === 'string' ? req.headers.host.trim() : '';
+  if (!host || !/^[a-z0-9](?:[a-z0-9.-]*[a-z0-9])?(?::\d{1,5})?$/i.test(host)) return sb.APP_ORIGIN;
+  return `${isProduction() ? 'https' : 'http'}://${host}`;
+}
 function validConsent(value) {
   return value && typeof value === 'object' && !Array.isArray(value) &&
     typeof value.version === 'string' && value.version.length <= 40 &&
@@ -66,7 +76,7 @@ module.exports = async function handler(req, res) {
     }
     if (action === 'recover') {
       if (!validEmail(body.email)) return json(res, 400, { error: 'invalid_input', message: 'Introduce un correo válido.' });
-      const response = await sb.auth('/recover', { method: 'POST', body: { email: body.email.trim().toLowerCase(), redirect_to: `${sb.APP_ORIGIN}/` } });
+      const response = await sb.auth('/recover', { method: 'POST', body: { email: body.email.trim().toLowerCase(), redirect_to: `${publicOrigin(req)}/` } });
       if (!response.ok && response.status !== 422) return json(res, response.status === 429 ? 429 : 400, { error: 'recovery_unavailable', message: 'No se pudo solicitar el restablecimiento ahora. Inténtalo más tarde.' });
       return json(res, 200, { ok: true });
     }
