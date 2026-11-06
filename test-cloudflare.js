@@ -1,0 +1,81 @@
+'use strict';
+const assert = require('node:assert/strict');
+const fs = require('node:fs');
+const path = require('node:path');
+
+const root = __dirname;
+const dist = path.join(root, 'dist');
+let passed = 0;
+function ok(value, label) {
+  assert.equal(value, true, label);
+  passed += 1;
+}
+
+const read = file => fs.readFileSync(path.join(root, file), 'utf8');
+const exists = file => fs.existsSync(path.join(root, file));
+
+ok(exists('wrangler.toml'), 'wrangler.toml exists');
+const wrangler = read('wrangler.toml');
+ok(/compatibility_date\s*=\s*"\d{4}-\d{2}-\d{2}"/.test(wrangler), 'wrangler declares a compatibility date');
+ok(/pages_build_output_dir\s*=\s*"\.\/dist"/.test(wrangler), 'wrangler points Pages at dist');
+const date = (wrangler.match(/compatibility_date\s*=\s*"([^"]+)"/) || [])[1];
+ok(date >= '2025-04-01', 'compatibility date enables process.env population');
+
+ok(fs.existsSync(path.join(dist, 'index.html')), 'dist/index.html exists');
+ok(fs.existsSync(path.join(dist, 'sw.js')), 'dist/sw.js exists');
+ok(fs.existsSync(path.join(dist, 'manifest.webmanifest')), 'dist manifest exists');
+ok(fs.existsSync(path.join(dist, 'apk/version.json')), 'dist APK feed exists');
+ok(fs.existsSync(path.join(dist, 'programs/index.json')), 'dist program catalogue exists');
+ok(fs.existsSync(path.join(dist, 'icons/icon-192.png')), 'dist icon exists');
+ok(fs.existsSync(path.join(dist, 'sounds/rest-alarm.mp3')), 'dist sound exists');
+
+for (const forbidden of ['api', 'lib', 'test-cloudflare.js', 'package.json', 'package-lock.json', 'node_modules', '.env', 'vercel.json', 'index.js', 'drakotrack-manifest.json']) {
+  ok(!fs.existsSync(path.join(dist, forbidden)), `dist does not publish ${forbidden}`);
+}
+const localArchives = fs.readdirSync(root).filter(file => /\.zip$|\.bundle$|\.apk$|\.idsig$/.test(file));
+ok(localArchives.every(file => !fs.existsSync(path.join(dist, file))), 'dist does not publish local archives');
+
+const index = read('dist/index.html');
+const localRefs = [...index.matchAll(/(?:src|href)="([^"]+)"/g)]
+  .map(match => match[1])
+  .filter(ref => !/^(?:#|mailto:|https?:|\/\/)/.test(ref))
+  .map(ref => ref.split(/[?#]/)[0]);
+for (const ref of localRefs) {
+  ok(fs.existsSync(path.join(dist, ref)), `index reference exists: ${ref}`);
+}
+
+const sw = read('dist/sw.js');
+const precache = [...sw.matchAll(/'\.\/([^']+)'/g)]
+  .map(match => match[1].split(/[?#]/)[0])
+  .filter(Boolean);
+for (const ref of [...new Set(precache)]) {
+  ok(fs.existsSync(path.join(dist, ref)), `service worker precache exists: ${ref}`);
+}
+
+const headers = read('dist/_headers');
+ok(/Content-Security-Policy:/.test(headers), 'Pages headers include CSP');
+ok(/Strict-Transport-Security:/.test(headers), 'Pages headers include HSTS');
+ok(/X-Frame-Options: DENY/.test(headers), 'Pages headers deny framing');
+ok(/\/sw\.js[\s\S]*Service-Worker-Allowed: \//.test(headers), 'Pages allows the root service worker');
+ok(/\/apk\/version\.json[\s\S]*Cache-Control: no-store/.test(headers), 'APK feed is not cached');
+
+const routes = JSON.parse(read('dist/_routes.json'));
+ok(routes.version === 1, 'routes schema version is 1');
+ok(Array.isArray(routes.include) && routes.include.includes('/api/*'), 'API routes invoke Functions');
+ok(routes.include.includes('/.env') && routes.include.includes('/.git/*'), 'sensitive paths invoke the guard');
+ok(!fs.existsSync(path.join(dist, '_redirects')), 'no catch-all redirect can swallow API routes');
+
+ok(exists('functions/_middleware.js'), 'Pages sensitive-path middleware exists');
+const middleware = read('functions/_middleware.js');
+ok(/path\.startsWith\("\/\."\)/.test(middleware), 'middleware blocks dotfiles');
+ok(/SENSITIVE_EXACT/.test(middleware), 'middleware blocks configuration files');
+
+ok(exists('functions/api/[[path]].js'), 'Pages API catch-all exists');
+const fn = read('functions/api/[[path]].js');
+ok(/export\s+async\s+function\s+onRequest/.test(fn), 'Pages adapter exports onRequest');
+ok(/api\/auth\/\[action\]\.js/.test(fn) && /api\/data\/\[action\]\.js/.test(fn) && /api\/account\/\[action\]\.js/.test(fn), 'adapter reuses all API handlers');
+ok(/readJson\(\)|readJson/.test(fn) && /query:.*action/.test(fn), 'adapter preserves body and action semantics');
+ok(/cf-connecting-ip/.test(fn) && /x-real-ip/.test(fn), 'adapter preserves the trusted client IP');
+ok(!/Access-Control-Allow-Origin.*\*/.test(fn), 'adapter does not add wildcard CORS');
+
+console.log(`cloudflare tests: ${passed} assertions passed`);

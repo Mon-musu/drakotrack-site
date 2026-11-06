@@ -74,7 +74,7 @@ function request({ method = 'POST', action, body, ip = '203.0.113.10', headers =
     method,
     query: { action },
     body,
-    headers: { origin: ORIGIN, 'x-real-ip': ip, ...headers },
+    headers: { origin: ORIGIN, host: 'drakotrack.vercel.app', 'x-real-ip': ip, ...headers },
   };
 }
 

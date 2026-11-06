@@ -26,7 +26,7 @@
 })(typeof self !== 'undefined' ? self : this, function () {
   'use strict';
 
-  const COLLECTIONS = ['workouts', 'sessions', 'records', 'prs', 'weights', 'exercises'];
+  const COLLECTIONS = ['workouts', 'sessions', 'records', 'prs', 'weights', 'exercises', 'programs', 'planner'];
   const KEYED_OBJECTS = ['prefs', 'profile', 'achievements'];
   const SCALARS = ['photo', 'consent'];
   const SETS = ['hiddenLib'];

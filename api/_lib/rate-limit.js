@@ -42,6 +42,7 @@ const POLICIES = Object.freeze({
   'auth:reset': { limit: 5, windowSec: 900, scope: 'ip' },
   'auth:signout': { limit: 30, windowSec: 60, scope: 'ip' },
   'auth:change-password': { limit: 5, windowSec: 900, scope: 'user' },
+  'auth:profile': { limit: 20, windowSec: 900, scope: 'user' },
   'data:read': { limit: 120, windowSec: 60, scope: 'user' },
   'data:write': { limit: 60, windowSec: 60, scope: 'user' },
   'data:delete': { limit: 5, windowSec: 3600, scope: 'user' },

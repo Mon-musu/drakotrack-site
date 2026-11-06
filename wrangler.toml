@@ -1,0 +1,18 @@
+name = "drakotrack"
+compatibility_date = "2026-08-04"
+pages_build_output_dir = "./dist"
+
+# Only public, non-secret values belong in [vars]. They ship with every
+# deployment and are readable in this repository, so server credentials stay in
+# the Pages dashboard (Production and Preview separately): SUPABASE_SECRET_KEY /
+# SUPABASE_SERVICE_ROLE_KEY and, optionally, SUPABASE_URL.
+#
+# SUPABASE_PUBLISHABLE_KEY is a Supabase publishable key (sb_publishable_...):
+# Supabase designs it to be exposed, and RLS is what protects the data. Keeping
+# it here means Git-driven builds get the same configuration as manual ones.
+#
+# compatibility_date >= 2025-04-01 makes Cloudflare populate process.env with
+# the Pages bindings/secrets, which is what the existing API layer reads.
+[vars]
+APP_ORIGIN = "https://drakotrack.pages.dev"
+SUPABASE_PUBLISHABLE_KEY = "sb_publishable_tJD8FwSnZjApRyQul4TxUw_r4_TXTc-"

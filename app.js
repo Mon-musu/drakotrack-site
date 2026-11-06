@@ -347,14 +347,10 @@ let _storageWarned = false;
 /* Escribe el documento sin tocar la nube. Se usa también al aplicar una
    combinación remota, para no reenviar lo que acaba de llegar. */
 function persistLocal(){
-  try{
-    localStorage.setItem(DB_KEY, JSON.stringify(db));
-  }catch(err){
-    if(!_storageWarned){
-      _storageWarned = true;
-      toast('El almacenamiento está lleno o no disponible — los últimos cambios no se guardaron.', 'error');
-    }
-  }
+  const result = Offline.writeDocument(localStorage, DB_KEY, JSON.stringify(db));
+  if(!result.ok){ markStorageError(result); return false; }
+  clearStorageError();
+  return true;
 }
 function saveDB(){
   persistLocal();
@@ -371,9 +367,19 @@ function isCloud(){
 }
 const syncStore = {
   get(key){ try{ return localStorage.getItem(key); }catch(e){ return null; } },
-  set(key, value){ try{ localStorage.setItem(key, value); }catch(e){} },
+  set(key, value){ try{ localStorage.setItem(key, value); }catch(e){ throw e; } },
   remove(key){ try{ localStorage.removeItem(key); }catch(e){} },
 };
+/* Prompt 8: cola persistente y estado de conexión. El motor de sync sigue
+   siendo la fuente de verdad; la cola programa y audita los intentos. */
+const opQueue = Offline.createQueue({ storage: syncStore });
+const offlineState = {
+  online: typeof navigator === 'undefined' || navigator.onLine !== false,
+  checking: null, lastCheck: 0, installPrompt: null, updateReady: false,
+  deferredUpdate: false, storageError: false, sw: null, refreshing: false,
+};
+const SW_ROLLBACK_KEY = 'draktrack_sw_rollback_done_v1';
+const SW_CACHE_PREFIX = 'drakotrack-';
 const cloudSync = window.DrakoSync.createEngine({
   storage: syncStore,
   remote: {
@@ -408,18 +414,21 @@ function queueSync(delay){
 }
 function scheduleCloudSync(){
   if(!isCloud() || state.sb.applying) return;
-  cloudSync.markDirty(currentUser);
+  const st = cloudSync.markDirty(currentUser);
+  enqueueSyncJob(currentUser, st, 'local-change');
   queueSync();
   renderHeader();
 }
-function syncFailed(notify){
+function syncFailed(notify, jobId){
   state.sb.status = 'offline';
   state.sb.attempts = (state.sb.attempts || 0) + 1;
-  const delay = Math.min(30000, Math.pow(2, state.sb.attempts) * 2000);
+  let delay = Math.min(30000, Math.pow(2, state.sb.attempts) * 2000);
+  try{ if(jobId){ const queued = opQueue.retry(jobId, 'network'); if(queued && queued.nextAt) delay = Math.max(1000, queued.nextAt - Date.now()); } }catch(e){}
   if(state.sb.retry) clearTimeout(state.sb.retry);
   state.sb.retry = setTimeout(() => { state.sb.retry = null; if(isCloud()) runSync(false); }, delay);
   if(notify) toast('No se pudo sincronizar ahora. Tus cambios están guardados en este dispositivo y se enviarán solos al volver la conexión.', 'error');
   renderHeader();
+  renderOfflineBar();
   return false;
 }
 function notifySyncResult(result){
@@ -438,15 +447,21 @@ async function runSync(notify){
   if(state.sb.timer){ clearTimeout(state.sb.timer); state.sb.timer = null; }
   if(state.sb.retry){ clearTimeout(state.sb.retry); state.sb.retry = null; }
   const account = currentUser;
+  const job = beginSyncJob(account);
   state.sb.status = 'syncing';
   renderHeader();
   let result;
   try{
     result = await cloudSync.sync(account, dataFor(account));
   }catch(err){
-    return syncFailed(notify);
+    return syncFailed(notify, job ? job.id : null);
   }
-  if(currentUser !== account) return false;
+  if(currentUser !== account){
+    /* La cuenta cambió mientras la petición estaba en vuelo: cerrar su trabajo
+       evita dejarlo en «sending» para siempre. */
+    try{ finishSyncJob(job, cloudSync.state(account) || {}); }catch(e){}
+    return false;
+  }
   if(result.data) applyRemoteDoc(result.data);
   /* Si hubo que combinar, se intenta subir el resultado una vez más para no
      dejar pendiente lo que ya está resuelto. Un segundo choque se muestra. */
@@ -454,12 +469,16 @@ async function runSync(notify){
     try{
       result = await cloudSync.sync(account, dataFor(account));
     }catch(err){
-      return syncFailed(notify);
+      return syncFailed(notify, job ? job.id : null);
     }
-    if(currentUser !== account) return false;
+    if(currentUser !== account){
+      try{ finishSyncJob(job, cloudSync.state(account) || {}); }catch(e){}
+      return false;
+    }
     if(result.data) applyRemoteDoc(result.data);
   }
   const st = cloudSync.state(account) || {};
+  finishSyncJob(job, st);
   if((st.conflicts || []).length) state.sb.status = 'conflict';
   else { state.sb.status = 'ok'; state.sb.last = Date.now(); state.sb.attempts = 0; }
   /* Si se guardó algo mientras la petición estaba en vuelo, el estado no puede
@@ -512,7 +531,8 @@ async function pullRemote(notify){
     renderHeader();
     return true;
   }catch(err){
-    return syncFailed(notify);
+    /* pullRemote no inicia un trabajo de cola: no existe `job` aquí. */
+    return syncFailed(notify, null);
   }
 }
 async function restoreLocalBackup(){
@@ -801,6 +821,8 @@ function dataFor(user){
   if(!Array.isArray(db.data[user].hiddenLib)) db.data[user].hiddenLib = [];
   if(!Array.isArray(db.data[user].exercises)) db.data[user].exercises = [];
   if(!Array.isArray(db.data[user].records)) db.data[user].records = [];
+  if(!Array.isArray(db.data[user].programs)) db.data[user].programs = [];
+  if(!Array.isArray(db.data[user].planner)) db.data[user].planner = [];
   if(!db.data[user].prefs || typeof db.data[user].prefs !== 'object') db.data[user].prefs = {};
   if(!('consent' in db.data[user])) db.data[user].consent = null;
   return db.data[user];
@@ -846,6 +868,7 @@ async function confirmDeleteAccount(){
     delete db.users[String(account).trim().toLowerCase()];
   }
   delete db.data[account];
+  try{ opQueue.removeAccount(account); }catch(e){}
   try{ localStorage.removeItem(BACKUP_REMINDER_KEY); }catch(e){}
   try{ localStorage.removeItem(SESSION_KEY); }catch(e){}
   if(window.DrakoSB && DrakoSB.hasSession && DrakoSB.hasSession()) DrakoSB.signOut();
@@ -1175,7 +1198,11 @@ function clearSetRecord(s, st){
   st.pr = false;
   if(Array.isArray(s.records)) s.records = s.records.filter(x => x.setId !== st.id);
 }
-/* Al terminar, los récords detectados pasan al historial de la cuenta. */
+/* Al terminar, los récords detectados pasan al historial de la cuenta. Además
+   se deriva la mejor serie efectiva de cada ejercicio: así una sesión diaria
+   registra su récord aunque la marca se haya calculado en otro orden o la
+   sesión venga de una versión anterior. Nunca duplica el mismo ejercicio en
+   la misma sesión. */
 function persistSessionRecords(s){
   if(!s) return;
   const d = dataFor(currentUser);
@@ -1183,6 +1210,26 @@ function persistSessionRecords(s){
   (s.records || []).forEach(r => {
     if(d.records.some(x => x.sessionId === s.id && x.setId === r.setId)) return;
     d.records.push({ ...r, id: r.id || uid(), sessionId: s.id, date: s.date, sessionName: s.workoutName });
+  });
+  (s.exercises || []).forEach(ex => {
+    const key = exKeyOf(ex, d);
+    const best = bestSetOfExercise(ex);
+    if(!key || !best) return;
+    const previous = bestHistoricalSet(s, ex);
+    if(!recordBeats(previous, best.weight, best.reps)) return;
+    if(d.records.some(x => x.sessionId === s.id && prKey({ exId: x.exId, exercise: x.exercise }, d) === key)) return;
+    d.records.push({
+      id: uid(),
+      exId: key,
+      exercise: ex.name,
+      weight: best.weight,
+      reps: best.reps,
+      previous,
+      at: nowIso(),
+      sessionId: s.id,
+      date: s.date,
+      sessionName: s.workoutName,
+    });
   });
 }
 function buildSummary(s){
@@ -1323,6 +1370,13 @@ function repsPickerHtml(value, attrs, ariaLabel){
 const $  = (s, el=document) => el.querySelector(s);
 const $$ = (s, el=document) => [...el.querySelectorAll(s)];  const uid = () => (crypto && crypto.randomUUID ? crypto.randomUUID() : Math.random().toString(36).slice(2,9) + Date.now().toString(36).slice(-4));
 const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;' }[c]));
+/* Solo se aceptan las imágenes que produce compressImage. Además de evitar
+   recursos externos, impide que un valor local manipulado cierre el atributo
+   src e inyecte HTML. */
+const safePhotoSrc = value => {
+  if(typeof value !== 'string' || value.length > 1500000) return '';
+  return /^data:image\/(?:jpeg|png|webp);base64,[A-Za-z0-9+/]+=*$/.test(value) ? value : '';
+};
 const escapeHtmlNum = v => esc(String(v ?? ''));
 
 /* ---- Privacidad: identidad enmascarada y consentimiento ---- */
@@ -1337,6 +1391,12 @@ function maskAccount(u){
     return local.slice(0, Math.min(2, local.length)) + '•••@' + domain;
   }
   return s.length > 2 ? s.slice(0, 2) + '•••' : s;
+}
+/* Nombre visible del perfil de nube; el correo solo es el identificador de
+   acceso. Si la cuenta no tiene nombre, se conserva el comportamiento anterior. */
+function accountDisplayName(){
+  const cloudName = window.DrakoSB && typeof DrakoSB.name === 'function' ? DrakoSB.name() : null;
+  return cloudName || currentUser || '';
 }
 function readConsent(){
   const terms = $('#consent-terms');
@@ -1499,6 +1559,9 @@ async function login(user, pass){
 }
 async function logout(){
   if(window.DrakoSB) await DrakoSB.signOut();
+  if(state.sb.timer){ clearTimeout(state.sb.timer); state.sb.timer = null; }
+  if(state.sb.retry){ clearTimeout(state.sb.retry); state.sb.retry = null; }
+  state.sb.status = 'idle'; state.sb.running = false;
   currentUser = null;
   localStorage.removeItem(SESSION_KEY);
   state.sessionId = null;
@@ -1574,7 +1637,9 @@ function render(){
   document.title = 'DrakoTrack — Seguimiento de entrenamiento';
   syncAccountTheme();
 
-  const { route, rest } = parseHash();
+  const parsedHash = parseHash();
+  const route = parsedHash.route === 'prs' ? 'progress' : parsedHash.route;
+  const rest = parsedHash.rest;
   renderHeader();
   setActiveTab(route);
   const main = $('#main');
@@ -1583,23 +1648,30 @@ function render(){
   else if(route === 'editor')  renderEditor(main, rest[0]);
   else if(route === 'start')   renderStart(main);
   else if(route === 'progress') renderProgress(main);
+  else if(route === 'analytics') renderAnalytics(main);
   else if(route === 'settings') renderSettings(main);
-  else  if(route === 'prs')     renderPRs(main);
   else if(route === 'weight')  renderWeight(main);
   else if(route === 'history') renderHistory(main);
+  else if(route === 'plan')    renderPlan(main);
   else if(route === 'program') renderProgram(main, rest[0]);
   else if(route === 'library') renderLibrary(main);
   else                         renderWorkouts(main);
   maybeBackupReminder();
+  maybePlanReminder();
+  maybeNotifySwRollback();
 }
 
 function renderHeader(){
-  const initials = currentUser.split(/[\s._-]+/).map(w => w[0] || '').join('').slice(0,2).toUpperCase();
-  const shown = maskAccount(currentUser);
+  const cloud = isCloud();
+  const display = accountDisplayName();
+  const initials = display.split(/[\s._-]+/).map(w => w[0] || '').join('').slice(0,2).toUpperCase();
+  const shown = cloud && display !== currentUser ? display : maskAccount(currentUser);
   $('#user-chip').innerHTML = `<span class="chip-avatar" aria-hidden="true">${esc(initials)}</span><span class="chip-name">${esc(shown)}</span>`;
   $('#user-chip').setAttribute('aria-label', 'Tu cuenta: ' + shown);
-  const cloud = isCloud();
-  $('#user-menu-head').textContent = 'Cuenta: ' + shown + (cloud ? ' (nube)' : ' (solo este dispositivo)');
+  const menuHead = cloud && display !== currentUser
+    ? display + ' · ' + maskAccount(currentUser) + ' (nube)'
+    : shown + (cloud ? ' (nube)' : ' (solo este dispositivo)');
+  $('#user-menu-head').textContent = 'Cuenta: ' + menuHead;
   const sbStatus = $('#sb-status'), sbPush = $('#sb-push'), sbRestore = $('#sb-restore'), sbExport = $('#sb-export');
   const sbConflicts = $('#sb-conflicts'), sbHistory = $('#sb-history'), sbLocal = $('#sb-local-backup');
   const st = cloud ? (cloudSync.state(currentUser) || {}) : null;
@@ -1624,6 +1696,7 @@ function renderHeader(){
   if(sbLocal) sbLocal.classList.toggle('hidden', !hasBackup);
   if(sbExport) sbExport.classList.remove('hidden');
   $('#top-date').textContent = new Date().toLocaleDateString('es', { weekday:'long', month:'long', day:'numeric' });
+  renderOfflineBar();
 }
 function setActiveTab(route){
   $$('.nav-btn[data-route]').forEach(b => {
@@ -1637,14 +1710,49 @@ function setActiveTab(route){
 /* ---------------- Inicio: entrenamientos ---------------- */
 function workoutStats(){
   const d = dataFor(currentUser);
-  const finished = d.sessions.filter(s => s.finished);
-  const now = new Date(); now.setHours(0,0,0,0);
-  const dow = (now.getDay() + 6) % 7;
-  const startWeek = new Date(now); startWeek.setDate(now.getDate() - dow);
-  const thisWeek = finished.filter(s => new Date(s.date + 'T00:00:00') >= startWeek).length;
-  const sorted = [...d.weights].sort((a,b) => a.date.localeCompare(b.date));
-  const curW = sorted.length ? sorted[sorted.length-1].weight : null;
-  return { done: finished.length, week: thisWeek, prs: d.prs.length, curW };
+  const resolve = name => resolveExerciseId(name, d);
+  const finished = d.sessions.filter(s => s.finished && s.status !== 'cancelled');
+  const vol = PG.volumeSummary(d, resolve);
+  const bw = PG.bodyweight(d);
+  const recs = PG.recordSummary(d, resolve);
+  const recordsNow = recs.reduce((n, r) => n + PG.RECORD_METRICS.filter(m => r[m.key]).length, 0);
+  const improving = PG.improvingExercises(d, resolve);
+  return {
+    done: finished.length,
+    week: vol.week.sessions, month: vol.month.sessions,
+    weekVol: vol.week.volume, monthVol: vol.month.volume,
+    weekSets: vol.week.sets, seconds: vol.all.seconds,
+    prs: (d.prs || []).length + ((d.records || []).length),
+    recordsNow,
+    up: improving.filter(x => x.trend === 'up').length,
+    down: improving.filter(x => x.trend === 'down').length,
+    improving,
+    curW: bw.latest ? bw.latest.weight : null,
+    wChange: bw.change30,
+    hasVolume: vol.week.sets > 0,
+  };
+}
+function dashboardProgressHTML(st){
+  const bits = [];
+  if(st.up) bits.push(st.up + ' ejercicio' + (st.up === 1 ? '' : 's') + ' con progresión positiva');
+  if(st.down) bits.push(st.down + ' a la baja');
+  const wTxt = st.curW != null
+    ? 'Peso actual: ' + fmtKg(st.curW) + ' kg' + (st.wChange == null ? '' : ' (' + (st.wChange > 0 ? '+' : '') + fmtKg(st.wChange) + ' kg en 30 días)')
+    : 'Aún no registras tu peso corporal.';
+  return `
+    <section class="dash-card">
+      <div class="section-head"><h2>Tu progreso</h2><span class="muted">Calculado con tus sesiones terminadas</span></div>
+      ${bits.length
+        ? `<ul class="dash-list">${st.improving.slice(0, 5).map(x => `
+            <li><span>${esc(x.name)}</span><span class="trend-chip ${x.trend}">${x.trend === 'up' ? '↑' : '↓'} ${fmtKg(Math.abs(x.delta))} kg</span></li>`).join('')}</ul>`
+        : '<p class="muted small">Todavía no hay suficientes sesiones repetidas para medir una tendencia. Con dos sesiones del mismo ejercicio empezarás a verla.</p>'}
+      <p class="muted small">${esc(wTxt)}</p>
+      <p class="muted small">Tiempo total entrenado: ${st.seconds ? esc(fmtDuration(st.seconds)) : '—'} · ${st.weekSets} series esta semana.</p>
+      <div class="dash-actions">
+        <button class="btn btn-ghost btn-sm" data-action="tab" data-route="progress" type="button">Ver progreso y récords</button>
+        <button class="btn btn-ghost btn-sm" data-action="tab" data-route="history" type="button">Ver historial</button>
+      </div>
+    </section>`;
 }
 /* ============================================================
    MEJOR MARCA VISIBLE
@@ -1740,36 +1848,57 @@ function customCard(w){
     </div>
   </article>`;
 }
-/* Tarjeta anclada en la parte superior de «Entrenamientos»: el último programa
-   elegido y, si ya se eligió un día, el botón para empezarlo directamente. */
-function lastProgramSection(){
+/* Una sola tarjeta para continuar: la sesión abierta y el programa elegido.
+   El botón del programa calcula el día siguiente al último realizado, sin
+   obligar a buscarlo a mano en la ficha del programa. */
+function openSessionsFor(d){
+  return ((d && d.sessions) || [])
+    .filter(s => !s.finished && s.status !== 'cancelled' && s.status !== 'completed')
+    .sort((a,b) => String(a.date).localeCompare(String(b.date)) || String(a.id).localeCompare(String(b.id)));
+}
+function continueSection(d){
+  const open = openSessionsFor(d);
   const last = getLastProgram();
-  if(!last) return '';
-  const hasDay = last.di != null;
-  const bits = [last.weekLabel, last.day].filter(Boolean);
-  return `
-    <section class="section last-program" aria-label="Último programa">
-      <div class="section-head">
-        <h2>Último programa</h2>
-        <div class="btn-group">
+  if(!open.length && !last) return '';
+  let sessionRow = '';
+  if(open.length){
+    const s = open[0];
+    const t = sessionTotals(s);
+    const more = open.length > 1 ? ` · ${open.length - 1} más sin terminar` : '';
+    sessionRow = `
+      <div class="continue-row">
+        <div class="continue-copy">
+          <span class="continue-kicker">${s.status === 'paused' ? 'Sesión pausada' : 'Sesión sin terminar'}</span>
+          <h3>${esc(s.workoutName)}</h3>
+          <p class="muted small">${t.setsDone}/${t.setsTotal || 0} series · ${fmtDuration(elapsedSec(s))}${more}</p>
+        </div>
+        <div class="continue-actions">
+          <button class="btn btn-primary" data-action="resume-session" data-id="${esc(s.id)}" type="button">Continuar</button>
+        </div>
+      </div>`;
+  }
+  let programRow = '';
+  if(last){
+    const bits = [last.weekLabel, last.day].filter(Boolean);
+    const detail = bits.length ? bits.map(esc).join(' · ') : 'Elige el día siguiente sin buscar la semana';
+    programRow = `
+      <div class="continue-row">
+        <div class="continue-copy">
+          <span class="continue-kicker">${last.di != null ? 'Programa en curso' : 'Programa elegido'}</span>
+          <h3>${esc(last.title || last.slug)}</h3>
+          <p class="muted small">${detail}${last.author ? ' · por ' + esc(last.author) : ''}</p>
+        </div>
+        <div class="continue-actions">
+          <button class="btn btn-primary" data-action="continue-program" type="button">Siguiente día</button>
           <button class="btn btn-ghost btn-sm" data-action="last-prog-open" type="button">Ver programa</button>
-          <button class="icon-btn danger" data-action="last-prog-clear" type="button" aria-label="Quitar el último programa del inicio" title="Quitar de aquí (el programa sigue en el catálogo)">✕</button>
+          <button class="icon-btn danger" data-action="last-prog-clear" type="button" aria-label="Quitar el programa del inicio" title="Quitar de aquí (el programa sigue en el catálogo)">✕</button>
         </div>
-      </div>
-      <article class="wcard">
-        <div class="wcard-top">
-          <span class="wcard-emoji">${DUMBBELL}</span>
-          <span class="wcard-badge">${hasDay ? 'Último día elegido' : 'Programa elegido'}</span>
-        </div>
-        <h3>${esc(last.title || last.slug)}</h3>
-        ${last.author ? `<p class="muted small card-author">por ${esc(last.author)}</p>` : ''}
-        ${bits.length ? `<div class="wcard-ex">${bits.map(b => `<span>${esc(b)}</span>`).join('')}</div>` : ''}
-        <div class="wcard-actions">
-          ${hasDay
-            ? `<button class="btn btn-primary" data-action="last-prog-start" type="button">Comenzar</button>`
-            : `<button class="btn btn-primary" data-action="last-prog-open" type="button">Abrir programa</button>`}
-        </div>
-      </article>
+      </div>`;
+  }
+  return `
+    <section class="section continue-section" aria-label="Continuar entrenamiento">
+      <div class="section-head"><h2>Continuar</h2><span class="muted">Sesión y programa</span></div>
+      <div class="continue-card">${sessionRow}${programRow}</div>
     </section>`;
 }
 /* Convierte un ejercicio heredado en su primera serie real usando solo los
@@ -1792,24 +1921,6 @@ function legacyToSets(ex){
   ex.legacyNote = 'Convertido desde un registro anterior: una sola serie con los valores guardados.';
   ex.done = ex.sets[0].completed;
 }
-/* Tarjeta para retomar desde Entrenamientos una sesión sin terminar. */
-function resumeCard(d){
-  const open = ((d && d.sessions) || []).filter(s => !s.finished && s.status !== 'cancelled' && s.status !== 'completed');
-  if(!open.length) return '';
-  open.sort((a,b) => String(a.date).localeCompare(String(b.date)) || String(a.id).localeCompare(String(b.id)));
-  const s = open[0];
-  const t = sessionTotals(s);
-  const more = open.length > 1 ? ` · ${open.length - 1} más sin terminar` : '';
-  return `
-  <section class="resume-card">
-    <div>
-      <h2>${s.status === 'paused' ? 'Sesión pausada' : 'Sesión sin terminar'}</h2>
-      <p class="muted small">${esc(s.workoutName)} · ${t.setsDone}/${t.setsTotal || 0} series · ${fmtDuration(elapsedSec(s))}${more}</p>
-    </div>
-    <button class="btn btn-primary" data-action="resume-session" data-id="${esc(s.id)}" type="button">Continuar</button>
-  </section>`;
-}
-
 function renderWorkouts(main){
   const d = dataFor(currentUser);
   const st = workoutStats();
@@ -1819,23 +1930,26 @@ function renderWorkouts(main){
   main.innerHTML = `
     <section class="hero-card">
       <div>
-        <p class="eyebrow">${greet}, ${esc(currentUser)}</p>
+        <p class="eyebrow">${greet}, ${esc(accountDisplayName())}</p>
         <h1>A darlo todo hoy</h1>
         <p class="hero-sub">Carga una sesión de la biblioteca del entrenador o crea tu propio entrenamiento.</p>
       </div>
     </section>
 
-    ${lastProgramSection()}
+    ${dashboardAnalyticsHTML(d)}
+
+    ${continueSection(d)}
 
     ${planCardHTML(d)}
 
-    ${resumeCard(d)}
+    ${dashboardProgressHTML(st)}
 
-    <section class="stats-grid">
-      <div class="stat-card"><p class="stat-value">${st.done}</p><p class="stat-label">Entrenos completados</p></div>
-      <div class="stat-card"><p class="stat-value">${st.week}</p><p class="stat-label">Esta semana</p></div>
-      <div class="stat-card"><p class="stat-value">${st.prs}</p><p class="stat-label">Récords registrados</p></div>
-      <div class="stat-card"><p class="stat-value">${st.curW != null ? st.curW + ' kg' : '—'}</p><p class="stat-label">Peso actual</p></div>
+    <section class="stats-grid five small">
+      <div class="stat-card"><p class="stat-value">${st.week}</p><p class="stat-label">Entrenos esta semana</p></div>
+      <div class="stat-card"><p class="stat-value">${st.month}</p><p class="stat-label">Este mes</p></div>
+      <div class="stat-card"><p class="stat-value">${st.hasVolume ? fmtKg(st.weekVol) + ' kg' : '—'}</p><p class="stat-label">Volumen semanal</p></div>
+      <div class="stat-card"><p class="stat-value">${st.recordsNow}</p><p class="stat-label">Récords vigentes</p></div>
+      <div class="stat-card"><p class="stat-value">${st.curW != null ? fmtKg(st.curW) + ' kg' : '—'}</p><p class="stat-label">Peso actual</p></div>
     </section>
 
     <section class="section">
@@ -2147,6 +2261,35 @@ const REST_ALERT_MIN_SECONDS = 1;
 const REST_ALERT_MAX_SECONDS = 4;
 const REST_ALERT_DEFAULT_SECONDS = 2;
 const HEAVY_SET_RATIO = 0.85;
+/* Sonidos de la alarma. «classic» no descarga nada: usa Web Audio. Los otros
+   tres son las vistas previas de Freesound, con su atribución en Ajustes. */
+const REST_SOUNDS = [
+  { id: 'classic', label: 'Clásico (tres notas)', src: null },
+  { id: 'alarm', label: 'Reloj de mesa', src: 'sounds/rest-alarm.mp3' },
+  { id: 'digital', label: 'Reloj digital', src: 'sounds/rest-digital.mp3' },
+  { id: 'timer', label: 'Temporizador de cocina', src: 'sounds/rest-timer.mp3' },
+];
+let _restAudioCache = {};
+let _restAudioTimer = null;
+function restSoundChoice(){
+  const d = currentUser ? dataFor(currentUser) : null;
+  const raw = d && d.prefs ? d.prefs.restSoundChoice : null;
+  return REST_SOUNDS.some(x => x.id === raw) ? raw : 'classic';
+}
+function setRestSoundChoice(value){
+  const d = currentUser ? dataFor(currentUser) : null;
+  if(!d) return 'classic';
+  if(!d.prefs || typeof d.prefs !== 'object') d.prefs = {};
+  d.prefs.restSoundChoice = REST_SOUNDS.some(x => x.id === value) ? value : 'classic';
+  saveDB();
+  return d.prefs.restSoundChoice;
+}
+function stopRestSoundPreview(){
+  if(_restAudioTimer){ clearTimeout(_restAudioTimer); _restAudioTimer = null; }
+  Object.keys(_restAudioCache).forEach(k => {
+    try{ _restAudioCache[k].pause(); _restAudioCache[k].currentTime = 0; }catch(e){}
+  });
+}
 /* Preferencias por cuenta: por defecto todo activado, y solo un false
    explícito desactiva (así las cuentas antiguas no cambian de golpe). */
 function prefEnabled(name, d){
@@ -2217,7 +2360,7 @@ function restAlertPlan(heavy, seconds){
   const beeps = freqs.map((freq, i) => ({ freq, offset: Math.round(i * step * 1000) / 1000, dur }));
   return { seconds: span, heavy: !!heavy, beeps, vibration: heavy ? [220, 120, 220, 120, 320] : [140, 90, 140] };
 }
-function beepRestEnd(heavy){
+function beepRestClassic(heavy){
   try{
     const Ctx = window.AudioContext || window.webkitAudioContext;
     if(!Ctx) return;
@@ -2239,6 +2382,30 @@ function beepRestEnd(heavy){
       osc.stop(t0 + b.dur + 0.02);
     });
   }catch(err){ /* sin audio disponible: se sigue sin sonido */ }
+}
+/* Reproduce el sonido elegido. Si el archivo no está cacheado, falla la red o
+   el navegador bloquea la reproducción, vuelve al tono sintetizado: el aviso
+   de descanso nunca se queda mudo por un MP3. */
+function beepRestEnd(heavy){
+  const pick = REST_SOUNDS.find(x => x.id === restSoundChoice()) || REST_SOUNDS[0];
+  if(!pick.src){ beepRestClassic(heavy); return; }
+  try{
+    stopRestSoundPreview();
+    let audio = _restAudioCache[pick.id];
+    if(!audio){
+      audio = new Audio(pick.src);
+      audio.preload = 'auto';
+      _restAudioCache[pick.id] = audio;
+    }
+    audio.volume = heavy ? 0.95 : 0.85;
+    try{ audio.currentTime = 0; }catch(e){}
+    const played = audio.play();
+    if(played && typeof played.catch === 'function') played.catch(() => beepRestClassic(heavy));
+    _restAudioTimer = setTimeout(() => {
+      try{ audio.pause(); }catch(e){}
+      _restAudioTimer = null;
+    }, Math.max(1000, restAlertSeconds() * 1000));
+  }catch(err){ beepRestClassic(heavy); }
 }
 function vibrateRestEnd(heavy){
   try{
@@ -2398,6 +2565,41 @@ function maybeStartRest(s, ex, st){
 /* Barra de descanso: estado siempre visible (detenido, en curso, en pausa o
    completado) y controles para iniciar, pausar, reanudar, ajustar, reiniciar y
    saltar. Todo se calcula con restRemaining(), nunca con el intervalo. */
+function restMenuOpen(){
+  if(typeof state.restMenuOpen === 'boolean') return state.restMenuOpen;
+  return typeof window !== 'undefined' && Number(window.innerWidth) >= 640;
+}
+function bindRestMenu(slot, s){
+  const menu = slot.querySelector('.rest-menu');
+  if(!menu) return;
+  menu.open = restMenuOpen();
+  menu.addEventListener('toggle', () => { state.restMenuOpen = menu.open; });
+  const lenSel = slot.querySelector('[data-action="rest-alert-len"]');
+  if(lenSel) lenSel.addEventListener('change', () => {
+    setRestAlertSeconds(lenSel.value);
+    toast('Duración del aviso: ' + restAlertSeconds() + ' s.', 'info');
+    renderRestBar(s);
+  });
+}
+function restMenuHTML(s, paused, done){
+  const sid = esc(s.id);
+  const buttons = [];
+  if(!done){
+    buttons.push(paused
+      ? '<button class="btn btn-primary btn-sm" data-action="rest-resume" data-sid="' + sid + '" type="button">Reanudar</button>'
+      : '<button class="btn btn-ghost btn-sm" data-action="rest-pause" data-sid="' + sid + '" type="button">Pausar</button>');
+    buttons.push('<button class="btn btn-ghost btn-sm" data-action="rest-minus" data-sid="' + sid + '" type="button" aria-label="Quitar 15 segundos de descanso">−15 s</button>');
+    buttons.push('<button class="btn btn-ghost btn-sm" data-action="rest-plus" data-sid="' + sid + '" type="button" aria-label="Añadir 15 segundos de descanso">+15 s</button>');
+  }
+  buttons.push('<button class="btn btn-ghost btn-sm" data-action="rest-reset" data-sid="' + sid + '" type="button">Reiniciar</button>');
+  buttons.push('<button class="btn btn-ghost btn-sm" data-action="rest-skip" data-sid="' + sid + '" type="button">' + (done ? 'Cerrar' : 'Saltar') + '</button>');
+  return '<details class="rest-menu">'
+    + '<summary aria-label="Opciones de descanso">⚙ Opciones</summary>'
+    + '<div class="rest-menu-panel">'
+    + '<div class="rest-menu-list">' + buttons.join('') + '</div>'
+    + '<div class="rest-menu-extra">' + restAlertsBtn() + restAlertLengthSelect() + '</div>'
+    + '</div></details>';
+}
 function renderRestBar(s){
   stopRestClock();
   const slot = $('#rest-slot');
@@ -2407,9 +2609,9 @@ function renderRestBar(s){
   if(!s.rest){
     if(locked){ slot.innerHTML = ''; return; }
     slot.innerHTML = '<div class="rest-bar idle" role="group" aria-label="Descanso">'
-      + '<span class="rest-label">Descanso</span>'
+      + '<div class="rest-main"><span class="rest-label">Descanso</span>'
       + '<span class="rest-state">Detenido</span>'
-      + '<span class="rest-actions"><button class="btn btn-ghost btn-sm" data-action="rest-start" data-sid="' + sid + '" type="button">Iniciar descanso</button></span>'
+      + '<span class="rest-actions"><button class="btn btn-ghost btn-sm" data-action="rest-start" data-sid="' + sid + '" type="button">Iniciar descanso</button></span></div>'
       + '</div>';
     return;
   }
@@ -2418,37 +2620,24 @@ function renderRestBar(s){
   if(status === 'done'){
     notifyRestEnd(s);
     slot.innerHTML = '<div class="rest-bar done" role="status">'
-      + '<span class="rest-label">Descanso completado</span>'
+      + '<div class="rest-main"><span class="rest-label">Descanso completado</span>'
       + (s.rest.heavy ? '<span class="rest-heavy">Serie pesada</span>' : '')
-      + '<span class="rest-actions">' + restAlertsBtn() + restAlertLengthSelect()
-      + '<button class="btn btn-ghost btn-sm" data-action="rest-reset" data-sid="' + sid + '" type="button">Reiniciar</button>'
-      + '<button class="btn btn-ghost btn-sm" data-action="rest-skip" data-sid="' + sid + '" type="button">Cerrar</button></span>'
-      + '</div>';
+      + restMenuHTML(s, false, true)
+      + '</div></div>';
+    bindRestMenu(slot, s);
     return;
   }
   const paused = status === 'paused';
   const pct = Math.min(100, Math.max(0, Math.round((1 - left / Math.max(1, s.rest.duration)) * 100)));
   slot.innerHTML = '<div class="rest-bar' + (paused ? ' paused' : '') + '" role="timer" aria-live="polite">'
-    + '<span class="rest-label">Descanso</span>'
+    + '<div class="rest-main"><span class="rest-label">Descanso</span>'
     + '<span class="rest-state">' + (paused ? 'En pausa' : 'En curso') + '</span>'
     + (s.rest.heavy ? '<span class="rest-heavy">Serie pesada</span>' : '')
     + '<span class="rest-time" id="rest-time">' + fmtClock(left) + '</span>'
     + '<div class="rest-progress"><div class="rest-fill" id="rest-fill" style="width:' + pct + '%"></div></div>'
-    + '<span class="rest-actions">' + restAlertsBtn() + restAlertLengthSelect()
-    + '<button class="btn btn-ghost btn-sm" data-action="rest-minus" data-sid="' + sid + '" type="button" aria-label="Quitar 15 segundos de descanso">−15 s</button>'
-    + '<button class="btn btn-ghost btn-sm" data-action="rest-plus" data-sid="' + sid + '" type="button" aria-label="Añadir 15 segundos de descanso">+15 s</button>'
-    + (paused
-        ? '<button class="btn btn-primary btn-sm" data-action="rest-resume" data-sid="' + sid + '" type="button">Reanudar</button>'
-        : '<button class="btn btn-ghost btn-sm" data-action="rest-pause" data-sid="' + sid + '" type="button">Pausar</button>')
-    + '<button class="btn btn-ghost btn-sm" data-action="rest-reset" data-sid="' + sid + '" type="button">Reiniciar</button>'
-    + '<button class="btn btn-ghost btn-sm" data-action="rest-skip" data-sid="' + sid + '" type="button">Saltar</button>'
-    + '</span></div>';
-  const lenSel = slot.querySelector('[data-action="rest-alert-len"]');
-  if(lenSel) lenSel.addEventListener('change', () => {
-    setRestAlertSeconds(lenSel.value);
-    toast('Duración del aviso: ' + restAlertSeconds() + ' s.', 'info');
-    renderRestBar(s);
-  });
+    + restMenuHTML(s, paused, false)
+    + '</div></div>';
+  bindRestMenu(slot, s);
   if(paused) return;   /* en pausa no hay nada que repintar cada segundo */
   const gen = _restGen;
   _restClock = setInterval(() => {
@@ -2688,6 +2877,22 @@ function renderSession(main, sid){
       ${locked ? '' : `<div class="session-add-ex"><button class="btn btn-ghost" data-action="add-session-ex" data-sid="${esc(s.id)}" type="button">+ Añadir ejercicio a esta sesión</button></div>`}
     </section>
 
+    ${(() => {
+      const lite = PG.sessionLite(s, name => resolveExerciseId(name, d));
+      if(!lite.sets) return '';
+      return `<section class="section">
+        <div class="section-head"><h2>Volumen de la sesión</h2><span class="muted">Peso × repeticiones, sin calentamientos</span></div>
+        <div class="pr-list">
+          ${lite.exercises.map(ex => `<div class="pr-item">
+            <span>${esc(ex.name)} <span class="muted small">· ${ex.sets} serie${ex.sets === 1 ? '' : 's'} · ${ex.reps} rep</span></span>
+            <span class="pr-val">${ex.volume ? fmtKg(ex.volume) + ' kg' : '<span class="muted small">peso corporal</span>'}</span>
+          </div>`).join('')}
+          <div class="pr-item"><span><b>Total de la sesión</b> <span class="muted small">· ${lite.sets} series · ${lite.reps} rep · ${fmtKg(lite.volume)} kg</span></span></div>
+        </div>
+        ${lite.bodyweightSets ? '<p class="muted small">Las series a peso corporal o asistidas cuentan repeticiones, no kilos de volumen.</p>' : ''}
+      </section>`;
+    })()}
+
     <div class="session-notes-wrap">
       <label class="field"><span>Notas de la sesión</span>
         <textarea id="session-notes" data-session-note="${esc(s.id)}" rows="2" maxlength="${LIMITS.sessionNotes}" ${locked ? 'disabled' : ''} placeholder="Sensaciones, incidencias, técnica…">${esc(s.notes || '')}</textarea>
@@ -2698,7 +2903,7 @@ function renderSession(main, sid){
       ${locked
         ? `<button class="btn btn-primary" data-action="restart-session" data-id="${esc(s.id)}" type="button">Entrenar de nuevo</button>`
         : `<button class="btn btn-ghost" data-action="${s.status === 'paused' ? 'resume-session-status' : 'pause-session'}" data-id="${esc(s.id)}" type="button">${s.status === 'paused' ? 'Reanudar' : 'Pausar'}</button>
-           <button class="btn btn-primary btn-lg" data-action="finish-session" data-id="${esc(s.id)}" type="button">Terminar sesión</button>
+           <button class="btn btn-primary btn-lg" data-action="finish-session" data-id="${esc(s.id)}" type="button">Terminar</button>
            <button class="btn btn-ghost" data-action="cancel-session" data-id="${esc(s.id)}" type="button">Cancelar</button>`}
     </div>
 
@@ -2795,81 +3000,146 @@ function autoGrow(el){
 }
 
 /* ---------------- Récords personales (PR) ---------------- */
-function renderPRs(main){
-  const d = dataFor(currentUser);
-  const exercises = exerciseOptions(d);
-  let sel = state.prExercise && exercises.some(o => o.id === state.prExercise) ? state.prExercise : (exercises[0] ? exercises[0].id : null);
-  state.prExercise = sel || null;
-  const picked = exercises.find(o => o.id === sel);
-  const selName = picked ? picked.name : '';
-  const entries = d.prs.filter(p => prKey(p, d) === sel).sort((a,b) => a.date.localeCompare(b.date));
-  const autoRecords = (d.records || []).filter(r => prKey({ exId: r.exId, exercise: r.exercise }, d) === sel)
-    .sort((a,b) => String(b.date).localeCompare(String(a.date)));
-  const best = entries.length ? Math.max(...entries.map(e => e.weight)) : null;
-  const lim = new Date(); lim.setDate(lim.getDate() - 30);
-  const last30 = entries.filter(e => new Date(e.date + 'T00:00:00') >= lim);
-  const chartData = last30.length ? last30 : entries.slice(-8);
-  let delta = '—';
-  if(last30.length >= 2){
-    const diff = last30[last30.length-1].weight - last30[0].weight;
-    delta = (diff > 0 ? '+' : '') + diff.toFixed(1) + ' kg';
-  } else if(last30.length === 1){ delta = 'nuevo'; }
-
-  main.innerHTML = `
-    <div class="page-head">
-      <h1>Récords personales</h1>
-      <p class="muted">Registra tus récords y observa tu progreso mensual.</p>
-    </div>
-
-    <div class="pr-top">
-      <div class="pr-select">
-        <label>Ejercicio</label>
-        <select id="pr-select">
-          ${exercises.map(o => `<option value="${esc(o.id)}" ${o.id === sel ? 'selected' : ''}>${esc(o.name)}</option>`).join('')}
-        </select>
-      </div>
-      <button class="btn btn-ghost" data-action="pr-progress" type="button" ${sel ? '' : 'disabled'}>Ver progreso</button>
-      <button class="btn btn-primary" data-action="log-pr" type="button" ${sel ? '' : 'disabled'}>+ Registrar récord</button>
-    </div>
-
-    <section class="stats-grid small">
-      <div class="stat-card"><p class="stat-value">${best != null ? best + ' kg' : '—'}</p><p class="stat-label">Máximo · ${selName ? esc(selName) : 'elige un ejercicio'}</p></div>
-      <div class="stat-card"><p class="stat-value">${entries.length ? entries[entries.length-1].weight + ' kg' : '—'}</p><p class="stat-label">Último</p></div>
-      <div class="stat-card"><p class="stat-value">${delta}</p><p class="stat-label">Cambio en 30 días</p></div>
-      <div class="stat-card"><p class="stat-value">${entries.length}</p><p class="stat-label">Récords registrados</p></div>
-    </section>
-
-    <section class="chart-card">
-      <div class="section-head"><h2>Progreso mensual</h2><span class="muted">${selName ? esc(selName) : ''} · últimos 30 días</span>
-        <button class="btn btn-primary btn-sm" data-action="share-pr" type="button" ${entries.length ? '' : 'disabled'}>Compartir en WhatsApp</button>
-      </div>
-      <div id="pr-chart" class="chart"></div>
-    </section>
-
-    <section class="section">
-      <div class="section-head"><h2>Todos los récords ${selName ? '· ' + esc(selName) : ''}</h2></div>
-      ${entries.length
-        ? `<div class="pr-list">${[...entries].reverse().map(p => `
-            <div class="pr-item">
-              <span>${fmtDateLong(p.date)}</span>
-              <span class="pr-val">${p.weight} kg${p.reps ? ` × ${p.reps} rep` : ''}</span>
-              <button class="icon-btn danger" data-action="delete-pr" data-id="${p.id}" type="button" aria-label="Eliminar el récord del ${fmtDateLong(p.date)}" title="Eliminar">✕</button>
-            </div>`).join('')}</div>`
-        : `<div class="empty-state">Aún no hay récords para este ejercicio. ¡Registra el primero!</div>`}
-    </section>
-
-    ${autoRecords.length ? `<section class="section">
-      <div class="section-head"><h2>Récords automáticos</h2><span class="muted">Detectados al completar series</span></div>
-      <div class="pr-list">${autoRecords.map(r => `
-        <div class="pr-item">
-          <span>${fmtDateLong(r.date)}</span>
-          <span class="pr-val">${r.weight} kg × ${r.reps} rep</span>
-          <button class="icon-btn danger" data-action="delete-auto-record" data-id="${esc(r.id)}" type="button" aria-label="Eliminar este récord automático" title="Eliminar">✕</button>
-        </div>`).join('')}</div>
-    </section>` : ''}`;
-
-  if(chartData.length) lineChart($('#pr-chart'), chartData.map(p => ({ label:p.date, value:p.weight })), 'Registra un récord para ver aquí tu progreso mensual.');
+/* ---------------- Récords personales ---------------- */
+function prMetricText(metric, entry){
+  if(!entry || entry.value == null) return '—';
+  if(metric === 'repsAtWeight') return entry.value + ' rep';
+  return fmtKg(entry.value) + ' kg';
 }
+function prMetricDetail(metric, entry){
+  if(!entry) return '';
+  if(metric === 'weight') return entry.reps ? '× ' + entry.reps + ' rep' : '';
+  if(metric === 'repsAtWeight') return entry.weight ? 'con ' + fmtKg(entry.weight) + ' kg' : '';
+  if(metric === 'setVolume') return entry.weight ? fmtKg(entry.weight) + ' kg × ' + entry.reps : '';
+  if(metric === 'sessionVolume') return 'suma del día';
+  if(metric === 'e1rm') return 'estimado, no levantado';
+  return '';
+}
+function prMetricDate(entry){ return entry && entry.date ? fmtDateLong(entry.date) : ''; }
+/* Bloque de récords dentro de Progreso. Usa las mismas fuentes que la
+   pantalla anterior, pero sin una pestaña aparte: los récords se recalculan
+   de las sesiones terminadas y de los registros manuales. */
+function recordsInlineHTML(d){
+  const resolve = name => resolveExerciseId(name, d);
+  const options = exerciseOptions(d);
+  const summaries = PG.recordSummary(d, resolve);
+  const byKey = new Map(summaries.map(r => [r.key, r]));
+  const pickable = [...summaries.map(r => ({ id: r.key, name: r.name })),
+                    ...options.filter(o => !byKey.has(o.id))];
+  pickable.sort((a, b) => a.name.localeCompare(b.name, 'es'));
+  let sel = state.prExercise;
+  if(!sel || !pickable.some(o => o.id === sel)) sel = pickable[0] ? pickable[0].id : null;
+  state.prExercise = sel || null;
+  const rec = sel ? PG.recordsFor(d, resolve, sel) : null;
+  const selName = rec ? rec.name : '';
+  const manual = ((d && d.prs) || []).filter(p => prKey(p, d) === sel)
+    .sort((a, b) => String(a.date).localeCompare(String(b.date)));
+  const autoRecords = ((d && d.records) || [])
+    .filter(r => prKey({ exId: r.exId, exercise: r.exercise }, d) === sel)
+    .sort((a, b) => String(b.date).localeCompare(String(a.date)));
+  const evolution = rec ? [...rec.timeline.weight].reverse() : [];
+  const hasData = !!(rec && rec.sessions);
+
+  return `
+    <section class="records-block" id="records-block" aria-labelledby="records-title">
+      <div class="section-head">
+        <h2 id="records-title">Récords personales</h2>
+        <span class="muted">${summaries.length} ejercicio${summaries.length === 1 ? '' : 's'} con historial</span>
+      </div>
+      <p class="muted small records-intro">Calculados automáticamente con tus sesiones terminadas: peso, repeticiones, volumen y 1RM estimado. Si borras o editas una sesión, se recalculan solos. El historial diario se completa al terminar cada entrenamiento.</p>
+      ${rec && rec.bestWeight ? `<p class="muted small">Último récord de «${esc(rec.name)}»: <b>${fmtKg(rec.bestWeight.value)} kg${rec.bestWeight.reps ? ' × ' + rec.bestWeight.reps : ''}</b> el ${fmtDateLong(rec.bestWeight.date)}${rec.bestWeight.sessionName ? ' en «' + esc(rec.bestWeight.sessionName) + '»' : ''}.</p>` : ''}
+
+      <div class="pr-top">
+        <div class="pr-select">
+          <label>Ejercicio</label>
+          <select id="pr-select">
+            ${pickable.length
+              ? pickable.map(o => `<option value="${esc(o.id)}" ${o.id === sel ? 'selected' : ''}>${esc(o.name)}</option>`).join('')
+              : '<option value="">Sin ejercicios todavía</option>'}
+          </select>
+        </div>
+        <button class="btn btn-ghost" data-action="pr-progress" type="button" ${sel ? '' : 'disabled'}>Ver progreso</button>
+        <button class="btn btn-primary" data-action="log-pr" type="button" ${sel ? '' : 'disabled'}>+ Registrar récord manual</button>
+      </div>
+
+      ${!sel
+        ? `<section class="empty-state">Todavía no hay ejercicios. Completa una sesión y aquí aparecerán sus récords.</section>`
+        : !hasData
+          ? `<section class="empty-state">Aún no hay series terminadas de «${esc(selName)}». En cuanto completes una sesión con este ejercicio verás aquí su primer récord.</section>`
+          : `<section class="stats-grid small five">
+          ${PG.RECORD_METRICS.map(m => {
+            const entry = rec[m.key];
+            return `<div class="stat-card">
+              <p class="stat-val">${esc(prMetricText(m.key, entry))}</p>
+              <p class="stat-label">${esc(m.label)}</p>
+              <p class="stat-sub">${esc(prMetricDetail(m.key, entry))}${entry && entry.date ? ' · ' + esc(fmtDate(entry.date)) : ''}</p>
+            </div>`;
+          }).join('')}
+        </section>
+
+        <section class="chart-card">
+          <div class="section-head"><h2>Evolución del récord de peso</h2><span class="muted">${esc(selName)} · ${rec.sessions} sesión${rec.sessions === 1 ? '' : 'es'}</span></div>
+          <div id="pr-chart" class="chart"></div>
+          <p class="muted small">Solo aparecen las veces que superaste tu marca anterior. El 1RM es una estimación de Epley (peso × (1 + rep/30)), no un levantamiento real.</p>
+        </section>
+
+        <section class="section">
+          <div class="section-head"><h2>Historial de récords</h2><span class="muted">Actual vs. anterior</span></div>
+          ${evolution.length
+            ? `<div class="pr-list">${evolution.map(e => `
+                <div class="pr-row pr-rec-row">
+                  <span class="pr-row-main"><b>${fmtDateLong(e.date)}</b><span class="muted small">${e.sessionName ? esc(e.sessionName) : 'Sesión'} · ${e.previous == null ? 'primer registro' : 'antes ' + fmtKg(e.previous) + ' kg'}</span></span>
+                  <span class="pr-val">${fmtKg(e.value)} kg${e.reps ? ' × ' + e.reps : ''}</span>
+                  ${e.sessionId ? `<button class="btn btn-ghost btn-sm" type="button" data-action="open-session" data-id="${esc(e.sessionId)}">Ver sesión</button>` : ''}
+                </div>`).join('')}</div>`
+            : '<div class="empty-state">Sin récords de peso todavía.</div>'}
+        </section>`}
+
+      ${summaries.length ? `<section class="section">
+        <div class="section-head"><h2>Récords por ejercicio</h2><span class="muted">${summaries.length} ejercicio${summaries.length === 1 ? '' : 's'} con historial</span></div>
+        <div class="pr-list">${summaries.slice(0, 15).map(r => `
+          <div class="pr-row">
+            <span class="pr-row-main">${esc(r.name)} <span class="muted small">· ${r.sessions} sesión${r.sessions === 1 ? '' : 'es'}${r.last ? ' · último ' + fmtDate(r.last) : ''}</span></span>
+            <span class="pr-val">${r.bestWeight ? fmtKg(r.bestWeight.value) + ' kg' : '—'}${r.bestE1rm ? ' <span class="muted small">· 1RM ' + fmtKg(r.bestE1rm.value) + ' kg</span>' : ''}</span>
+            <button class="btn btn-ghost btn-sm" type="button" data-action="pr-pick" data-ex="${esc(r.key)}">Ver</button>
+          </div>`).join('')}</div>
+      </section>` : ''}
+
+      ${sel ? `<section class="section">
+        <div class="section-head"><h2>Récords manuales</h2><span class="muted">Los que anotas a mano</span></div>
+        ${manual.length
+          ? `<div class="pr-list">${[...manual].reverse().map(p => `
+              <div class="pr-item">
+                <span>${fmtDateLong(p.date)}</span>
+                <span class="pr-val">${p.weight} kg${p.reps ? ' × ' + p.reps + ' rep' : ''}</span>
+                <button class="icon-btn danger" data-action="delete-pr" data-id="${p.id}" type="button" aria-label="Eliminar el récord del ${fmtDateLong(p.date)}" title="Eliminar">✕</button>
+              </div>`).join('')}</div>`
+          : '<div class="empty-state">Aún no hay récords manuales para este ejercicio.</div>'}
+      </section>
+
+      ${autoRecords.length ? `<section class="section">
+        <div class="section-head"><h2>Récords automáticos</h2><span class="muted">Solo de este ejercicio</span></div>
+        <div class="pr-list">${autoRecords.map(r => `
+          <div class="pr-item">
+            <span>${fmtDateLong(r.date)}</span>
+            <span class="pr-val">${r.weight} kg × ${r.reps} rep</span>
+            <button class="icon-btn danger" data-action="delete-auto-record" data-id="${esc(r.id)}" type="button" aria-label="Eliminar este récord automático" title="Eliminar">✕</button>
+          </div>`).join('')}</div>
+      </section>` : ''}` : ''}
+    </section>`;
+}
+function bindRecordsInline(){
+  const d = dataFor(currentUser);
+  const sel = state.prExercise;
+  if(!sel) return;
+  const rec = PG.recordsFor(d, name => resolveExerciseId(name, d), sel);
+  if(!rec || !rec.sessions) return;
+  const evolution = [...rec.timeline.weight].reverse();
+  lineChart($('#pr-chart'), evolution.slice().reverse().map(e => ({ label: e.date, value: e.value })), evolution.length > 1 ? 'Necesitas dos récords para ver la evolución.' : 'Con un segundo récord verás aquí la evolución.');
+}
+/* La ruta antigua #/prs sigue funcionando: ahora abre Progreso, donde vive
+   la sección de récords. */
+function renderPRs(main){ renderProgress(main); }
 function openPRModal(preselected){
   const d = dataFor(currentUser);
   const exercises = exerciseOptions(d);
@@ -3051,34 +3321,67 @@ function cmpDelta(prev, now, unit){
   const pct = Math.round((diff / prev) * 100);
   return { text: (diff > 0 ? '+' : '') + pct + ' %', cls: diff > 0 ? 'up' : 'down' };
 }
+/* ---------------- Progreso por ejercicio ---------------- */
+const PROG_PERIODS = [
+  { days:30, label:'30 días' }, { days:90, label:'90 días' },
+  { days:180, label:'6 meses' }, { days:365, label:'1 año' }, { days:0, label:'Todo' }
+];
+function trendLabel(trend){
+  return trend === 'up' ? 'Mejorando' : trend === 'down' ? 'Bajando' : 'Se mantiene';
+}
+function cmpResultHTML(res, unit){
+  if(!res) return '<span class="muted small">Faltan datos</span>';
+  const txt = (res.current || 0).toLocaleString('es') + (unit ? ' ' + unit : '');
+  const baseTxt = (res.base || 0).toLocaleString('es') + (unit ? ' ' + unit : '');
+  return `<span class="cmp-val cmp-now">${txt}</span>
+    <span class="muted small">antes ${baseTxt}</span>
+    <span class="trend-chip ${res.trend}">${trendLabel(res.trend)}${res.pct == null ? '' : ' ' + (res.pct > 0 ? '+' : '') + res.pct + ' %'}</span>`;
+}
 function renderProgress(main){
   const d = dataFor(currentUser);
+  const resolve = name => resolveExerciseId(name, d);
   const exercises = exerciseOptions(d);
   let sel = state.progressExercise && exercises.some(o => o.id === state.progressExercise) ? state.progressExercise : (exercises[0] ? exercises[0].id : null);
   state.progressExercise = sel || null;
+  if(!state.prExercise || !exercises.some(o => o.id === state.prExercise)) state.prExercise = sel || null;
+  if(state.progDays == null) state.progDays = 0;
+  const days = state.progDays;
   const picked = exercises.find(o => o.id === sel);
   const label = picked ? picked.name : '';
-  const rows = sel ? exerciseProgress(d, sel) : [];
-  const bestSet = rows.reduce((acc, r) => (!acc || r.best.weight > acc.weight || (r.best.weight === acc.weight && r.best.reps > acc.reps)) ? r.best : acc, null);
+  const series = sel ? PG.seriesFor(d, resolve, sel, { days }) : { rows: [], weight: [], reps: [], volume: [], e1rm: [] };
+  const rows = series.rows;
+  const rec = sel ? PG.recordsFor(d, resolve, sel) : null;
+  const history = PG.history(d, resolve).filter(r => !days || (PG.parseDay(r.date) || 0) >= Date.now() - days * PG.DAY);
+  const volume = PG.volumeSummary(d, resolve);
+  const prog = sel ? progressionSuggestion(d, sel) : { kind:'none', sessions:0, text:'Elige un ejercicio para ver su progresión.', weight:0, reps:0 };
   const totalVolume = rows.reduce((a, r) => a + r.volume, 0);
   const totalReps = rows.reduce((a, r) => a + r.reps, 0);
-  const diff = rows.length >= 2 ? Math.round((rows[rows.length-1].best.weight - rows[0].best.weight) * 10) / 10 : null;
-  const prog = sel ? progressionSuggestion(d, sel) : { kind:'none', sessions:0, text:'Elige un ejercicio para ver su progresión.', weight:0, reps:0 };
-  const e1rm = bestE1RM(rows);
+  const comparisons = PG.METRIC_LABELS && ['weight', 'reps', 'volume', 'e1rm'].map(metric => ({
+    metric,
+    session: PG.compare(rows, metric, 'session'),
+    first: PG.compare(rows, metric, 'first'),
+  }));
+  const weekCmp = [
+    { label:'Volumen semanal', metric:'volume', res: PG.compare(rows, 'volume', 'week'), unit:'kg' },
+    { label:'Peso máximo semanal', metric:'weight', res: PG.compare(rows, 'weight', 'week'), unit:'kg' },
+    { label:'Volumen mensual', metric:'volume', res: PG.compare(rows, 'volume', 'month'), unit:'kg' },
+  ];
   const win = progressWindows(rows);
-  const kg = (v, digits) => v ? fmtKg(Math.round(v * 10) / 10) + ' kg' : '—';
-  const cmp = [
+  const winKg = v => v ? fmtKg(Math.round(v * 10) / 10) + ' kg' : '—';
+  const winRows = [
     { label:'Sesiones', prev: win.previous.sessions || '—', now: win.recent.sessions || '—', delta: cmpDelta(win.previous.sessions, win.recent.sessions) },
-    { label:'Volumen', prev: kg(win.previous.volume), now: kg(win.recent.volume), delta: cmpDelta(win.previous.volume, win.recent.volume) },
+    { label:'Volumen', prev: winKg(win.previous.volume), now: winKg(win.recent.volume), delta: cmpDelta(win.previous.volume, win.recent.volume) },
     { label:'Repeticiones', prev: win.previous.reps ? win.previous.reps + ' rep' : '—', now: win.recent.reps ? win.recent.reps + ' rep' : '—', delta: cmpDelta(win.previous.reps, win.recent.reps) },
     { label:'Mejor serie', prev: win.previous.best ? fmtKg(win.previous.best.weight) + ' kg × ' + win.previous.best.reps : '—', now: win.recent.best ? fmtKg(win.recent.best.weight) + ' kg × ' + win.recent.best.reps : '—', delta: cmpDelta(win.previous.best ? win.previous.best.weight : 0, win.recent.best ? win.recent.best.weight : 0) },
-    { label:'1RM estimado', prev: kg(win.previous.e1rm), now: kg(win.recent.e1rm), delta: cmpDelta(win.previous.e1rm, win.recent.e1rm) }
+    { label:'1RM estimado', prev: winKg(win.previous.e1rm), now: winKg(win.recent.e1rm), delta: cmpDelta(win.previous.e1rm, win.recent.e1rm) },
   ];
+  const freqRows = PG.buckets(history, 'week');
+  const unitOf = metric => metric === 'reps' ? 'rep' : 'kg';
 
   main.innerHTML = `
     <div class="page-head">
       <h1>Progreso por ejercicio</h1>
-      <p class="muted">Tu semana, tu mes y cada ejercicio, sesión a sesión.</p>
+      <p class="muted">Tu semana, tu mes y cada ejercicio, sesión a sesión. Solo cuentan sesiones terminadas y series efectivas.</p>
     </div>
 
     ${streakCardHTML(d)}
@@ -3094,30 +3397,104 @@ function renderProgress(main){
           ${exercises.map(o => `<option value="${esc(o.id)}" ${o.id === sel ? 'selected' : ''}>${esc(o.name)}</option>`).join('')}
         </select>
       </div>
+      <div class="pr-select">
+        <label>Período</label>
+        <select id="pg-days">
+          ${PROG_PERIODS.map(p => `<option value="${p.days}"${p.days === days ? ' selected' : ''}>${p.label}</option>`).join('')}
+        </select>
+      </div>
       <button class="btn btn-ghost" data-action="progress-prs" type="button" ${sel ? '' : 'disabled'}>Ver récords</button>
       <button class="btn btn-ghost" data-action="share-progress" type="button" ${rows.length ? '' : 'disabled'} title="Comparte la gráfica como imagen (WhatsApp, Instagram, etc.)">Compartir gráfica</button>
     </div>
 
     ${!rows.length
-      ? `<section class="empty-state">Aún no hay sesiones terminadas con «${esc(label || 'este ejercicio')}». Completa una sesión y aquí verás su evolución.</section>`
+      ? `<section class="empty-state">En ${days ? 'los últimos ' + days + ' días' : 'todo el historial'} no hay sesiones terminadas con «${esc(label || 'este ejercicio')}». Prueba otro período o completa una sesión.</section>`
       : `<section class="stats-grid small five">
-      <div class="stat-card"><p class="stat-value">${bestSet ? bestSet.weight + ' kg' : '—'}</p><p class="stat-label">Mejor peso</p></div>
-      <div class="stat-card"><p class="stat-value">${bestSet ? bestSet.weight + ' × ' + bestSet.reps : '—'}</p><p class="stat-label">Mejor serie</p></div>
-      <div class="stat-card"><p class="stat-value">${totalVolume.toLocaleString('es')} kg</p><p class="stat-label">Volumen total</p></div>
-      <div class="stat-card"><p class="stat-value">${rows.length}</p><p class="stat-label">Sesiones${diff != null ? ' · ' + (diff > 0 ? '+' : '') + diff + ' kg' : ''}</p></div>
-      <div class="stat-card"><p class="stat-value">${e1rm ? fmtKg(e1rm) + ' kg' : '—'}</p><p class="stat-label">1RM estimado</p></div>
+      <div class="stat-card"><p class="stat-value">${rec && rec.bestWeight ? fmtKg(rec.bestWeight.value) + ' kg' : '—'}</p><p class="stat-label">Mejor peso</p></div>
+      <div class="stat-card"><p class="stat-value">${rec && rec.bestSetVolume ? fmtKg(rec.bestSetVolume.value) + ' kg' : '—'}</p><p class="stat-label">Mejor serie (volumen)</p></div>
+      <div class="stat-card"><p class="stat-value">${fmtKg(totalVolume)} kg</p><p class="stat-label">Volumen del período</p></div>
+      <div class="stat-card"><p class="stat-value">${rows.length}</p><p class="stat-label">Sesiones</p></div>
+      <div class="stat-card"><p class="stat-value">${rec && rec.bestE1rm ? fmtKg(rec.bestE1rm.value) + ' kg' : '—'}</p><p class="stat-label">1RM estimado</p></div>
     </section>
 
     <section class="cmp-card">
       <div class="section-head"><h2>Últimas 4 semanas</h2><span class="muted">Frente a las 4 anteriores</span></div>
       <div class="cmp-legend"><span>Métrica</span><span class="muted small">Antes</span><span class="muted small">Ahora</span><span></span></div>
-      ${cmp.map(m => `<div class="cmp-row">
+      ${winRows.map(m => `<div class="cmp-row">
         <span>${m.label}</span>
         <span class="cmp-val">${m.prev}</span>
         <span class="cmp-val cmp-now">${m.now}</span>
         <span class="cmp-delta ${m.delta.cls}">${m.delta.text}</span>
       </div>`).join('')}
-      <p class="muted small">1RM por fórmula de Epley (peso × (1 + rep/30)): es una estimación, no una marca levantada.</p>
+      <p class="muted small">Ventanas de 28 días: la actual frente a la inmediatamente anterior.</p>
+    </section>
+
+    <section class="cmp-card">
+      <div class="section-head"><h2>Comparaciones</h2><span class="muted">${esc(label)}</span></div>
+      ${comparisons.map(c => `
+        <div class="prog-cmp">
+          <p class="prog-cmp-title">${esc(PG.METRIC_LABELS[c.metric].label)}</p>
+          <div class="cmp-row">
+            <span>Última sesión</span>
+            ${cmpResultHTML(c.session, unitOf(c.metric))}
+          </div>
+          <div class="cmp-row">
+            <span>Primer registro</span>
+            ${cmpResultHTML(c.first, unitOf(c.metric))}
+          </div>
+        </div>`).join('')}
+      <p class="muted small">«Mejorando» exige una diferencia mayor que el margen de ruido (0,5 kg o 1 % en peso y 1RM; 2 % en repeticiones y volumen). El volumen mide trabajo total, no fuerza: un día con más series puede subir el volumen sin que levantes más peso.</p>
+    </section>
+
+    <section class="cmp-card">
+      <div class="section-head"><h2>Semana y mes</h2><span class="muted">Media del período frente al anterior</span></div>
+      ${weekCmp.map(w => `<div class="cmp-row">
+        <span>${esc(w.label)}</span>
+        ${cmpResultHTML(w.res, w.unit)}
+      </div>`).join('')}
+      <p class="muted small">Se comparan ventanas de 7 y 30 días con las inmediatamente anteriores. Si falta una de las dos ventanas, se indica «Faltan datos» en vez de inventar una tendencia.</p>
+    </section>
+
+    <section class="cmp-card">
+      <div class="section-head"><h2>Hace tres meses</h2><span class="muted">Tu marca de entonces frente a la de ahora</span></div>
+      ${['weight', 'reps', 'volume', 'e1rm'].map(metric => {
+        const since = PG.compareSince(rows, metric, 90);
+        return `<div class="cmp-row">
+          <span>${esc(PG.METRIC_LABELS[metric].label)}</span>
+          ${cmpResultHTML(since, metric === 'reps' ? 'rep' : 'kg')}
+        </div>`;
+      }).join('')}
+      <p class="muted small">Se toma la última sesión de hace 90 días o más y se compara con la más reciente. Si no había entrenamientos de ese ejercicio, se indica «Faltan datos».</p>
+    </section>
+
+    <section class="chart-card">
+      <div class="section-head"><h2>Peso levantado</h2><span class="muted">Mejor serie de cada sesión</span></div>
+      <div id="pg-weight" class="chart"></div>
+    </section>
+
+    <section class="chart-card">
+      <div class="section-head"><h2>Repeticiones</h2><span class="muted">Reps efectivas por sesión</span></div>
+      <div id="pg-reps" class="chart"></div>
+    </section>
+
+    <section class="chart-card">
+      <div class="section-head"><h2>Volumen</h2><span class="muted">Peso × repeticiones</span></div>
+      <div id="pg-volume" class="chart"></div>
+    </section>
+
+    <section class="chart-card">
+      <div class="section-head"><h2>Volumen semanal</h2><span class="muted">Toda la cuenta, últimas 12 semanas</span></div>
+      <div id="pg-volweek" class="chart"></div>
+    </section>
+
+    <section class="chart-card">
+      <div class="section-head"><h2>1RM estimado</h2><span class="muted">Fórmula de Epley</span></div>
+      <div id="pg-e1rm" class="chart"></div>
+    </section>
+
+    <section class="chart-card">
+      <div class="section-head"><h2>Frecuencia</h2><span class="muted">Sesiones por semana en tu historial completo</span></div>
+      <div id="pg-freq" class="chart"></div>
     </section>
 
     <section class="prog-card prog-${prog.kind}">
@@ -3126,33 +3503,53 @@ function renderProgress(main){
       ${prog.best ? `<p class="muted small">Última vez: ${fmtKg(prog.best.weight)} kg × ${prog.best.reps} rep · ${prog.last.sets} serie${prog.last.sets === 1 ? '' : 's'} efectiva${prog.last.sets === 1 ? '' : 's'}.</p>` : ''}
     </section>
 
-    <section class="chart-card">
-      <div class="section-head"><h2>Evolución del peso</h2><span class="muted">Mejor serie de cada sesión</span></div>
-      <div id="pg-weight" class="chart"></div>
-    </section>
-
-    <section class="chart-card">
-      <div class="section-head"><h2>Volumen por sesión</h2><span class="muted">Peso × repeticiones</span></div>
-      <div id="pg-volume" class="chart"></div>
-    </section>
-
     <section class="section">
       <div class="section-head"><h2>Sesiones</h2><span class="muted">${totalReps} repeticiones en total</span></div>
       <div class="pg-table">${[...rows].reverse().map(r => `
         <div class="pg-row">
           <span><b>${fmtDateLong(r.date)}</b><br><span class="muted small">${esc(r.name)} · ${r.sets} serie${r.sets === 1 ? '' : 's'}</span></span>
-          <span class="pr-val">${r.best.weight} kg × ${r.best.reps}</span>
+          <span class="pr-val">${r.best ? fmtKg(r.best.weight) + ' kg × ' + r.best.reps : '—'}</span>
           <span class="muted">${r.reps} reps</span>
           <span class="pr-val">${r.volume.toLocaleString('es')} kg</span>
         </div>`).join('')}</div>
-    </section>`}`;
+    </section>
+
+    <section class="section">
+      <div class="section-head"><h2>Volumen total</h2><span class="muted">De toda la cuenta</span></div>
+      <div class="stats-grid small">
+        <div class="stat-card"><p class="stat-value">${fmtKg(volume.week.volume)} kg</p><p class="stat-label">Esta semana</p></div>
+        <div class="stat-card"><p class="stat-value">${fmtKg(volume.month.volume)} kg</p><p class="stat-label">Últimos 30 días</p></div>
+        <div class="stat-card"><p class="stat-value">${fmtKg(volume.all.volume)} kg</p><p class="stat-label">Histórico</p></div>
+        <div class="stat-card"><p class="stat-value">${volume.all.sets}</p><p class="stat-label">Series efectivas</p></div>
+      </div>
+      <p class="muted small">El peso corporal y los ejercicios asistidos no suman kilos de volumen (se cuentan sus series y repeticiones): mezclarlos con las pesas daría cifras infladas.</p>
+    </section>`}
+    ${recordsInlineHTML(d)}`;
 
   const selEl = $('#pg-select');
   if(selEl) selEl.addEventListener('change', () => { state.progressExercise = selEl.value; render(); });
+  const daysEl = $('#pg-days');
+  if(daysEl) daysEl.addEventListener('change', () => { state.progDays = Number(daysEl.value) || 0; render(); });
   if(rows.length){
-    lineChart($('#pg-weight'), rows.map(r => ({ label: r.date, value: r.best.weight })), 'Necesitas al menos dos sesiones para ver la evolución.');
-    lineChart($('#pg-volume'), rows.map(r => ({ label: r.date, value: r.volume })), 'Necesitas al menos dos sesiones para ver la evolución.');
+    lineChart($('#pg-weight'), series.weight, 'Necesitas al menos dos sesiones para ver la evolución.');
+    lineChart($('#pg-reps'), series.reps, 'Necesitas al menos dos sesiones para ver la evolución.');
+    lineChart($('#pg-volume'), series.volume, 'Necesitas al menos dos sesiones para ver la evolución.');
+    lineChart($('#pg-e1rm'), series.e1rm, 'Necesitas dos sesiones con repeticiones válidas (1–12) para estimar el 1RM.');
   }
+  const volWeeks = volume.weekly.slice(-12);
+  if(volWeeks.length){
+    lineChart($('#pg-volweek'), volWeeks.map(b => ({ label: b.key, value: b.volume })), 'Necesitas al menos dos semanas con volumen para ver la tendencia.');
+  } else {
+    const vw = $('#pg-volweek');
+    if(vw) vw.innerHTML = '<div class="chart-empty">Aún no hay volumen semanal registrado.</div>';
+  }
+  if(freqRows.length){
+    lineChart($('#pg-freq'), freqRows.map(b => ({ label: b.key, value: b.sessions })), 'Necesitas al menos dos semanas con entrenamiento para ver la frecuencia.');
+  } else {
+    const el = $('#pg-freq');
+    if(el) el.innerHTML = '<div class="chart-empty">Aún no hay semanas con entrenamiento registrado.</div>';
+  }
+  bindRecordsInline();
 }
 /* ============================================================
    AJUSTES DE LA CUENTA
@@ -3660,8 +4057,18 @@ function renderSettings(main){
   main.innerHTML = `
     <div class="page-head">
       <h1>Ajustes de la cuenta</h1>
-      <p class="muted">Tema, descanso y avisos de ${esc(maskAccount(currentUser))}. Se guardan en tu cuenta y te siguen en cualquier dispositivo.</p>
+      <p class="muted">Tema, descanso y avisos de ${esc(accountDisplayName())}. Se guardan en tu cuenta y te siguen en cualquier dispositivo.</p>
     </div>
+
+    ${isCloud() ? `<section class="settings-card">
+      <h2>Perfil en la nube</h2>
+      <p class="muted small">Este nombre aparece en tu saludo y en la cabecera. No cambia tu correo de acceso.</p>
+      <div class="form-row" style="margin-top:10px">
+        <input id="set-cloud-name" maxlength="40" autocomplete="nickname" value="${esc(DrakoSB.name() || '')}" placeholder="Tu nombre de usuario" aria-label="Nombre de usuario en la nube">
+        <button class="btn btn-primary" type="button" data-action="save-cloud-name">Guardar nombre</button>
+      </div>
+      <p class="muted small">Cuenta: ${esc(maskAccount(currentUser))}</p>
+    </section>` : ''}
 
     <section class="settings-card">
       <h2>Exportar a CSV</h2>
@@ -3677,6 +4084,8 @@ function renderSettings(main){
       <h2>Tu plan</h2>
       ${planSummaryHTML(d)}
     </section>
+
+    ${offlineSettingsHTML()}
 
     <section class="settings-card">
       <h2>Apariencia</h2>
@@ -3696,6 +4105,16 @@ function renderSettings(main){
           ${[1, 2, 3, 4].map(n => `<option value="${n}" ${n === secs ? 'selected' : ''}>${n} s</option>`).join('')}
         </select>
       </label>
+      <label class="set-row">
+        <span class="set-text"><b>Sonido de la alarma</b><small class="muted">Elige el aviso que suena al llegar a cero.</small></span>
+        <select class="rest-alert-len rest-sound-select" id="set-rest-sound" aria-label="Sonido de la alarma de descanso">
+          ${REST_SOUNDS.map(x => `<option value="${x.id}" ${x.id === restSoundChoice() ? 'selected' : ''}>${esc(x.label)}</option>`).join('')}
+        </select>
+      </label>
+      <div class="settings-inline">
+        <button class="btn btn-ghost btn-sm" type="button" data-action="rest-sound-test">Probar sonido</button>
+      </div>
+      <p class="muted sound-credit">Audios: <a href="https://freesound.org/people/Chelly01/sounds/541077/" target="_blank" rel="noopener noreferrer">Chelly01</a> (CC0), <a href="https://freesound.org/people/zanox/sounds/233645/" target="_blank" rel="noopener noreferrer">zanox</a> (CC BY-NC 4.0) y <a href="https://freesound.org/people/zharvill/sounds/721826/" target="_blank" rel="noopener noreferrer">zharvill</a> (CC0).</p>
     </section>
 
     <section class="settings-card">
@@ -3712,48 +4131,79 @@ function renderSettings(main){
     setRestAlertSeconds(lenSel.value);
     toast('Duración del aviso: ' + restAlertSeconds() + ' s.', 'info');
   });
+  const soundSel = $('#set-rest-sound');
+  if(soundSel) soundSel.addEventListener('change', () => {
+    stopRestSoundPreview();
+    setRestSoundChoice(soundSel.value);
+    beepRestEnd(false);
+    toast('Sonido de descanso: ' + (REST_SOUNDS.find(x => x.id === soundSel.value) || {}).label + '.', 'info');
+  });
   $$('.set-check').forEach(cb => cb.addEventListener('change', () => { setPref(cb.dataset.pref, cb.checked); render(); }));
+}
+function weightPeriodDays(){
+  return state.weightDays == null ? 0 : state.weightDays;
 }
 function renderWeight(main){
   const d = dataFor(currentUser);
-  const sorted = [...d.weights].sort((a,b) => a.date.localeCompare(b.date));
-  const cur = sorted.length ? sorted[sorted.length-1].weight : null;
-  const start = sorted.length ? sorted[0].weight : null;
-  const change = cur != null && start != null ? cur - start : null;
+  const bw = PG.bodyweight(d);
+  const sorted = bw.list;
+  const days = weightPeriodDays();
+  const periodRows = days ? sorted.filter(w => (PG.parseDay(w.date) || 0) >= Date.now() - days * PG.DAY) : sorted;
+  const periodChange = periodRows.length >= 2 ? PG.round1(periodRows[periodRows.length - 1].weight - periodRows[0].weight) : null;
+  const edit = state.weightEdit || null;
   const last60 = sorted.slice(-60);
+  const weekly = bw.weekly.slice(-8).reverse();
+  const monthly = bw.monthly.slice(-6).reverse();
+  const photo = safePhotoSrc(d.photo);
 
   main.innerHTML = `
     <div class="page-head">
       <h1>Control de peso</h1>
-      <p class="muted">Registra tu peso corporal y guarda una foto de referencia de tu progreso.</p>
+      <p class="muted">Registra tu peso corporal, edita cualquier medición y guarda una foto de referencia de tu progreso.</p>
     </div>
 
     <section class="stats-grid small">
-      <div class="stat-card"><p class="stat-value">${cur != null ? cur + ' kg' : '—'}</p><p class="stat-label">Peso actual</p></div>
-      <div class="stat-card"><p class="stat-value">${change == null ? '—' : (change > 0 ? '+' : '') + change.toFixed(1) + ' kg'}</p><p class="stat-label">Cambio total</p></div>
-      <div class="stat-card"><p class="stat-value">${sorted.length}</p><p class="stat-label">Registros</p></div>
-      <div class="stat-card"><p class="stat-value">${d.photo ? 'sí' : '—'}</p><p class="stat-label">Foto de referencia</p></div>
+      <div class="stat-card"><p class="stat-value">${bw.latest ? fmtKg(bw.latest.weight) + ' kg' : '—'}</p><p class="stat-label">Peso actual</p></div>
+      <div class="stat-card"><p class="stat-value">${periodChange == null ? '—' : (periodChange > 0 ? '+' : '') + fmtKg(periodChange) + ' kg'}</p><p class="stat-label">${days ? 'Cambio en el período' : 'Cambio total'}</p></div>
+      <div class="stat-card"><p class="stat-value">${bw.weekAvg == null ? '—' : fmtKg(bw.weekAvg) + ' kg'}</p><p class="stat-label">Media semanal</p></div>
+      <div class="stat-card"><p class="stat-value">${bw.monthAvg == null ? '—' : fmtKg(bw.monthAvg) + ' kg'}</p><p class="stat-label">Media mensual</p></div>
     </section>
 
     <section class="chart-card">
-      <div class="section-head"><h2>Tendencia de peso</h2><span class="muted">${last60.length} últimos registros</span>
+      <div class="section-head"><h2>Tendencia de peso</h2><span class="muted">${periodRows.length} registro${periodRows.length === 1 ? '' : 's'}${days ? ' en el período' : ''}</span>
         <button class="btn btn-primary btn-sm" data-action="share-weight" type="button" ${sorted.length ? '' : 'disabled'}>Compartir en WhatsApp</button>
+      </div>
+      <div class="pr-top">
+        <div class="pr-select">
+          <label>Período</label>
+          <select id="w-period">
+            <option value="0"${days === 0 ? ' selected' : ''}>Todo</option>
+            <option value="30"${days === 30 ? ' selected' : ''}>Últimos 30 días</option>
+            <option value="90"${days === 90 ? ' selected' : ''}>Últimos 90 días</option>
+            <option value="365"${days === 365 ? ' selected' : ''}>Último año</option>
+          </select>
+        </div>
       </div>
       <div id="w-chart" class="chart"></div>
     </section>
 
     <div class="grid-2">
       <div class="card">
-        <h3>Registrar el peso de hoy</h3>
+        <h3>${edit ? 'Editar la medición' : 'Registrar el peso de hoy'}</h3>
         <div class="form-row">
-          <input type="date" id="w-date" value="${todayISO()}" aria-label="Fecha del registro de peso">
-          <input type="number" id="w-weight" placeholder="kg" inputmode="decimal" min="0" aria-label="Peso en kg">
-          <button class="btn btn-primary" data-action="add-weight" type="button">Añadir</button>
+          <input type="date" id="w-date" value="${edit ? esc(edit.date) : todayISO()}" aria-label="Fecha del registro de peso">
+          <input type="number" id="w-weight" placeholder="kg" inputmode="decimal" min="0" value="${edit ? esc(String(edit.weight)) : ''}" aria-label="Peso en kg">
+          <button class="btn btn-primary" data-action="add-weight" type="button">${edit ? 'Guardar cambios' : 'Añadir'}</button>
+          ${edit ? `<button class="btn btn-ghost" data-action="cancel-weight-edit" type="button">Cancelar</button>` : ''}
         </div>
+        <p class="muted small">Solo se guarda una medición por día: si repites la fecha se actualiza la existente.</p>
         <div class="weight-list">
-          ${[...sorted].reverse().slice(0,10).map(w => `
-            <div class="pr-item"><span>${fmtDateLong(w.date)}</span><span class="pr-val">${w.weight} kg</span>
-              <button class="icon-btn danger" data-action="delete-weight" data-id="${w.id}" type="button" aria-label="Eliminar el registro de peso del ${fmtDateLong(w.date)}" title="Eliminar registro">✕</button>
+          ${[...sorted].reverse().slice(0, 12).map(w => `
+            <div class="pr-item">
+              <span>${fmtDateLong(w.date)}</span>
+              <span class="pr-val">${fmtKg(w.weight)} kg</span>
+              <button class="icon-btn" data-action="edit-weight" data-id="${esc(w.id || '')}" type="button" aria-label="Editar el peso del ${fmtDateLong(w.date)}" title="Editar">✎</button>
+              <button class="icon-btn danger" data-action="delete-weight" data-id="${esc(w.id || '')}" type="button" aria-label="Eliminar el registro de peso del ${fmtDateLong(w.date)}" title="Eliminar registro">✕</button>
             </div>`).join('') || '<div class="empty-state">Aún no hay registros. Añade tu primer peso arriba.</div>'}
         </div>
       </div>
@@ -3761,8 +4211,8 @@ function renderWeight(main){
       <div class="card">
         <h3>Foto de referencia</h3>
         <p class="muted small" style="margin-bottom:14px">Sube una foto de progreso — solo se guarda en este dispositivo.</p>
-        ${d.photo && String(d.photo).startsWith('data:image/')
-          ? `<div class="photo-wrap"><img src="${d.photo}" alt="Foto de referencia de progreso"><div class="photo-actions">
+        ${photo
+          ? `<div class="photo-wrap"><img src="${esc(photo)}" alt="Foto de referencia de progreso"><div class="photo-actions">
               <button class="btn btn-ghost btn-sm" data-action="change-photo" type="button">Reemplazar</button>
               <button class="btn btn-ghost btn-sm danger-text" data-action="remove-photo" type="button">Eliminar</button>
             </div></div>`
@@ -3770,9 +4220,27 @@ function renderWeight(main){
              <p class="muted small" style="margin-top:10px">JPG / PNG, se comprime automáticamente.</p></div>`}
         <input type="file" id="photo-input" accept="image/*" hidden>
       </div>
+    </div>
+
+    <div class="grid-2">
+      <div class="card">
+        <h3>Medias semanales</h3>
+        ${weekly.length ? `<div class="pr-list">${weekly.map(w => `<div class="pr-item"><span>Semana del ${fmtDate(w.key)}</span><span class="pr-val">${fmtKg(w.avg)} kg</span><span class="muted small">${w.n} medición${w.n === 1 ? '' : 'es'}</span></div>`).join('')}</div>` : '<p class="muted small">Sin mediciones suficientes.</p>'}
+      </div>
+      <div class="card">
+        <h3>Medias mensuales</h3>
+        ${monthly.length ? `<div class="pr-list">${monthly.map(m => `<div class="pr-item"><span>${esc(m.key)}</span><span class="pr-val">${fmtKg(m.avg)} kg</span><span class="muted small">${m.n} medición${m.n === 1 ? '' : 'es'}</span></div>`).join('')}</div>` : '<p class="muted small">Sin mediciones suficientes.</p>'}
+      </div>
     </div>`;
 
-  if(sorted.length) lineChart($('#w-chart'), last60.map(w => ({ label:w.date, value:w.weight })), 'Añade tu primer registro de peso para ver tu tendencia.');
+  const per = $('#w-period');
+  if(per) per.addEventListener('change', () => { state.weightDays = Number(per.value) || 0; render(); });
+  const chartRows = days
+    ? sorted.filter(w => (PG.parseDay(w.date) || 0) >= Date.now() - days * PG.DAY)
+    : last60;
+  if(chartRows.length){
+    lineChart($('#w-chart'), chartRows.map(w => ({ label:w.date, value:w.weight })), 'Añade tu primer registro de peso para ver tu tendencia.');
+  }
 }
 function compressImage(file, maxDim = 720, quality = 0.72){
   return new Promise((resolve, reject) => {
@@ -3794,36 +4262,176 @@ function compressImage(file, maxDim = 720, quality = 0.72){
 }
 
 /* ---------------- Historial de entrenamientos ---------------- */
+/* ---------------- Historial de entrenamientos ---------------- */
+/* Filtros del historial: viven en `state`, así que se conservan al cambiar
+   de pantalla y volver. Todo se calcula sobre las sesiones ya guardadas. */
+function histFilters(){
+  if(!state.hist) state.hist = { q:'', period:'all', workout:'all', exercise:'all', order:'desc', limit:20, from:'', to:'' };
+  return state.hist;
+}
+function histFrom(period){
+  if(!period || period === 'all') return null;
+  const days = { week:7, month:30, '3m':90, year:365 }[period];
+  if(!days) return null;
+  const d = new Date(); d.setHours(0, 0, 0, 0); d.setDate(d.getDate() - (days - 1));
+  return d.toISOString().slice(0, 10);
+}
+function histLiteRows(d){
+  const f = histFilters();
+  let rows = PG.history(d, name => resolveExerciseId(name, d));
+  const from = histFrom(f.period);
+  if(from) rows = rows.filter(r => r.date >= from);
+  if(f.period === 'custom'){
+    if(f.from) rows = rows.filter(r => r.date >= f.from);
+    if(f.to) rows = rows.filter(r => r.date <= f.to);
+  }
+  if(f.workout !== 'all') rows = rows.filter(r => r.name === f.workout);
+  if(f.exercise !== 'all') rows = rows.filter(r => (r.exercises || []).some(e => e.key === f.exercise));
+  const q = f.q.trim().toLowerCase();
+  if(q) rows = rows.filter(r =>
+    String(r.name).toLowerCase().includes(q) ||
+    (r.exercises || []).some(e => String(e.name).toLowerCase().includes(q)));
+  rows.sort((a, b) => f.order === 'asc' ? a.date.localeCompare(b.date) : b.date.localeCompare(a.date));
+  return rows;
+}
+function histClock(v){
+  if(!v) return '';
+  const t = new Date(v);
+  if(isNaN(t)) return '';
+  return t.toLocaleTimeString('es', { hour:'2-digit', minute:'2-digit' });
+}
+function histTimeRange(lite){
+  if(!lite) return '';
+  const a = histClock(lite.startedAt), b = histClock(lite.finishedAt);
+  if(a && b) return a + ' – ' + b;
+  return a || b || '';
+}
 function renderHistory(main){
   const d = dataFor(currentUser);
-  const finished = d.sessions.filter(s => s.finished).sort((a,b) => b.date.localeCompare(a.date) || (b.id > a.id ? 1 : -1));
+  const f = histFilters();
+  const all = PG.history(d, name => resolveExerciseId(name, d));
+  const rows = histLiteRows(d);
+  const shown = rows.slice(0, f.limit);
+  const byId = new Map(((d && d.sessions) || []).map(s => [s.id, s]));
+  const names = new Map();
+  all.forEach(r => (r.exercises || []).forEach(e => { if(e.key && !names.has(e.key)) names.set(e.key, e.name); }));
+  const workoutNames = [...new Set(all.map(r => r.name))].sort((a, b) => a.localeCompare(b, 'es'));
+  const exerciseNames = [...names.entries()].sort((a, b) => a[1].localeCompare(b[1], 'es'));
+  const filtered = !!(f.q || f.period !== 'all' || f.workout !== 'all' || f.exercise !== 'all');
+  const totalVol = rows.reduce((a, r) => a + r.volume, 0);
+
   main.innerHTML = `
     <div class="page-head">
       <h1>Historial</h1>
-      <p class="muted">Todas tus sesiones completadas: los pesos y repeticiones que usaste en cada ejercicio.</p>
+      <p class="muted">Todas tus sesiones terminadas, con series, volumen y duración. Filtra para encontrar cualquier día.</p>
     </div>
-    ${!finished.length
+
+    ${!all.length
       ? `<section class="empty-state">Cuando termines sesiones en «Entrenamientos» aparecerán aquí, con el peso que usaste en cada ejercicio.</section>`
-      : `<section class="section">${finished.map(histCard).join('')}</section>`}`;
+      : `<section class="hist-tools" aria-label="Filtros del historial">
+      <div class="hist-search field">
+        <label for="hist-q">Buscar</label>
+        <input id="hist-q" type="search" placeholder="Ejercicio o rutina…" value="${esc(f.q)}" autocomplete="off">
+      </div>
+      <div class="hist-filters">
+        <label class="field"><span>Período</span>
+          <select id="hist-period">
+            <option value="all"${f.period === 'all' ? ' selected' : ''}>Todo</option>
+            <option value="week"${f.period === 'week' ? ' selected' : ''}>Últimos 7 días</option>
+            <option value="month"${f.period === 'month' ? ' selected' : ''}>Últimos 30 días</option>
+            <option value="3m"${f.period === '3m' ? ' selected' : ''}>Últimos 3 meses</option>
+            <option value="year"${f.period === 'year' ? ' selected' : ''}>Último año</option>
+            <option value="custom"${f.period === 'custom' ? ' selected' : ''}>Fechas personalizadas</option>
+          </select>
+        </label>
+        <label class="field"><span>Desde</span>
+          <input type="date" id="hist-from" value="${esc(f.from || '')}">
+        </label>
+        <label class="field"><span>Hasta</span>
+          <input type="date" id="hist-to" value="${esc(f.to || '')}">
+        </label>
+        <label class="field"><span>Rutina</span>
+          <select id="hist-workout">
+            <option value="all">Todas</option>
+            ${workoutNames.map(n => `<option value="${esc(n)}"${f.workout === n ? ' selected' : ''}>${esc(n)}</option>`).join('')}
+          </select>
+        </label>
+        <label class="field"><span>Ejercicio</span>
+          <select id="hist-exercise">
+            <option value="all">Todos</option>
+            ${exerciseNames.map(([id, n]) => `<option value="${esc(id)}"${f.exercise === id ? ' selected' : ''}>${esc(n)}</option>`).join('')}
+          </select>
+        </label>
+        <label class="field"><span>Orden</span>
+          <select id="hist-order">
+            <option value="desc"${f.order === 'desc' ? ' selected' : ''}>Más recientes primero</option>
+            <option value="asc"${f.order === 'asc' ? ' selected' : ''}>Más antiguas primero</option>
+          </select>
+        </label>
+      </div>
+      <div class="hist-summary">
+        <span><b>${rows.length}</b> de ${all.length} sesiones</span>
+        <span><b>${rows.reduce((a, r) => a + r.sets, 0)}</b> series</span>
+        <span><b>${fmtKg(totalVol)}</b> kg de volumen</span>
+        ${filtered ? `<button class="btn btn-ghost btn-sm" type="button" id="hist-clear">Quitar filtros</button>` : ''}
+      </div>
+    </section>`}
+
+    ${!rows.length
+      ? `<section class="empty-state">Ninguna sesión coincide con esos filtros. <button class="btn btn-ghost btn-sm" type="button" id="hist-clear">Ver todo el historial</button></section>`
+      : `<section class="section">${shown.map(lite => {
+          const s = byId.get(lite.id);
+          return s ? histCard(s, lite) : '';
+        }).join('')}</section>
+      ${rows.length > shown.length
+        ? `<div class="hist-more"><button class="btn btn-ghost" type="button" id="hist-more">Cargar más (${rows.length - shown.length})</button></div>`
+        : ''}`}
+  `;
+
+  const q = $('#hist-q');
+  if(q) q.addEventListener('input', () => { f.q = q.value; f.limit = 20; render(); });
+  const period = $('#hist-period');
+  if(period) period.addEventListener('change', () => { f.period = period.value; f.limit = 20; render(); });
+  const wSel = $('#hist-workout');
+  if(wSel) wSel.addEventListener('change', () => { f.workout = wSel.value; f.limit = 20; render(); });
+  const eSel = $('#hist-exercise');
+  if(eSel) eSel.addEventListener('change', () => { f.exercise = eSel.value; f.limit = 20; render(); });
+  const order = $('#hist-order');
+  if(order) order.addEventListener('change', () => { f.order = order.value; render(); });
+  const fromEl = $('#hist-from');
+  if(fromEl) fromEl.addEventListener('change', () => { f.from = fromEl.value; f.period = 'custom'; f.limit = 20; render(); });
+  const toEl = $('#hist-to');
+  if(toEl) toEl.addEventListener('change', () => { f.to = toEl.value; f.period = 'custom'; f.limit = 20; render(); });
+  document.querySelectorAll('#hist-clear').forEach(btn => btn.addEventListener('click', () => {
+    Object.assign(f, { q:'', period:'all', workout:'all', exercise:'all', limit:20, from:'', to:'' });
+    render();
+  }));
+  const more = $('#hist-more');
+  if(more) more.addEventListener('click', () => { f.limit += 20; render(); });
 }
-function histCard(s){
+function histCard(s, lite){
   const t = sessionTotals(s);
   const cancelled = s.status === 'cancelled';
+  const status = SESSION_STATUS_LABELS[s.status] || 'Completada';
+  const range = histTimeRange(lite);
+  const duration = s.durationSec != null ? fmtDuration(s.durationSec) : (lite && lite.durationSec != null ? fmtDuration(lite.durationSec) : null);
+  const bodyweightOnly = !!(lite && lite.sets > 0 && lite.sets === lite.bodyweightSets && !t.volume);
   return `
   <article class="hist-card${cancelled ? ' cancelled' : ''}">
     <div class="hist-top">
       <span class="wcard-emoji">${DUMBBELL}</span>
       <div class="hist-head">
         <h3>${esc(s.workoutName)}</h3>
-        <span class="muted small">${fmtDateLong(s.date)} · ${t.exercisesDone}/${t.exercisesTotal + t.legacy} ejercicios${cancelled ? ' · cancelada' : ''}</span>
+        <span class="muted small">${fmtDateLong(s.date)}${range ? ' · ' + range : ''} · ${t.exercisesDone}/${t.exercisesTotal + t.legacy} ejercicios</span>
       </div>
+      <span class="hist-status ${cancelled ? 'is-cancelled' : 'is-done'}">${esc(status)}</span>
       <button class="btn btn-ghost btn-sm" data-action="open-session" data-id="${esc(s.id)}" type="button">Ver sesión</button>
     </div>
     <div class="hist-metrics">
       <span><b>${t.setsDone}</b> series${t.warmupDone ? ' <span class="muted">(+' + t.warmupDone + ' calent.)</span>' : ''}</span>
       <span><b>${t.reps}</b> reps</span>
-      <span><b>${t.volume ? t.volume + ' kg' : '—'}</b> volumen</span>
-      ${s.durationSec != null ? `<span><b>${fmtDuration(s.durationSec)}</b></span>` : ''}
+      <span><b>${t.volume ? fmtKg(t.volume) + ' kg' : (bodyweightOnly ? 'peso corporal' : '—')}</b>${bodyweightOnly ? '' : ' volumen'}</span>
+      ${duration ? `<span><b>${duration}</b> de duración</span>` : ''}
     </div>
     <div class="hist-ex">
       ${s.exercises.map(e => {
@@ -3957,6 +4565,51 @@ function startProgramDay(idStr){
     nav('#/session/' + s.id);
   }).catch(() => toast('No se pudo cargar el programa desde el catálogo.', 'error'));
 }
+/* Devuelve la sesión que sigue después del día recordado. Si se acaba la
+   semana, avanza a la siguiente; si se acaba el programa, vuelve al inicio
+   para que el usuario pueda repetirlo sin buscar nada a mano. */
+function nextProgramTarget(p, last){
+  if(!p || !last) return null;
+  const vars = Array.isArray(p.vars) ? p.vars : [];
+  const vi = Math.max(0, Math.min(Number(last.vi) || 0, vars.length - 1));
+  const v = vars[vi];
+  if(!v || !Array.isArray(v.weeks)) return null;
+  const startWi = Math.max(0, Math.min(Number(last.wi) || 0, v.weeks.length - 1));
+  const startDi = last.di == null ? null : Number(last.di);
+  const pick = (w, wrap) => {
+    const week = v.weeks[w];
+    const days = week && Array.isArray(week.d) ? week.d : [];
+    const from = (!wrap && w === startWi && startDi != null) ? startDi + 1 : 0;
+    for(let di = from; di < days.length; di++){
+      const day = days[di];
+      if(day && Array.isArray(day.ex) && day.ex.length){
+        return { vi, wi: w, di, day: DrakoBC.dayTitle(day, di), weekLabel: 'Semana ' + (w + 1) };
+      }
+    }
+    return null;
+  };
+  for(let wi = startWi; wi < v.weeks.length; wi++){
+    const found = pick(wi);
+    if(found) return found;
+  }
+  for(let wi = 0; wi <= startWi; wi++){
+    const found = pick(wi, true);
+    if(found) return Object.assign(found, { wrapped: true });
+  }
+  return null;
+}
+function continueProgram(){
+  const last = getLastProgram();
+  if(!last){ toast('Elige antes un programa.', 'info'); return; }
+  toast('Buscando el siguiente día del programa…');
+  DrakoBC.program(last.slug).then(p => {
+    const target = nextProgramTarget(p, last);
+    if(!target){ toast('Este programa no tiene días con ejercicios.', 'error'); return; }
+    if(target.wrapped) toast('Programa completado: vuelves a empezar por el principio.', 'info');
+    startProgramDay('bc:' + last.slug + ':' + target.vi + ':' + target.wi + ':' + target.di);
+  }).catch(() => toast('No se pudo cargar el programa desde el catálogo.', 'error'));
+}
+
 function renderProgram(main, slug){
   if(!slug){ nav('#/workouts'); return; }
   /* Si venimos de la tarjeta anclada, se abre en la variación y semana que el
@@ -4196,6 +4849,8 @@ document.addEventListener('click', e => {
   const el = e.target.closest('[data-action]');
   if(!el) return;
   const a = el.dataset.action;
+  if(a.indexOf('ana-') === 0 && analyticsAction(a, el)) return;
+  if(a.indexOf('offline-') === 0 || a.indexOf('pwa-') === 0 || a.indexOf('sw-') === 0){ if(offlineAction(a, el)) return; }
 
   if(a === 'close-modal'){
     /* Cerrar solo si el toque fue directamente sobre el fondo oscuro o sobre
@@ -4441,11 +5096,9 @@ document.addEventListener('click', e => {
     if(last) openProgram(last.slug);
     return;
   }
-  if(a === 'last-prog-start'){
-    const last = getLastProgram();
-    if(last) startProgramDay('bc:' + last.slug + ':' + last.vi + ':' + last.wi + ':' + last.di);
-    return;
-  }
+  if(a === 'continue-program' || a === 'last-prog-start'){ continueProgram(); return; }
+  if(a === 'save-cloud-name'){ saveCloudName(); return; }
+  if(a === 'rest-sound-test'){ stopRestSoundPreview(); beepRestEnd(false); toast('Reproduciendo el sonido elegido.', 'info'); return; }
   if(a === 'last-prog-clear'){ clearLastProgram(); render(); return; }
   if(a === 'bc-cat'){
     bcCat = BC_CATS.some(c => c.k === el.dataset.cat) ? el.dataset.cat : 'all';
@@ -4842,6 +5495,87 @@ document.addEventListener('click', e => {
     return;
   }
   if(a === 'open-session'){ nav('#/session/' + el.dataset.id); return; }
+  if(a === 'pr-pick'){ state.prExercise = el.dataset.ex; state.progressExercise = el.dataset.ex; render(); return; }
+  if(a === 'edit-weight'){
+    const d = dataFor(currentUser);
+    const w = d.weights.find(x => x.id && x.id === el.dataset.id) || d.weights.find(x => x.date === el.dataset.date);
+    if(!w){ render(); return; }
+    state.weightEdit = { id: w.id || null, date: w.date, weight: w.weight };
+    render();
+    return;
+  }
+  if(a === 'cancel-weight-edit'){ state.weightEdit = null; render(); return; }
+  if(a === 'plan-tab'){ planState().tab = el.dataset.tab || 'week'; render(); return; }
+  if(a === 'plan-week'){ const ps = planState(); ps.week = PL.addDays(ps.week, (Number(el.dataset.dir) || 0) * 7); render(); return; }
+  if(a === 'plan-month'){ const ps = planState(); const [y, m] = ps.month.split('-').map(Number); ps.month = new Date(Date.UTC(y, m - 1 + (Number(el.dataset.dir) || 0), 1)).toISOString().slice(0, 7); render(); return; }
+  if(a === 'plan-today'){ const ps = planState(); ps.week = PL.weekStart(todayISO()); ps.selectedDay = todayISO(); ps.month = todayISO().slice(0, 7); ps.tab = 'week'; render(); return; }
+  if(a === 'plan-day'){ planState().selectedDay = el.dataset.date; render(); return; }
+  if(a === 'plan-start'){
+    const d = dataFor(currentUser);
+    const entry = (d.planner || []).find(x => x.id === el.dataset.id);
+    if(!entry) return;
+    if(!getWorkout(entry.workoutId)){ toast('La rutina de este plan ya no existe. Elige otra desde Entrenamientos.', 'error'); return; }
+    const session = startOrGetSession(entry.workoutId);
+    if(!session) return;
+    entry.sessionId = session.id;
+    entry.updatedAt = nowIso();
+    saveDB();
+    nav('#/session/' + session.id);
+    return;
+  }
+  if(a === 'plan-clear'){ const d = dataFor(currentUser); d.planner = (d.planner || []).filter(x => x.id !== el.dataset.id); saveDB(); render(); return; }
+  if(a === 'plan-apply-template'){
+    const d = dataFor(currentUser);
+    const program = PL.activeProgram(d);
+    if(!program){ toast('No hay un programa activo. Crea uno o actívalo en Programas.', 'error'); return; }
+    const added = PL.applyTemplate(program, planState().week, d.planner, planNameOf(d));
+    if(!added.length){ toast('La plantilla de esa semana ya estaba aplicada.', 'info'); return; }
+    added.forEach(entry => d.planner.push(entry));
+    saveDB(); toast(added.length + ' día(s) añadidos a la semana.'); render();
+    return;
+  }
+  if(a === 'plan-copy-prev'){
+    const d = dataFor(currentUser); const ps = planState(); const program = PL.activeProgram(d);
+    const added = PL.copyWeek(d.planner, PL.addDays(ps.week, -7), ps.week, program ? program.id : '');
+    if(!added.length){ toast('La semana anterior estaba vacía o ya está copiada.', 'info'); return; }
+    added.forEach(entry => d.planner.push(entry));
+    saveDB(); toast(added.length + ' día(s) copiados de la semana anterior.'); render();
+    return;
+  }
+  if(a === 'plan-reminder'){ enablePlanReminders(); return; }
+  if(a === 'program-new'){ const ps = planState(); ps.programEdit = 'new'; ps.tab = 'programs'; render(); return; }
+  if(a === 'program-edit'){ const ps = planState(); ps.programEdit = el.dataset.id; ps.tab = 'programs'; render(); return; }
+  if(a === 'program-cancel'){ planState().programEdit = null; render(); return; }
+  if(a === 'program-save'){ saveProgramForm(); return; }
+  if(a === 'program-add-phase'){ const box = document.getElementById('pf-phases'); if(box) box.insertAdjacentHTML('beforeend', planPhaseRowHTML(null)); return; }
+  if(a === 'program-add-goal'){ const box = document.getElementById('pf-goals'); if(box) box.insertAdjacentHTML('beforeend', planGoalRowHTML(null, dataFor(currentUser))); return; }
+  if(a === 'program-remove-row'){ const row = el.closest('.plan-phase-row, .plan-goal-row'); if(row) row.remove(); return; }
+  if(a === 'program-duplicate'){
+    const d = dataFor(currentUser); const program = PL.programById(d, el.dataset.id);
+    if(!program) return;
+    d.programs.push(PL.duplicateProgram(program));
+    saveDB(); toast('Programa duplicado. Queda en pausa hasta que lo actives.'); render();
+    return;
+  }
+  if(a === 'program-status'){
+    const d = dataFor(currentUser); const program = PL.programById(d, el.dataset.id);
+    if(!program) return;
+    const next = el.dataset.status;
+    if(!PL.STATUSES.some(x => x.id === next)) return;
+    if(next === 'active'){ d.programs.forEach(x => { if(x.status === 'active' && x.id !== program.id) x.status = 'paused'; }); toast('Programa activo: ' + program.name); }
+    program.status = next; program.updatedAt = nowIso();
+    saveDB(); render();
+    return;
+  }
+  if(a === 'program-delete'){
+    const d = dataFor(currentUser); const program = PL.programById(d, el.dataset.id);
+    if(!program) return;
+    confirmModal('¿Eliminar el programa?', 'Se borra el programa y sus fases, pero tus entrenamientos realizados y los días del calendario se conservan.', 'Eliminar programa', () => {
+      d.programs = d.programs.filter(x => x.id !== program.id);
+      saveDB(); closeModal(); toast('Programa eliminado.', 'info'); render();
+    });
+    return;
+  }
   if(a === 'bc-variation'){
     if(bcCurrent){ state.bc.vi = Number(el.dataset.i) || 0; state.bc.wi = 0; bcRenderBody(bcCurrentMeta, bcCurrent); }
     return;
@@ -5027,8 +5761,18 @@ document.addEventListener('click', e => {
     return;
   }
   if(a === 'share-progress'){ shareProgressChart(); return; }
-  if(a === 'progress-prs'){ state.prExercise = state.progressExercise; nav('#/prs'); return; }
-  if(a === 'pr-progress'){ state.progressExercise = state.prExercise; nav('#/progress'); return; }
+  if(a === 'progress-prs'){
+    state.prExercise = state.progressExercise;
+    render();
+    requestAnimationFrame(() => { const box = $('#records-block'); if(box && box.scrollIntoView) box.scrollIntoView({ behavior:'smooth', block:'start' }); });
+    return;
+  }
+  if(a === 'pr-progress'){
+    state.progressExercise = state.prExercise;
+    nav('#/progress');
+    requestAnimationFrame(() => { const box = $('#pg-select'); if(box && box.scrollIntoView) box.scrollIntoView({ behavior:'smooth', block:'center' }); });
+    return;
+  }
   if(a === 'delete-auto-record'){
     const d = dataFor(currentUser);
     d.records = (d.records || []).filter(r => r.id !== el.dataset.id);
@@ -5050,12 +5794,35 @@ document.addEventListener('click', e => {
     if(!date){ toast('Elige una fecha.', 'error'); return; }
     if(!(weight > 0 && weight <= LIMITS.kg)){ toast('Introduce un peso válido entre 0 y ' + LIMITS.kg + ' kg.', 'error'); return; }
     const d = dataFor(currentUser);
-    const existing = d.weights.find(w => w.date === date);
-    const isUpdate = !!existing;
-    if(existing) existing.weight = weight;
-    else d.weights.push({ id: uid(), date, weight });
+    const edit = state.weightEdit || null;
+    const dupe = d.weights.find(w => w.date === date && !(edit && w.id === edit.id));
+    if(edit){
+      const target = d.weights.find(w => w.id === edit.id);
+      state.weightEdit = null;
+      if(!target){ render(); return; }
+      if(dupe){
+        /* La fecha destino ya tenía medición: se conserva una sola, con el valor nuevo. */
+        target.weight = weight;
+        target.date = date;
+        d.weights = d.weights.filter(w => w !== dupe);
+      } else {
+        target.weight = weight;
+        target.date = date;
+      }
+      d.weights.sort((x, y) => x.date.localeCompare(y.date));
+      saveDB(); toast('Medición actualizada: ' + weight + ' kg');
+      render();
+      return;
+    }
+    if(dupe){
+      dupe.weight = weight;
+      saveDB(); toast('Actualizado: ' + weight + ' kg para ese día');
+      render();
+      return;
+    }
+    d.weights.push({ id: uid(), date, weight });
     d.weights.sort((x,y) => x.date.localeCompare(y.date));
-    saveDB(); toast(isUpdate ? `Actualizado: ${weight} kg para ese día` : `Registrado: ${weight} kg`);
+    saveDB(); toast('Registrado: ' + weight + ' kg');
     render();
     return;
   }
@@ -5206,6 +5973,7 @@ document.addEventListener('change', e => {
   }
   if(t.id === 'pr-select'){
     state.prExercise = t.value;
+    state.progressExercise = t.value;
     render();
   }
   if(t.id === 'import-workouts-input' && t.files && t.files[0]){
@@ -5288,8 +6056,11 @@ document.addEventListener('submit', async e => {
       const mail = u.trim().toLowerCase();
       if(!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(mail)){ showAuthError('Introduce un correo válido.'); return; }
       if(p.length < 8){ showAuthError('La contraseña debe tener al menos 8 caracteres.'); return; }
+      const nameEl = $('#auth-name');
+      const cloudName = nameEl ? nameEl.value.trim().replace(/\s+/g, ' ') : '';
+      if(cloudName && (cloudName.length < 2 || cloudName.length > 40)){ showAuthError('El nombre de usuario debe tener entre 2 y 40 caracteres.'); return; }
       const btn = $('#auth-submit'); btn.disabled = true;
-      const err = await DrakoSB.signUp(mail, p, consent);
+      const err = await DrakoSB.signUp(mail, p, consent, cloudName || undefined);
       btn.disabled = false;
       if(typeof err === 'string' && err){ showAuthError(err); return; }
       $('#auth-err').classList.add('hidden');
@@ -5354,6 +6125,7 @@ function setAuthMode(mode){
   const submit = $('#auth-submit'); if(!submit) return;
   const userLabel = $('#auth-user-label'), userInput = $('#auth-user');
   const passField = $('#auth-pass-field'), passInput = $('#auth-pass');
+  const nameField = $('#auth-name-field'), nameInput = $('#auth-name');
   const cloudExtra = $('#cloud-extra');
   const toggle = $('#cloud-toggle'), localLink = $('#local-signup-link'), cloudLink = $('#cloud-mode-link');
   const forgotBtn = cloudExtra ? cloudExtra.querySelector('[data-auth-alt="forgot"]') : null;
@@ -5362,6 +6134,8 @@ function setAuthMode(mode){
   /* Consentimiento: solo visible al crear cuenta y siempre sin premarcar */
   const consentBox = $('#consent-box');
   const isSignup = mode === 'signup' || mode === 'signup-local';
+  if(nameField) nameField.classList.toggle('hidden', mode !== 'signup');
+  if(nameInput) nameInput.disabled = mode !== 'signup';
   if(consentBox) consentBox.classList.toggle('hidden', !isSignup);
   if(!isSignup){
     const c1 = $('#consent-terms'), c2 = $('#consent-age');
@@ -5420,6 +6194,19 @@ document.addEventListener('click', e => {
   const tab = e.target.closest('.auth-tab');
   if(tab) setAuthMode(tab.dataset.auth);
 });
+async function saveCloudName(){
+  if(!isCloud()){ toast('Inicia sesión en la nube para cambiar el nombre.', 'error'); return; }
+  const input = $('#set-cloud-name');
+  const name = input ? input.value.trim().replace(/\s+/g, ' ') : '';
+  if(name.length < 2 || name.length > 40){ toast('El nombre debe tener entre 2 y 40 caracteres.', 'error'); return; }
+  const btn = document.querySelector('[data-action="save-cloud-name"]');
+  if(btn) btn.disabled = true;
+  const err = await DrakoSB.updateProfile(name);
+  if(btn) btn.disabled = false;
+  if(typeof err === 'string' && err){ toast(err, 'error'); return; }
+  render();
+  toast('Nombre de usuario guardado.');
+}
 function showAuthError(msg){
   const box = $('#auth-err');
   box.textContent = msg;
@@ -5490,9 +6277,14 @@ window.addEventListener('hashchange', () => { render(); focusMain(); });
     currentUser = DrakoSB.email();
     localStorage.setItem(SESSION_KEY, currentUser);
     dataFor(currentUser);
+    try{
+      opQueue.recover(currentUser);
+      const st0 = cloudSync.state(currentUser);
+      if(st0 && st0.dirty) enqueueSyncJob(currentUser, st0, 'boot');
+    }catch(e){}
     render();
     DrakoSB.refresh().then(ok => {
-      if(!ok) return;
+      if(!ok){ renderOfflineBar(); return; }
       runSync(false).then(() => { if(currentUser) render(); });
     });
   } else {
@@ -5502,17 +6294,1129 @@ window.addEventListener('hashchange', () => { render(); focusMain(); });
 
 /* Si el dispositivo estuvo sin conexión, al volver la red se reintenta solo:
    los cambios pendientes ya están guardados en localStorage. */
-window.addEventListener('online', () => {
-  if(isCloud()) runSync(false);
+window.addEventListener('online', () => { offlineState.online = true; handleConnectivity('online'); });
+window.addEventListener('offline', () => { offlineState.online = false; renderOfflineBar(); });
+document.addEventListener('visibilitychange', () => {
+  if(document.visibilityState === 'visible' && Date.now() - (offlineState.lastCheck || 0) > 8000) handleConnectivity('visible');
+});
+window.addEventListener('focus', () => {
+  if(Date.now() - (offlineState.lastCheck || 0) > 15000) handleConnectivity('focus');
 });
 
 /* ---------------- PWA: registro del service worker ---------------- */
 /* Solo en contextos seguros (https o localhost): la app sigue funcionando
    igual si el navegador no lo soporta o el registro falla. */
-(function registerServiceWorker(){
+setupPwa();
+/* ============================================================
+   PROMPT 6 — Programas, planificación semanal y calendario
+   Los datos viven en d.programs y d.planner (sync.js los trata
+   como colecciones normales). Las sesiones nunca se reescriben:
+   el plan solo enlaza sessionId y el estado se deduce.
+   ============================================================ */
+function planState(){
+  if(!state.plan) state.plan = { tab:'week', week:PL.weekStart(todayISO()), month:todayISO().slice(0, 7), selectedDay:todayISO(), programEdit:null };
+  if(!state.plan.week) state.plan.week = PL.weekStart(todayISO());
+  if(!state.plan.month) state.plan.month = todayISO().slice(0, 7);
+  if(!state.plan.selectedDay) state.plan.selectedDay = todayISO();
+  return state.plan;
+}
+function planNameOf(d){
+  return id => {
+    const w = getWorkout(id);
+    if(w) return w.name;
+    const e = ((d && d.planner) || []).find(x => x.workoutId === id);
+    return e ? e.workoutName || '' : '';
+  };
+}
+function planWorkoutChoices(d){
+  const list = [], seen = new Set();
+  ((d && d.workouts) || []).forEach(w => { if(w && w.id && !seen.has(w.id)){ seen.add(w.id); list.push({ id:w.id, name:w.name }); } });
+  (typeof LIBRARY !== 'undefined' ? LIBRARY : []).forEach(w => { if(w && w.id && !seen.has(w.id)){ seen.add(w.id); list.push({ id:w.id, name:w.name }); } });
+  return list.sort((a, b) => a.name.localeCompare(b.name, 'es'));
+}
+function planChip(status){
+  const map = {
+    done: ['Hecha', 'is-done'], progress: ['En curso', 'is-progress'], pending: ['Pendiente', 'is-pending'],
+    missed: ['Omitida', 'is-missed'], rest: ['Descanso', 'is-rest'], none: ['—', 'is-none'],
+  };
+  const item = map[status] || map.none;
+  return '<span class="plan-chip ' + item[1] + '">' + item[0] + '</span>';
+}
+function planMoveOptions(entry){
+  const dates = PL.weekDates(entry.date).concat(PL.weekDates(PL.addDays(entry.date, 7)));
+  return dates.map(date => '<option value="' + esc(date) + '"' + (date === entry.date ? ' selected' : '') + '>' + esc(fmtDate(date)) + '</option>').join('');
+}
+function planEntryHTML(d, entry){
+  const status = PL.entryStatus(entry, PL.sessionsById(d), todayISO());
+  const isRest = entry.kind === 'rest';
+  const name = isRest ? 'Descanso' : (entry.workoutName || planNameOf(d)(entry.workoutId) || 'Rutina eliminada');
+  let actions = '';
+  if(!isRest && status !== 'done') actions += '<button class="btn btn-primary btn-sm" type="button" data-action="plan-start" data-id="' + esc(entry.id) + '">Empezar</button>';
+  if(!isRest && entry.sessionId) actions += '<button class="btn btn-ghost btn-sm" type="button" data-action="open-session" data-id="' + esc(entry.sessionId) + '">Ver sesión</button>';
+  actions += '<label class="plan-move"><span class="sr-only">Mover a otro día</span><select data-plan-move="' + esc(entry.id) + '">' + planMoveOptions(entry) + '</select></label>';
+  actions += '<button class="icon-btn danger" type="button" data-action="plan-clear" data-id="' + esc(entry.id) + '" aria-label="Quitar del plan" title="Quitar del plan">✕</button>';
+  return '<div class="plan-entry">'
+    + '<div class="plan-entry-head"><span class="plan-entry-name">' + esc(name) + '</span>' + (isRest ? planChip('rest') : planChip(status)) + '</div>'
+    + '<div class="plan-entry-actions">' + actions + '</div>'
+    + '</div>';
+}
+function planAddSelectHTML(d, date){
+  const choices = planWorkoutChoices(d).map(w => '<option value="' + esc(w.id) + '">' + esc(w.name) + '</option>').join('');
+  return '<label class="plan-add"><span class="sr-only">Añadir a este día</span><select data-plan-add="' + esc(date) + '"><option value="">+ Añadir…</option><option value="rest">Descanso</option>' + choices + '</select></label>';
+}
+function planReminderHTML(){
+  const d = dataFor(currentUser);
+  const on = !!(d.prefs && d.prefs.planReminder);
+  const supported = typeof window !== 'undefined' && 'Notification' in window;
+  if(!supported) return '<p class="muted small">Este navegador no admite notificaciones locales. Los avisos push con la app cerrada necesitan infraestructura adicional; no se simulan.</p>';
+  if(on && window.Notification.permission === 'granted') return '<p class="muted small">Recordatorios activos: al abrir la app el día del entrenamiento verás un aviso local. Con la app cerrada no hay push.</p>';
+  return '<button class="btn btn-ghost btn-sm" type="button" data-action="plan-reminder">Activar recordatorios del plan</button><p class="muted small">El permiso se pide solo al pulsar. Sin servidor push, el aviso llega al abrir la app ese día.</p>';
+}
+function planWeekHTML(d){
+  const ps = planState();
+  const dates = PL.weekDates(ps.week);
+  const entries = PL.entriesForWeek(d.planner, ps.week);
+  const byDate = new Map(dates.map(x => [x, []]));
+  entries.forEach(e => { if(byDate.has(e.date)) byDate.get(e.date).push(e); });
+  const doneByDate = new Map(dates.map(x => [x, []]));
+  ((d && d.sessions) || []).forEach(s => {
+    if(!s || !s.finished || s.status === 'cancelled' || !doneByDate.has(s.date)) return;
+    doneByDate.get(s.date).push(s);
+  });
+  const program = PL.activeProgram(d);
+  const today = todayISO();
+  const rows = dates.map((date, i) => {
+    const dayEntries = byDate.get(date) || [];
+    const done = doneByDate.get(date) || [];
+    const plannedSessions = new Set(dayEntries.map(e => e.sessionId).filter(Boolean));
+    const extra = done.filter(s => !plannedSessions.has(s.id));
+    const bits = [];
+    dayEntries.forEach(e => bits.push(planEntryHTML(d, e)));
+    extra.forEach(s => bits.push('<p class="plan-extra">También entrenaste: <b>' + esc(s.workoutName) + '</b> · <button class="linklike" type="button" data-action="open-session" data-id="' + esc(s.id) + '">ver</button></p>'));
+    return '<div class="plan-day' + (date === today ? ' is-today' : '') + (date < today ? ' is-past' : '') + '">'
+      + '<div class="plan-day-head"><span class="plan-day-name">' + esc(PL.WEEKDAY_LABELS[i]) + '</span><span class="plan-day-date">' + esc(fmtDate(date)) + '</span></div>'
+      + '<div class="plan-day-body">' + (bits.join('') || '<p class="muted small">Sin planificar.</p>') + planAddSelectHTML(d, date) + '</div>'
+      + '</div>';
+  }).join('');
+  return ''
+    + '<div class="plan-bar">'
+    +   '<button class="btn btn-ghost btn-sm" type="button" data-action="plan-week" data-dir="-1" aria-label="Semana anterior">‹</button>'
+    +   '<span class="plan-range">' + esc(fmtDate(ps.week)) + ' – ' + esc(fmtDate(PL.addDays(ps.week, 6))) + '</span>'
+    +   '<button class="btn btn-ghost btn-sm" type="button" data-action="plan-week" data-dir="1" aria-label="Semana siguiente">›</button>'
+    +   '<button class="btn btn-ghost btn-sm" type="button" data-action="plan-today">Hoy</button>'
+    + '</div>'
+    + (program
+        ? '<p class="plan-program-line">Programa activo: <b>' + esc(program.name) + '</b> · <button class="linklike" type="button" data-action="plan-tab" data-tab="programs">gestionar</button></p>'
+        : '<p class="plan-program-line muted">Sin programa activo. <button class="linklike" type="button" data-action="plan-tab" data-tab="programs">Crear uno</button></p>')
+    + '<div class="plan-actions">'
+    +   '<button class="btn btn-primary btn-sm" type="button" data-action="plan-apply-template">Aplicar plantilla a esta semana</button>'
+    +   '<button class="btn btn-ghost btn-sm" type="button" data-action="plan-copy-prev">Copiar semana anterior</button>'
+    + '</div>'
+    + '<div class="plan-week">' + rows + '</div>'
+    + '<section class="card plan-reminder"><h3>Recordatorios</h3>' + planReminderHTML() + '</section>';
+}
+function planMonthHTML(d){
+  const ps = planState();
+  const [year, month] = ps.month.split('-').map(Number);
+  const grid = PL.monthGrid(year, month - 1);
+  const sessions = PL.sessionsById(d);
+  const byDate = new Map();
+  ((d && d.planner) || []).forEach(e => { if(!byDate.has(e.date)) byDate.set(e.date, []); byDate.get(e.date).push(e); });
+  const doneByDate = new Map();
+  ((d && d.sessions) || []).forEach(s => { if(s && s.finished && s.status !== 'cancelled'){ if(!doneByDate.has(s.date)) doneByDate.set(s.date, 0); doneByDate.set(s.date, doneByDate.get(s.date) + 1); } });
+  const today = todayISO();
+  const head = PL.WEEKDAY_LABELS.map(x => '<span class="cal-dow">' + esc(x.slice(0, 2)) + '</span>').join('');
+  const cells = grid.map(week => week.map(cell => {
+    const entries = byDate.get(cell.date) || [];
+    const statuses = entries.map(e => PL.entryStatus(e, sessions, today));
+    const doneCount = doneByDate.get(cell.date) || 0;
+    const classes = ['cal-cell'];
+    if(!cell.inMonth) classes.push('is-out');
+    if(cell.date === today) classes.push('is-today');
+    if(cell.date === ps.selectedDay) classes.push('is-selected');
+    if(statuses.includes('done') || doneCount > 0) classes.push('has-done');
+    if(statuses.includes('missed')) classes.push('has-missed');
+    if(statuses.includes('pending')) classes.push('has-pending');
+    if(statuses.includes('rest')) classes.push('has-rest');
+    return '<button type="button" class="' + classes.join(' ') + '" data-action="plan-day" data-date="' + esc(cell.date) + '">'
+      + '<span class="cal-num">' + cell.day + '</span>'
+      + '<span class="cal-marks">' + (doneCount ? '<span class="cal-dot done" title="Entrenamiento completado"></span>' : '')
+      + (statuses.includes('pending') ? '<span class="cal-dot pending" title="Planificado"></span>' : '')
+      + (statuses.includes('missed') ? '<span class="cal-dot missed" title="Omitido"></span>' : '')
+      + (statuses.includes('rest') ? '<span class="cal-dot rest" title="Descanso"></span>' : '') + '</span>'
+      + '</button>';
+  }).join('')).join('');
+  const label = new Date(Date.UTC(year, month - 1, 1)).toLocaleDateString('es', { month:'long', year:'numeric' });
+  return ''
+    + '<div class="plan-bar">'
+    +   '<button class="btn btn-ghost btn-sm" type="button" data-action="plan-month" data-dir="-1" aria-label="Mes anterior">‹</button>'
+    +   '<span class="plan-range">' + esc(label) + '</span>'
+    +   '<button class="btn btn-ghost btn-sm" type="button" data-action="plan-month" data-dir="1" aria-label="Mes siguiente">›</button>'
+    +   '<button class="btn btn-ghost btn-sm" type="button" data-action="plan-today">Hoy</button>'
+    + '</div>'
+    + '<div class="cal-head">' + head + '</div>'
+    + '<div class="cal-grid">' + cells + '</div>'
+    + '<div class="cal-legend"><span><i class="cal-dot pending"></i> Planificado</span><span><i class="cal-dot done"></i> Completado</span><span><i class="cal-dot missed"></i> Omitido</span><span><i class="cal-dot rest"></i> Descanso</span></div>'
+    + planDayDetailHTML(d);
+}
+function planDayDetailHTML(d){
+  const ps = planState();
+  const day = PL.daySummary(d, ps.selectedDay);
+  const entries = day.entries.map(item => planEntryHTML(d, item.entry)).join('');
+  const done = day.done.map(s => '<div class="pr-item"><span>' + esc(s.workoutName) + '</span><span class="muted small">' + esc(SESSION_STATUS_LABELS[s.status] || 'Completada') + '</span><button class="btn btn-ghost btn-sm" type="button" data-action="open-session" data-id="' + esc(s.id) + '">Ver sesión</button></div>').join('');
+  const extra = day.extra.length ? '<p class="muted small">' + day.extra.length + ' de estas sesiones no estaban planificadas: se conservan tal cual.</p>' : '';
+  return '<section class="card plan-day-detail"><h3>' + esc(fmtDateLong(day.date)) + '</h3>'
+    + (entries || '<p class="muted small">Nada planificado para este día.</p>')
+    + (done ? '<div class="pr-list plan-done-list">' + done + '</div>' : '')
+    + extra
+    + planAddSelectHTML(d, day.date)
+    + '</section>';
+}
+function planProgramCard(d, program){
+  const progress = PL.programProgress(program, todayISO());
+  const goals = PL.evaluateGoals(program, d, PG, { today: todayISO(), resolve: name => resolveExerciseId(name, d) });
+  const sessions = ((d.sessions || []).filter(s => s && s.finished && s.status !== 'cancelled'
+    && s.date >= (program.startDate || '0000-00-00') && s.date <= (program.endDate || '9999-12-31'))).length;
+  const goalsHTML = goals.length
+    ? '<ul class="plan-goals">' + goals.map(g => {
+        const pct = g.target ? Math.min(100, Math.round(g.current / g.target * 100)) : 0;
+        return '<li><span>' + esc(g.label) + '</span><span class="plan-goal-val">' + (g.verifiable ? esc(String(g.current)) + ' / ' + esc(String(g.target)) + ' ' + esc(g.unit) : 'Sin datos') + '</span>'
+          + '<span class="plan-goal-track"><span class="plan-goal-fill' + (g.met ? ' is-met' : '') + '" style="width:' + (g.verifiable ? pct : 0) + '%"></span></span></li>';
+      }).join('') + '</ul>'
+    : '<p class="muted small">Sin objetivos definidos.</p>';
+  const phases = (program.phases || []).length
+    ? '<p class="muted small">Fases: ' + program.phases.map(ph => esc(ph.name) + (ph.weeks ? ' (' + ph.weeks + ' sem)' : '')).join(' · ') + '</p>'
+    : '';
+  const statusButtons = [];
+  if(program.status === 'active') statusButtons.push('<button class="btn btn-ghost btn-sm" type="button" data-action="program-status" data-id="' + esc(program.id) + '" data-status="paused">Pausar</button>');
+  if(program.status === 'paused') statusButtons.push('<button class="btn btn-primary btn-sm" type="button" data-action="program-status" data-id="' + esc(program.id) + '" data-status="active">Reanudar</button>');
+  if(program.status !== 'completed') statusButtons.push('<button class="btn btn-ghost btn-sm" type="button" data-action="program-status" data-id="' + esc(program.id) + '" data-status="completed">Completar</button>');
+  if(program.status !== 'archived') statusButtons.push('<button class="btn btn-ghost btn-sm" type="button" data-action="program-status" data-id="' + esc(program.id) + '" data-status="archived">Archivar</button>');
+  return '<article class="card plan-program">'
+    + '<div class="plan-program-head"><h3>' + esc(program.name) + '</h3><span class="plan-chip is-' + esc(program.status) + '">' + esc(PL.statusLabel(program.status)) + '</span></div>'
+    + (program.description ? '<p class="muted small">' + esc(program.description) + '</p>' : '')
+    + '<p class="muted small">' + esc(fmtDate(program.startDate)) + (program.endDate ? ' → ' + esc(fmtDate(program.endDate)) : '') + ' · ' + program.weeks + ' semanas · ' + program.daysPerWeek + ' días/semana · ' + (program.workoutIds || []).length + ' rutinas · ' + sessions + ' sesiones hechas</p>'
+    + '<div class="plan-progress"><span style="width:' + progress.pct + '%"></span></div><p class="muted small">Semana ' + progress.elapsed + ' de ' + progress.weeks + (progress.remaining ? ' · quedan ' + progress.remaining : '') + '</p>'
+    + phases
+    + goalsHTML
+    + '<div class="plan-program-actions">' + statusButtons.join('')
+    + '<button class="btn btn-ghost btn-sm" type="button" data-action="program-duplicate" data-id="' + esc(program.id) + '">Duplicar</button>'
+    + '<button class="btn btn-ghost btn-sm" type="button" data-action="program-edit" data-id="' + esc(program.id) + '">Editar</button>'
+    + '<button class="icon-btn danger" type="button" data-action="program-delete" data-id="' + esc(program.id) + '" aria-label="Eliminar programa" title="Eliminar programa">✕</button>'
+    + '</div></article>';
+}
+function renderPlanPrograms(d){
+  const ps = planState();
+  if(ps.programEdit) return planEditorHTML(d, ps.programEdit);
+  const programs = (d.programs || []).slice().sort((a, b) => (a.status === 'active' ? -1 : 0) - (b.status === 'active' ? -1 : 0) || String(a.name).localeCompare(String(b.name), 'es'));
+  return '<div class="plan-actions"><button class="btn btn-primary btn-sm" type="button" data-action="program-new">+ Nuevo programa</button></div>'
+    + (programs.length ? programs.map(p => planProgramCard(d, p)).join('') : '<div class="empty-state">Aún no hay programas. Crea uno, define sus rutinas y su plantilla semanal, y aplícala al calendario.</div>');
+}
+function planPhaseRowHTML(phase){
+  const ph = phase || { id:'', name:'', weeks:3, goal:'', notes:'' };
+  return '<div class="plan-phase-row" data-id="' + esc(ph.id || '') + '">'
+    + '<label class="field"><span>Fase</span><input class="ph-name" value="' + esc(ph.name) + '" placeholder="Hipertrofia" maxlength="80"></label>'
+    + '<label class="field"><span>Semanas</span><input class="ph-weeks" type="number" min="1" max="104" value="' + esc(String(ph.weeks || 1)) + '"></label>'
+    + '<label class="field"><span>Objetivo</span><input class="ph-goal" value="' + esc(ph.goal || '') + '" maxlength="200"></label>'
+    + '<label class="field"><span>Notas</span><input class="ph-notes" value="' + esc(ph.notes || '') + '" maxlength="500"></label>'
+    + '<button class="icon-btn danger" type="button" data-action="program-remove-row" aria-label="Quitar fase">✕</button>'
+    + '</div>';
+}
+function planGoalRowHTML(goal, d){
+  const g = goal || { id:'', type:'sessions', target:12, exerciseId:'', targetWeight:0 };
+  const options = PG.GOAL_TYPES || [];
+  const ex = exerciseOptions(d).map(o => '<option value="' + esc(o.id) + '"' + (o.id === g.exerciseId ? ' selected' : '') + '>' + esc(o.name) + '</option>').join('');
+  return '<div class="plan-goal-row" data-id="' + esc(g.id || '') + '">'
+    + '<label class="field"><span>Objetivo</span><select class="pg-type">' + options.map(t => '<option value="' + esc(t.id) + '"' + (t.id === g.type ? ' selected' : '') + '>' + esc(t.label) + '</option>').join('') + '</select></label>'
+    + '<label class="field"><span>Meta</span><input class="pg-target" type="number" min="0" max="100000" step="0.5" value="' + esc(String(g.target || 0)) + '"></label>'
+    + '<label class="field"><span>Ejercicio (peso/reps)</span><select class="pg-ex"><option value="">—</option>' + ex + '</select></label>'
+    + '<label class="field"><span>Peso para reps</span><input class="pg-tw" type="number" min="0" max="1000" step="0.5" value="' + esc(String(g.targetWeight || 0)) + '"></label>'
+    + '<button class="icon-btn danger" type="button" data-action="program-remove-row" aria-label="Quitar objetivo">✕</button>'
+    + '</div>';
+}
+function planEditorHTML(d, edit){
+  const isNew = edit === 'new';
+  const program = isNew ? { id:'', name:'', description:'', goal:'', startDate:todayISO(), endDate:'', weeks:8, daysPerWeek:3, status:'active', workoutIds:[], template:['','','','','','',''], phases:[], goals:[] } : (PL.programById(d, edit) || PL.newProgram());
+  const choices = planWorkoutChoices(d);
+  const goalOptions = [{ id:'', label:'Sin objetivo definido' }, { id:'fuerza', label:'Fuerza' }, { id:'hipertrofia', label:'Hipertrofia' }, { id:'resistencia', label:'Resistencia' }, { id:'perdida-grasa', label:'Pérdida de grasa' }, { id:'salud', label:'Salud general' }];
+  const workoutChecks = choices.map(w => '<label class="check-inline"><input type="checkbox" data-pf-workout value="' + esc(w.id) + '"' + ((program.workoutIds || []).includes(w.id) ? ' checked' : '') + '> ' + esc(w.name) + '</label>').join('');
+  const templateRows = [0,1,2,3,4,5,6].map(i => {
+    const current = (program.template || [])[i] || '';
+    const opts = ['<option value="">—</option>', '<option value="rest"' + (current === 'rest' ? ' selected' : '') + '>Descanso</option>']
+      .concat(choices.map(w => '<option value="' + esc(w.id) + '"' + (current === w.id ? ' selected' : '') + '>' + esc(w.name) + '</option>')).join('');
+    return '<label class="field"><span>' + esc(PL.WEEKDAY_LABELS[i]) + '</span><select data-pf-tpl="' + i + '">' + opts + '</select></label>';
+  }).join('');
+  return '<div class="card plan-editor">'
+    + '<h3>' + (isNew ? 'Nuevo programa' : 'Editar programa') + '</h3>'
+    + '<div class="plan-form">'
+    + '<label class="field"><span>Nombre</span><input id="pf-name" maxlength="120" value="' + esc(program.name) + '" placeholder="Bloque de fuerza 8 semanas"></label>'
+    + '<label class="field"><span>Descripción</span><textarea id="pf-desc" maxlength="600" rows="2">' + esc(program.description || '') + '</textarea></label>'
+    + '<label class="field"><span>Objetivo principal</span><select id="pf-goal">' + goalOptions.map(o => '<option value="' + esc(o.id) + '"' + (o.id === (program.goal || '') ? ' selected' : '') + '>' + esc(o.label) + '</option>').join('') + '</select></label>'
+    + '<label class="field"><span>Inicio</span><input id="pf-start" type="date" value="' + esc(program.startDate || todayISO()) + '"></label>'
+    + '<label class="field"><span>Fin (opcional)</span><input id="pf-end" type="date" value="' + esc(program.endDate || '') + '"></label>'
+    + '<label class="field"><span>Duración (semanas)</span><input id="pf-weeks" type="number" min="1" max="104" value="' + esc(String(program.weeks || 8)) + '"></label>'
+    + '<label class="field"><span>Días por semana</span><input id="pf-days" type="number" min="1" max="7" value="' + esc(String(program.daysPerWeek || 3)) + '"></label>'
+    + '<label class="field"><span>Estado</span><select id="pf-status">' + PL.STATUSES.map(x => '<option value="' + esc(x.id) + '"' + (x.id === program.status ? ' selected' : '') + '>' + esc(x.label) + '</option>').join('') + '</select></label>'
+    + '</div>'
+    + '<h4>Rutinas del programa</h4><div class="plan-checks">' + (workoutChecks || '<p class="muted small">No hay rutinas disponibles todavía.</p>') + '</div>'
+    + '<h4>Plantilla semanal</h4><p class="muted small">Se aplica a una semana concreta con «Aplicar plantilla»; cambiar la plantilla no modifica semanas ya planificadas.</p><div class="plan-template">' + templateRows + '</div>'
+    + '<h4>Fases</h4><div id="pf-phases" class="plan-rows">' + (program.phases || []).map(planPhaseRowHTML).join('') + '</div>'
+    + '<button class="btn btn-ghost btn-sm" type="button" data-action="program-add-phase">+ Añadir fase</button>'
+    + '<h4>Objetivos</h4><div id="pf-goals" class="plan-rows">' + (program.goals || []).map(g => planGoalRowHTML(g, d)).join('') + '</div>'
+    + '<button class="btn btn-ghost btn-sm" type="button" data-action="program-add-goal">+ Añadir objetivo</button>'
+    + '<p class="muted small">Los objetivos se comprueban con tus sesiones y récords reales. Un objetivo sin datos aparece como «Sin datos», nunca como cumplido.</p>'
+    + '<div class="plan-actions"><button class="btn btn-primary" type="button" data-action="program-save">Guardar programa</button><button class="btn btn-ghost" type="button" data-action="program-cancel">Cancelar</button></div>'
+    + '</div>';
+}
+function planSegHTML(){
+  const ps = planState();
+  return '<div class="plan-seg" role="tablist" aria-label="Vistas del plan">'
+    + PLAN_TABS.map(t => '<button type="button" role="tab" aria-selected="' + (ps.tab === t.id) + '" class="plan-seg-btn' + (ps.tab === t.id ? ' is-active' : '') + '" data-action="plan-tab" data-tab="' + t.id + '">' + esc(t.label) + '</button>').join('')
+    + '</div>';
+}
+function renderPlan(main){
+  const d = dataFor(currentUser);
+  PL.ensurePlanData(d);
+  const ps = planState();
+  const body = ps.tab === 'programs' ? renderPlanPrograms(d) : ps.tab === 'month' ? planMonthHTML(d) : planWeekHTML(d);
+  main.innerHTML = '<div class="page-head"><h1>Plan</h1><p class="muted">Programas, plantilla semanal y calendario. Lo que entrenas de verdad se guarda aparte: aquí no se reescribe tu historial.</p></div>'
+    + planSegHTML() + body;
+  document.querySelectorAll('[data-plan-move]').forEach(sel => sel.addEventListener('change', () => {
+    const dd = dataFor(currentUser);
+    const entry = (dd.planner || []).find(x => x.id === sel.dataset.planMove);
+    if(!entry || !sel.value) return;
+    PL.moveEntry(entry, sel.value);
+    saveDB();
+    toast('Movido al ' + fmtDate(sel.value));
+    render();
+  }));
+  document.querySelectorAll('[data-plan-add]').forEach(sel => sel.addEventListener('change', () => {
+    if(!sel.value) return;
+    planAddEntry(sel.dataset.planAdd, sel.value);
+  }));
+  if(ps.tab === 'week') maybePlanReminder();
+}
+function planAddEntry(date, value){
+  const d = dataFor(currentUser);
+  const program = PL.activeProgram(d);
+  if(value === 'rest'){
+    if(!d.planner.some(e => e.date === date && e.kind === 'rest')){
+      d.planner.push({ id: PL.newId(), date, programId: program ? program.id : '', kind:'rest', workoutId:'', workoutName:'', sessionId:'' });
+    }
+  } else {
+    const w = getWorkout(value);
+    d.planner.push({ id: PL.newId(), date, programId: program ? program.id : '', kind:'workout', workoutId:value, workoutName:w ? w.name : '', sessionId:'' });
+  }
+  saveDB();
+  render();
+}
+function saveProgramForm(){
+  const d = dataFor(currentUser);
+  const ps = planState();
+  const isNew = ps.programEdit === 'new';
+  const program = isNew ? PL.newProgram({ startDate: todayISO() }) : PL.programById(d, ps.programEdit);
+  if(!program){ planState().programEdit = null; return; }
+  const name = (($('#pf-name') || {}).value || '').trim();
+  if(!name){ toast('Ponle un nombre al programa.', 'error'); return; }
+  program.name = name.slice(0, 120);
+  program.description = (($('#pf-desc') || {}).value || '').slice(0, 600);
+  program.goal = (($('#pf-goal') || {}).value || '').slice(0, 40);
+  program.startDate = (($('#pf-start') || {}).value) || todayISO();
+  program.endDate = (($('#pf-end') || {}).value) || '';
+  program.weeks = Math.max(1, Math.min(104, Number(($('#pf-weeks') || {}).value) || 8));
+  program.daysPerWeek = Math.max(1, Math.min(7, Number(($('#pf-days') || {}).value) || 3));
+  program.status = (($('#pf-status') || {}).value) || 'active';
+  program.workoutIds = $$('input[data-pf-workout]:checked').map(i => i.value);
+  program.template = [0,1,2,3,4,5,6].map(i => { const el = document.querySelector('[data-pf-tpl="' + i + '"]'); return el ? el.value : ''; });
+  program.phases = $$('#pf-phases .plan-phase-row').map(row => ({
+    id: row.dataset.id || PL.newId(),
+    name: (row.querySelector('.ph-name').value || 'Fase').slice(0, 80),
+    weeks: Math.max(1, Math.min(104, Number(row.querySelector('.ph-weeks').value) || 1)),
+    goal: (row.querySelector('.ph-goal').value || '').slice(0, 200),
+    workoutIds: [], notes: (row.querySelector('.ph-notes').value || '').slice(0, 500),
+  }));
+  program.goals = $$('#pf-goals .plan-goal-row').map(row => ({
+    id: row.dataset.id || PL.newId(),
+    type: row.querySelector('.pg-type').value,
+    target: Math.max(0, Math.min(100000, Number(row.querySelector('.pg-target').value) || 0)),
+    exerciseId: (row.querySelector('.pg-ex') || {}).value || '',
+    targetWeight: Math.max(0, Math.min(1000, Number((row.querySelector('.pg-tw') || {}).value) || 0)),
+    period: 'program', label: '',
+  }));
+  program.updatedAt = nowIso();
+  if(isNew) d.programs.push(program);
+  if(program.status === 'active') d.programs.forEach(p => { if(p.status === 'active' && p.id !== program.id) p.status = 'paused'; });
+  saveDB();
+  planState().programEdit = null;
+  toast(isNew ? 'Programa creado.' : 'Programa actualizado.');
+  render();
+}
+function planReminderEnabled(){
+  const d = dataFor(currentUser);
+  return !!(d && d.prefs && d.prefs.planReminder);
+}
+function enablePlanReminders(){
+  const d = dataFor(currentUser);
+  if(typeof window === 'undefined' || !('Notification' in window)){
+    toast('Este navegador no admite notificaciones locales.', 'error');
+    return;
+  }
+  window.Notification.requestPermission().then(permission => {
+    d.prefs.planReminder = permission === 'granted';
+    saveDB();
+    toast(permission === 'granted' ? 'Recordatorios activados: aviso local al abrir la app el día planificado.' : 'Sin permiso de notificaciones: no se activan los avisos.', permission === 'granted' ? 'info' : 'error');
+    render();
+  }).catch(() => toast('No se pudo pedir permiso de notificaciones.', 'error'));
+}
+function maybePlanReminder(){
+  if(!currentUser || !planReminderEnabled()) return;
+  if(typeof window === 'undefined' || !('Notification' in window) || window.Notification.permission !== 'granted') return;
+  const today = todayISO();
+  const key = 'dt_plan_notified_' + currentUser + '_' + today;
+  try { if(localStorage.getItem(key)) return; } catch (e) { return; }
+  const next = PL.upcoming(dataFor(currentUser), 1)[0];
+  if(!next || next.entry.date !== today) return;
+  try {
+    new window.Notification('DrakoTrack — hoy toca entrenar', { body: next.entry.workoutName || 'Entrenamiento planificado', tag: 'dt-plan-' + today });
+    localStorage.setItem(key, '1');
+  } catch (e) { /* notificaciones bloqueadas por el sistema */ }
+}
+const PLAN_TABS = [{ id:'week', label:'Semana' }, { id:'month', label:'Mes' }, { id:'programs', label:'Programas' }];
+
+/* ============================================================
+   Prompt 7 — Dashboard avanzado y analíticas (interfaz)
+   La lógica vive en analytics.js (AN). Aquí solo se pinta, se
+   eligen períodos y se guardan las preferencias en d.prefs.dashboard,
+   que viaja en el perfil sincronizado como el resto de prefs.
+   ============================================================ */
+function anaState(){
+  if(!state.ana) state.ana = { period: null, custom: { from: '', to: '' }, exerciseKey: null, compareKey: '', compare: 'month', config: false, focus: null, group: null };
+  if(!state.ana.custom) state.ana.custom = { from: '', to: '' };
+  return state.ana;
+}
+function anaConfig(d){
+  return AN.normalizeConfig(d && d.prefs ? d.prefs.dashboard : null);
+}
+function anaSaveConfig(d, cfg){
+  if(!d.prefs) d.prefs = {};
+  d.prefs.dashboard = AN.normalizeConfig(cfg);
+  saveDB();
+  return d.prefs.dashboard;
+}
+function anaGroupOf(d){
+  return key => {
+    const entry = findExercise(key, d);
+    return entry && entry.group ? entry.group : '';
+  };
+}
+function anaOpts(d, preset, extra){
+  return Object.assign({
+    preset: preset || 'month',
+    now: todayISO(),
+    PG: PG,
+    PL: PL,
+    resolve: name => resolveExerciseId(name, d),
+    groupOf: anaGroupOf(d),
+  }, extra || {});
+}
+function anaCardHTML(c){
+  const cmp = c.comparable && c.comparison
+    ? '<span class="ana-kpi-cmp ' + (c.delta > 0 ? 'up' : c.delta < 0 ? 'down' : 'flat') + '">' + esc(c.comparison) + '</span>'
+    : '';
+  return '<button type="button" class="ana-kpi" data-action="ana-open" data-card="' + esc(c.id) + '">'
+    + '<span class="ana-kpi-label">' + esc(c.label) + '</span>'
+    + '<span class="ana-kpi-value">' + esc(c.display) + '</span>'
+    + '<span class="ana-kpi-period">' + esc(c.period) + '</span>'
+    + cmp + '</button>';
+}
+function anaKpisHTML(a, cfg){
+  const list = AN.visibleCards(a.cards, cfg);
+  return '<div class="ana-kpis">' + (list.length ? list.map(anaCardHTML).join('') : '<div class="empty-state">Todos los indicadores están ocultos. Restaura la configuración para verlos.</div>') + '</div>';
+}
+function anaDeltaHTML(delta, pct, unit){
+  if(delta == null) return '<span class="ana-muted">—</span>';
+  const cls = delta > 0 ? 'up' : delta < 0 ? 'down' : 'flat';
+  const sign = delta > 0 ? '+' : '';
+  return '<span class="ana-delta ' + cls + '">' + sign + AN.formatKg(delta) + ' ' + esc(unit || '') + (pct == null ? '' : ' · ' + sign + pct + ' %') + '</span>';
+}
+function anaFocusHTML(a, ana){
+  if(!ana.focus) return '';
+  const c = a.cards.find(x => x.id === ana.focus);
+  if(!c) return '';
+  return '<section class="ana-focus" id="ana-focus"><div class="section-head"><h2>' + esc(c.label) + '</h2><button type="button" class="icon-btn" data-action="ana-focus-clear" aria-label="Cerrar detalle">✕</button></div>'
+    + '<p class="ana-focus-value">' + esc(c.display) + ' <span class="muted small">' + esc(c.period) + '</span></p>'
+    + (c.comparable && c.comparison ? '<p class="muted small">' + esc(c.comparison) + '</p>' : '')
+    + (c.hint ? '<p class="muted small">' + esc(c.hint) + '</p>' : '')
+    + '</section>';
+}
+function anaInsightsHTML(a){
+  if(!a.insights.length) return '';
+  return '<section class="ana-sec"><div class="section-head"><h2>Resumen del período</h2><span class="muted">' + esc(a.range.label) + '</span></div>'
+    + '<ul class="ana-insights">' + a.insights.map(i => '<li><span class="ana-fact">Hecho</span> ' + esc(i.text) + '</li>').join('') + '</ul>'
+    + '<p class="muted small">Solo se describen datos registrados. No se atribuyen causas ni se hacen recomendaciones médicas o de carga.</p></section>';
+}
+function anaCompareHTML(a, ana, d){
+  const cmp = ana.compare || 'month';
+  const range = AN.rangeFor(cmp, { now: todayISO() });
+  const exList = a.strength.exercises.map(s => '<option value="' + esc(s.key) + '"' + (s.key === ana.compareKey ? ' selected' : '') + '>' + esc(s.name) + '</option>').join('');
+  const table = AN.comparePeriods(d, PG, name => resolveExerciseId(name, d), { range, exerciseKey: ana.compareKey || null });
+  return '<section class="ana-sec"><div class="section-head"><h2>Comparaciones</h2><span class="muted">' + esc(range.label) + ' frente a ' + esc(range.prevLabel || '—') + '</span></div>'
+    + '<div class="ana-controls"><label class="field"><span>Período</span><select id="ana-compare">'
+    + ['week', 'month', '30', '90'].map(id => '<option value="' + id + '"' + (id === cmp ? ' selected' : '') + '>' + esc((AN.PERIODS.find(p => p.id === id) || {}).label || id) + '</option>').join('')
+    + '</select></label><label class="field"><span>Ejercicio (opcional)</span><select id="ana-compare-ex"><option value="">—</option>' + exList + '</select></label></div>'
+    + '<div class="ana-table ana-cmp-table"><div class="ana-row ana-head"><span>Indicador</span><span>Este período</span><span>Anterior</span><span>Variación</span></div>'
+    + table.rows.map(r => '<div class="ana-row"><span>' + esc(r.label) + '</span><span>' + (r.current == null ? '—' : esc(AN.formatKg(r.current))) + ' ' + esc(r.unit) + '</span><span>' + (r.previous == null ? '—' : esc(AN.formatKg(r.previous))) + ' ' + esc(r.unit) + '</span><span>' + (r.comparable ? anaDeltaHTML(r.delta, r.pct, r.unit) : '<span class="ana-muted">Faltan datos</span>') + '</span></div>').join('')
+    + '</div><p class="muted small">' + esc(table.note) + '</p></section>';
+}
+function anaConsistencyHTML(a){
+  const c = a.consistency;
+  return '<section class="ana-sec"><div class="section-head"><h2>Consistencia</h2><span class="muted">' + esc(a.range.label) + '</span></div>'
+    + '<div class="stats-grid small five">'
+    + '<div class="stat-card"><p class="stat-value">' + c.daysTrained + '</p><p class="stat-label">Días entrenados</p></div>'
+    + '<div class="stat-card"><p class="stat-value">' + c.avgWeekly + '</p><p class="stat-label">Sesiones/semana (4 sem.)</p></div>'
+    + '<div class="stat-card"><p class="stat-value">' + (c.plan.compliance == null ? '—' : c.plan.compliance + ' %') + '</p><p class="stat-label">Cumplimiento del plan</p></div>'
+    + '<div class="stat-card"><p class="stat-value">' + c.streaks.current + '</p><p class="stat-label">Semanas de racha</p></div>'
+    + '<div class="stat-card"><p class="stat-value">' + c.streaks.best + '</p><p class="stat-label">Mejor racha</p></div>'
+    + '</div>'
+    + '<div class="ana-split"><div class="chart-card"><div class="section-head"><h3>Días por semana</h3><span class="muted">12 semanas</span></div><div id="ana-weekdays" class="chart"></div></div>'
+    + '<div class="chart-card"><div class="section-head"><h3>Días de la semana</h3><span class="muted">Frecuencia en el período</span></div><div id="ana-dow" class="chart"></div></div></div>'
+    + '<div class="ana-plan-summary"><span>Planificados: <b>' + c.plan.planned + '</b></span><span>Hechos: <b>' + c.plan.done + '</b></span><span>Omitidos: <b>' + c.plan.missed + '</b></span><span>Descansos: <b>' + c.plan.rest + '</b></span><span>Próximos: <b>' + c.plan.upcoming + '</b></span></div>'
+    + '<p class="muted small">Racha: ' + esc(c.streaks.definition) + ' La semana en curso no la corta si todavía no entrenaste. Los días de descanso planificados no cuentan como incumplimiento y una sesión por día no se cuenta dos veces.</p></section>';
+}
+function anaVolumeHTML(a){
+  const v = a.volume;
+  const rows = v.byExercise.slice(0, 12).map(x => '<div class="ana-row"><span>' + esc(x.name) + '<br><span class="muted small">' + esc(x.group || 'Sin clasificar') + '</span></span><span>' + AN.formatKg(x.volume) + ' kg</span><span>' + x.sets + ' series</span><span>' + x.sessions + ' ses.</span></div>').join('');
+  return '<section class="ana-sec"><div class="section-head"><h2>Volumen</h2><span class="muted">Solo peso externo × repeticiones</span></div>'
+    + '<div class="stats-grid small five">'
+    + '<div class="stat-card"><p class="stat-value">' + AN.formatKg(v.total) + ' kg</p><p class="stat-label">Total del período</p></div>'
+    + '<div class="stat-card"><p class="stat-value">' + AN.formatKg(v.prevTotal) + ' kg</p><p class="stat-label">Período anterior</p></div>'
+    + '<div class="stat-card"><p class="stat-value">' + (v.pct == null ? '—' : (v.pct > 0 ? '+' : '') + v.pct + ' %') + '</p><p class="stat-label">Variación</p></div>'
+    + '<div class="stat-card"><p class="stat-value">' + (v.avgPerSession == null ? '—' : AN.formatKg(v.avgPerSession) + ' kg') + '</p><p class="stat-label">Media por sesión</p></div>'
+    + '<div class="stat-card"><p class="stat-value">' + v.bodyweightSets + '</p><p class="stat-label">Series sin peso externo</p></div>'
+    + '</div>'
+    + '<div class="chart-card"><div class="section-head"><h3>Evolución semanal</h3><span class="muted">kg levantados</span></div><div id="ana-volume-week" class="chart"></div></div>'
+    + '<div class="ana-table"><div class="ana-row ana-head"><span>Ejercicio</span><span>Volumen</span><span>Series</span><span>Sesiones</span></div>' + (rows || '<div class="empty-state">Sin volumen en este período.</div>') + '</div>'
+    + '<p class="muted small">Las series de peso corporal o asistidas se cuentan aparte y no se suman como kilos: mezclar magnitudes daría cifras infladas. Más volumen no significa automáticamente mejor rendimiento.</p></section>';
+}
+function anaStrengthHTML(a, ana){
+  const s = a.strength;
+  const focus = s.focus || (s.exercises[0] || null);
+  const select = s.exercises.length ? '<label class="field"><span>Ejercicio</span><select id="ana-ex">' + s.exercises.map(x => '<option value="' + esc(x.key) + '"' + (focus && x.key === focus.key ? ' selected' : '') + '>' + esc(x.name) + '</option>').join('') + '</select></label>' : '';
+  const list = (title, items, cls) => items.length ? '<div class="ana-list"><h4>' + esc(title) + '</h4>' + items.slice(0, 8).map(x => '<div class="ana-list-row"><span>' + esc(x.name) + '</span><span class="ana-delta ' + cls + '">' + (x.status === 'up' ? '+' : x.status === 'down' ? '' : '') + (x.delta ? AN.formatKg(x.delta) + ' kg' : x.sessions + ' sesiones') + '</span></div>').join('') + '</div>' : '';
+  return '<section class="ana-sec"><div class="section-head"><h2>Fuerza y rendimiento</h2><span class="muted">' + esc(a.range.label) + '</span></div>'
+    + (select || '<div class="empty-state">Todavía no hay ejercicios con series efectivas.</div>')
+    + (focus ? '<div class="ana-focus-line">' + esc(focus.name) + ': ' + (focus.bestWeight ? 'mejor peso ' + AN.formatKg(focus.bestWeight) + ' kg' : 'sin peso externo') + ' · ' + (focus.bestE1rm ? '1RM estimado ' + AN.formatKg(focus.bestE1rm) + ' kg' : '1RM no estimable') + ' · ' + focus.sessions + ' sesión(es)</div>'
+      + '<div class="ana-split"><div class="chart-card"><div class="section-head"><h3>Peso por sesión</h3><span class="muted">Mejor serie</span></div><div id="ana-ex-weight" class="chart"></div></div>'
+      + '<div class="chart-card"><div class="section-head"><h3>1RM estimado</h3><span class="muted">Epley, no una marca real</span></div><div id="ana-ex-e1rm" class="chart"></div></div></div>'
+      + '<p class="muted small">' + esc(s.note) + '</p>' : '')
+    + '<div class="ana-split three">' + list('Progresión positiva', s.positive, 'up') + list('Sin cambios relevantes', s.stable, 'flat') + list('Disminución', s.declining, 'down') + '</div>'
+    + (s.prs.length ? '<div class="ana-list"><h4>Récords del período</h4>' + s.prs.slice(0, 8).map(p => '<div class="ana-list-row"><span>' + esc(p.label || p.key) + '</span><span class="muted">' + esc(p.date) + '</span></div>').join('') + '</div>' : '')
+    + '</section>';
+}
+function anaMusclesHTML(a, ana){
+  const g = a.muscles;
+  const max = Math.max.apply(null, g.groups.map(x => x.volume).concat([1]));
+  const chosen = ana.group && g.groups.find(x => x.id === ana.group);
+  const bars = g.groups.map(x => '<button type="button" class="ana-bar-row' + (ana.group === x.id ? ' is-active' : '') + '" data-action="ana-group" data-group="' + esc(x.id) + '"><span>' + esc(groupLabel(x.id)) + '</span><span class="ana-bar"><i style="width:' + Math.round(x.volume / max * 100) + '%"></i></span><span>' + AN.formatKg(x.volume) + ' kg · ' + x.sessions + ' ses.</span></button>').join('');
+  const detail = chosen ? '<div class="ana-table"><div class="ana-row ana-head"><span>Ejercicio</span><span>Volumen</span><span>Series</span><span>Sesiones</span></div>'
+    + a.volume.byExercise.filter(x => x.group === chosen.id).map(x => '<div class="ana-row"><span>' + esc(x.name) + '</span><span>' + AN.formatKg(x.volume) + ' kg</span><span>' + x.sets + '</span><span>' + x.sessions + '</span></div>').join('') + '</div>' : '';
+  return '<section class="ana-sec"><div class="section-head"><h2>Grupos musculares</h2><span class="muted">' + (g.classifiedPct == null ? 'Sin datos clasificados' : g.classifiedPct + ' % del volumen clasificado') + '</span></div>'
+    + (bars || '<div class="empty-state">Los ejercicios de este período no tienen grupo muscular asignado.</div>')
+    + (detail || '')
+    + (g.unclassified.exercises.length ? '<div class="ana-warn"><b>Sin clasificar:</b> ' + g.unclassified.exercises.slice(0, 8).map(x => esc(x.name)).join(', ') + '. Puedes asignarles grupo editándolos en la biblioteca de ejercicios.</div>' : '')
+    + '<p class="muted small">' + esc(g.note) + ' <button type="button" class="linklike" data-action="tab" data-route="library">Abrir biblioteca</button></p></section>';
+}
+function anaBodyweightHTML(a){
+  const b = a.bodyweight;
+  return '<section class="ana-sec"><div class="section-head"><h2>Peso corporal</h2><span class="muted">' + esc(a.range.label) + '</span></div>'
+    + '<div class="stats-grid small five">'
+    + '<div class="stat-card"><p class="stat-value">' + (b.latest ? AN.formatKg(b.latest.weight) + ' kg' : '—') + '</p><p class="stat-label">Último del período</p></div>'
+    + '<div class="stat-card"><p class="stat-value">' + (b.first ? AN.formatKg(b.first.weight) + ' kg' : '—') + '</p><p class="stat-label">Primero del período</p></div>'
+    + '<div class="stat-card"><p class="stat-value">' + (b.change == null ? '—' : (b.change > 0 ? '+' : '') + AN.formatKg(b.change) + ' kg') + '</p><p class="stat-label">Cambio en el período</p></div>'
+    + '<div class="stat-card"><p class="stat-value">' + (b.weekAvg == null ? '—' : AN.formatKg(b.weekAvg) + ' kg') + '</p><p class="stat-label">Media últimos 7 días</p></div>'
+    + '<div class="stat-card"><p class="stat-value">' + (b.rangeAvg == null ? '—' : AN.formatKg(b.rangeAvg) + ' kg') + '</p><p class="stat-label">Media del período</p></div>'
+    + '</div>'
+    + '<div class="chart-card"><div class="section-head"><h3>Evolución</h3><span class="muted">Una medición por día</span></div><div id="ana-bw" class="chart"></div></div>'
+    + '<p class="muted small">' + esc(b.note) + '</p></section>';
+}
+function anaProgramsHTML(a){
+  const p = a.programs;
+  if(!p.count) return '<section class="ana-sec"><div class="section-head"><h2>Programas</h2></div><div class="empty-state">Aún no hay programas. Crea uno en Plan para medir su cumplimiento aquí.</div></section>';
+  let html = '<section class="ana-sec"><div class="section-head"><h2>Programas</h2><span class="muted">' + p.count + ' en total</span></div>';
+  if(p.active){
+    const s = p.active, prog = s.progress || { pct: 0, elapsed: 0, weeks: 0 };
+    html += '<div class="ana-program"><div class="section-head"><h3>' + esc(s.program.name) + '</h3><span class="muted">' + (s.program.status === 'active' ? 'Activo' : esc(s.program.status)) + '</span></div>'
+      + '<div class="ana-progress"><i style="width:' + Math.max(0, Math.min(100, prog.pct)) + '%"></i></div>'
+      + '<p class="muted small">Semana ' + prog.elapsed + ' de ' + prog.weeks + ' · ' + s.done + ' de ' + s.planned + ' entrenamientos planificados hechos' + (s.compliance == null ? '' : ' · ' + s.compliance + ' % de cumplimiento') + '.</p>'
+      + '<div class="ana-plan-summary"><span>Planificados: <b>' + s.planned + '</b></span><span>Hechos: <b>' + s.done + '</b></span><span>Omitidos: <b>' + s.missed + '</b></span><span>Descansos: <b>' + s.rest + '</b></span></div>'
+      + (s.goals.length ? '<div class="ana-goals">' + s.goals.map(g => '<div class="ana-goal ' + (g.met ? 'met' : g.verifiable ? 'pending' : 'unknown') + '"><span>' + esc(g.label) + '</span><span>' + esc(String(g.current)) + ' / ' + esc(String(g.target)) + ' ' + esc(g.unit) + '</span><b>' + (g.met ? 'Cumplido' : g.verifiable ? 'Pendiente' : 'Sin datos') + '</b></div>').join('') + '</div>' : '')
+      + '</div>';
+  } else {
+    html += '<div class="empty-state">No hay un programa activo. Puedes consultar el historial de programas abajo.</div>';
+  }
+  if(p.past.length){
+    html += '<div class="ana-table"><div class="ana-row ana-head"><span>Programa</span><span>Estado</span><span>Hechos</span><span>Cumplimiento</span></div>'
+      + p.past.map(x => '<div class="ana-row"><span>' + esc(x.program.name) + '</span><span>' + esc(x.program.status) + '</span><span>' + x.done + ' / ' + x.planned + '</span><span>' + (x.compliance == null ? '—' : x.compliance + ' %') + '</span></div>').join('') + '</div>';
+  }
+  return html + '<p class="muted small">' + esc(p.note) + '</p></section>';
+}
+function anaConfigHTML(d, a, cfg){
+  const rows = cfg.order.map((id, i) => {
+    const c = a.cards.find(x => x.id === id);
+    return '<div class="ana-config-row"><label class="check-inline"><input type="checkbox" data-action="ana-card" data-card="' + esc(id) + '"' + (cfg.hidden.includes(id) ? '' : ' checked') + '> ' + esc((c && c.label) || id) + '</label>'
+      + '<span class="ana-config-move"><button type="button" class="icon-btn" data-action="ana-move" data-card="' + esc(id) + '" data-dir="-1" aria-label="Subir ' + esc((c && c.label) || id) + '">↑</button>'
+      + '<button type="button" class="icon-btn" data-action="ana-move" data-card="' + esc(id) + '" data-dir="1" aria-label="Bajar ' + esc((c && c.label) || id) + '">↓</button></span></div>';
+  }).join('');
+  return '<section class="ana-sec ana-config"><div class="section-head"><h2>Personalizar dashboard</h2><button type="button" class="btn btn-ghost btn-sm" data-action="ana-reset">Restaurar</button></div>'
+    + '<p class="muted small">Elige qué tarjetas ver y en qué orden. Se guarda en tu perfil y se sincroniza con el resto de preferencias.</p>'
+    + rows
+    + '<label class="field"><span>Período predeterminado</span><select id="ana-default-period">'
+    + AN.PERIODS.filter(p => p.id !== 'custom').map(p => '<option value="' + p.id + '"' + (cfg.period === p.id ? ' selected' : '') + '>' + esc(p.label) + '</option>').join('')
+    + '</select></label></section>';
+}
+function anaPeriodBarHTML(a, ana, cfg){
+  const current = ana.period || cfg.period || 'month';
+  return '<div class="ana-controls ana-periods">'
+    + '<label class="field"><span>Período analizado</span><select id="ana-period">'
+    + AN.PERIODS.map(p => '<option value="' + p.id + '"' + (current === p.id ? ' selected' : '') + '>' + esc(p.label) + '</option>').join('')
+    + '</select></label>'
+    + '<div class="ana-custom' + (current === 'custom' ? '' : ' hidden') + '"><label class="field"><span>Desde</span><input type="date" id="ana-from" value="' + esc(ana.custom.from || a.range.from || '') + '"></label>'
+    + '<label class="field"><span>Hasta</span><input type="date" id="ana-to" value="' + esc(ana.custom.to || a.range.to || '') + '"></label>'
+    + '<button type="button" class="btn btn-ghost btn-sm" data-action="ana-custom-apply">Aplicar</button></div>'
+    + '<button type="button" class="btn btn-ghost btn-sm" data-action="ana-config-toggle">' + (ana.config ? 'Cerrar personalización' : 'Personalizar') + '</button>'
+    + '</div>';
+}
+function anaExportHTML(){
+  return '<section class="ana-sec"><div class="section-head"><h2>Exportar</h2><span class="muted">Sin credenciales ni datos de acceso</span></div>'
+    + '<div class="ana-actions"><button type="button" class="btn btn-primary btn-sm" data-action="ana-export-csv">Descargar CSV</button>'
+    + '<button type="button" class="btn btn-ghost btn-sm" data-action="ana-export-json">Descargar JSON</button></div>'
+    + '<p class="muted small">El CSV incluye resumen, sesiones, volumen por ejercicio, peso y objetivos del período elegido. El JSON guarda la estructura completa con las notas de cada cálculo. Los indicadores que no puedan calcularse se marcan como «sin datos» en el propio archivo.</p></section>';
+}
+function anaDownload(file){
+  try{
+    if(window.DrakoShare && DrakoShare.shareFile){
+      DrakoShare.shareFile(file.filename, file.text, file.mime).then(res => toast(res === 'shared' ? 'Archivo compartido.' : 'Archivo descargado.')).catch(() => toast('No se pudo compartir el archivo.', 'error'));
+      return;
+    }
+    const blob = new Blob([file.text], { type: file.mime });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url; a.download = file.filename;
+    document.body.appendChild(a); a.click(); a.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 5000);
+    toast('Archivo descargado.');
+  }catch(e){ toast('No se pudo generar el archivo.', 'error'); }
+}
+function dashboardAnalyticsHTML(d){
+  const cfg = anaConfig(d);
+  const a = AN.analyze(d, anaOpts(d, cfg.period || 'month'));
+  return '<section class="ana-dash">'
+    + '<div class="section-head"><h2>Panel de rendimiento</h2><span class="muted">' + esc(a.range.label) + '</span></div>'
+    + anaKpisHTML(a, cfg)
+    + (a.insights.length ? '<p class="ana-dash-insight">' + esc(a.insights[0].text) + '</p>' : '')
+    + '<div class="ana-dash-actions"><button type="button" class="btn btn-primary btn-sm" data-action="tab" data-route="analytics">Ver análisis completo</button>'
+    + '<button type="button" class="btn btn-ghost btn-sm" data-action="tab" data-route="plan">Ver plan</button></div></section>';
+}
+function renderAnalytics(main){
+  const d = dataFor(currentUser);
+  const ana = anaState();
+  const cfg = anaConfig(d);
+  const preset = ana.period || cfg.period || 'month';
+  const a = AN.analyze(d, anaOpts(d, preset, { custom: ana.custom, exerciseKey: ana.exerciseKey }));
+  const opts = anaOpts(d, preset, { custom: ana.custom, exerciseKey: ana.exerciseKey });
+  main.innerHTML = '<div class="page-head"><h1>Analíticas</h1><p class="muted">Estadísticas reconstruidas de tus sesiones, récords, peso y programas. Sin datos inventados: cuando no alcanza la evidencia, se indica.</p></div>'
+    + anaPeriodBarHTML(a, ana, cfg)
+    + (ana.config ? anaConfigHTML(d, a, cfg) : '')
+    + anaFocusHTML(a, ana)
+    + anaKpisHTML(a, cfg)
+    + anaInsightsHTML(a)
+    + anaCompareHTML(a, ana, d)
+    + anaConsistencyHTML(a)
+    + anaVolumeHTML(a)
+    + anaStrengthHTML(a, ana)
+    + anaMusclesHTML(a, ana)
+    + anaBodyweightHTML(a)
+    + anaProgramsHTML(a)
+    + anaExportHTML();
+
+  const periodEl = $('#ana-period');
+  if(periodEl) periodEl.addEventListener('change', () => {
+    const st = anaState();
+    st.period = periodEl.value;
+    render();
+  });
+  const cmpEl = $('#ana-compare');
+  if(cmpEl) cmpEl.addEventListener('change', () => { anaState().compare = cmpEl.value; render(); });
+  const cmpEx = $('#ana-compare-ex');
+  if(cmpEx) cmpEx.addEventListener('change', () => { anaState().compareKey = cmpEx.value; render(); });
+  const exEl = $('#ana-ex');
+  if(exEl) exEl.addEventListener('change', () => { anaState().exerciseKey = exEl.value; render(); });
+  const defEl = $('#ana-default-period');
+  if(defEl) defEl.addEventListener('change', () => {
+    const next = anaConfig(d); next.period = defEl.value; anaSaveConfig(d, next); toast('Período predeterminado guardado.'); render();
+  });
+
+  /* Gráficas después de insertar el HTML */
+  const weekRows = a.consistency.weeks.map(w => ({ label: w.week, value: w.days }));
+  barChart($('#ana-weekdays'), weekRows, { unit: 'días', label: 'Días entrenados por semana' });
+  const dow = a.consistency.weekday.map((v, i) => ({ label: PL.WEEKDAY_LABELS[i].slice(0, 3), value: v }));
+  barChart($('#ana-dow'), dow, { unit: 'sesiones', label: 'Sesiones por día de la semana' });
+  const volWeeks = a.volume.weekly.map(b => ({ label: b.key, value: b.volume }));
+  lineChart($('#ana-volume-week'), volWeeks, 'Necesitas al menos dos semanas con volumen para ver la evolución.');
+  const focus = a.strength.focus || a.strength.exercises[0];
+  if(focus){
+    lineChart($('#ana-ex-weight'), focus.weight, 'Necesitas al menos dos sesiones con peso para ver la evolución.');
+    lineChart($('#ana-ex-e1rm'), focus.e1rm, 'Necesitas dos sesiones con repeticiones válidas (1–12) para estimar el 1RM.');
+  }
+  lineChart($('#ana-bw'), (a.bodyweight.list || []).map(w => ({ label: w.date, value: w.weight })), 'Necesitas al menos dos mediciones para ver la evolución.');
+}
+/* Barras verticales con base en cero: no exagera diferencias. */
+function barChart(el, data, opts){
+  if(!el) return;
+  const o = opts || {};
+  const unit = o.unit || '';
+  const list = (data || []).filter(d => d && isFinite(d.value));
+  if(!list.length){ el.innerHTML = '<div class="chart-empty">' + esc(o.empty || 'Aún no hay datos para este gráfico.') + '</div>'; return; }
+  const W = 560, H = 210, P = 20;
+  const max = Math.max.apply(null, list.map(d => d.value).concat([1]));
+  const bw = (W - 2 * P) / list.length;
+  const barW = Math.max(4, Math.min(38, bw * 0.62));
+  const bars = list.map((d, i) => {
+    const x = P + bw * i + (bw - barW) / 2;
+    const h = Math.max(d.value > 0 ? 2 : 0, (H - 2 * P) * (d.value / max));
+    const y = H - P - h;
+    return '<rect x="' + x.toFixed(1) + '" y="' + y.toFixed(1) + '" width="' + barW.toFixed(1) + '" height="' + h.toFixed(1) + '" rx="3" class="bar"><title>' + esc(d.label + ': ' + d.value + ' ' + unit) + '</title></rect>'
+      + (list.length <= 8 ? '<text x="' + (x + barW / 2).toFixed(1) + '" y="' + (y - 5).toFixed(1) + '" text-anchor="middle" class="axis">' + d.value + '</text>' : '');
+  }).join('');
+  const shortLabel = d => /^\d{4}-\d{2}-\d{2}$/.test(String(d.label)) ? String(d.label).slice(5) : String(d.label);
+  const labels = list.map((d, i) => (list.length > 12 && i % 3) ? '' : '<text x="' + (P + bw * i + bw / 2).toFixed(1) + '" y="' + (H - 3) + '" text-anchor="middle" class="axis">' + esc(shortLabel(d)) + '</text>').join('');
+  const summary = (o.label || 'Gráfico de barras') + ': ' + list.length + ' valores, máximo ' + max + ' ' + unit + '.';
+  el.innerHTML = '<svg viewBox="0 0 ' + W + ' ' + H + '" class="linechart barchart" role="img" aria-label="' + esc(summary) + '">'
+    + '<line x1="' + P + '" y1="' + (H - P) + '" x2="' + (W - P) + '" y2="' + (H - P) + '" class="grid"/>'
+    + bars + labels + '</svg>';
+}
+function analyticsAction(action, el){
+  const d = currentUser ? dataFor(currentUser) : null;
+  if(!d) return false;
+  const ana = anaState();
+  if(action === 'ana-open'){
+    ana.focus = el.dataset.card || null;
+    nav('#/analytics');
+    return true;
+  }
+  if(action === 'ana-focus-clear'){ ana.focus = null; render(); return true; }
+  if(action === 'ana-config-toggle'){ ana.config = !ana.config; render(); return true; }
+  if(action === 'ana-card'){
+    const cfg = anaConfig(d);
+    const id = el.dataset.card;
+    if(!id) return true;
+    if(cfg.hidden.includes(id)) cfg.hidden = cfg.hidden.filter(x => x !== id);
+    else cfg.hidden = cfg.hidden.concat([id]);
+    anaSaveConfig(d, cfg); render(); return true;
+  }
+  if(action === 'ana-move'){
+    const cfg = AN.moveCard(anaConfig(d), el.dataset.card, Number(el.dataset.dir) || 1);
+    anaSaveConfig(d, cfg); render(); return true;
+  }
+  if(action === 'ana-reset'){
+    delete d.prefs.dashboard;
+    ana.period = null; ana.config = false;
+    saveDB(); toast('Dashboard restaurado.', 'info'); render(); return true;
+  }
+  if(action === 'ana-custom-apply'){
+    const from = $('#ana-from') ? $('#ana-from').value : '';
+    const to = $('#ana-to') ? $('#ana-to').value : '';
+    if(!from || !to){ toast('Elige las dos fechas del período.', 'error'); return true; }
+    if(from > to){ toast('La fecha inicial debe ser anterior a la final.', 'error'); return true; }
+    ana.custom = { from, to }; ana.period = 'custom'; render(); return true;
+  }
+  if(action === 'ana-group'){ ana.group = el.dataset.group || null; render(); return true; }
+  if(action === 'ana-export-csv' || action === 'ana-export-json'){
+    const cfg = anaConfig(d);
+    const preset = ana.period || cfg.period || 'month';
+    const opts = anaOpts(d, preset, { custom: ana.custom, exerciseKey: ana.exerciseKey });
+    const file = action === 'ana-export-csv' ? AN.exportCSV(d, opts) : AN.exportJSON(d, opts);
+    anaDownload(file);
+    return true;
+  }
+  return false;
+}
+
+/* ============================================================
+   Prompt 8 — PWA, offline, cola y estado de sincronización
+   ============================================================ */
+function isStandaloneApp(){
+  try{ return window.matchMedia('(display-mode: standalone)').matches || navigator.standalone === true; }
+  catch(e){ return false; }
+}
+function isIos(){ return /iPad|iPhone|iPod/.test(navigator.userAgent || '') && !window.MSStream; }
+function hasUnfinishedSession(){
+  if(!currentUser) return false;
+  const d = dataFor(currentUser);
+  if(state.sessionId){
+    const open = (d.sessions || []).find(s => s.id === state.sessionId);
+    if(open && !open.finished && open.status !== 'cancelled') return true;
+  }
+  return (d.sessions || []).some(s => s && !s.finished && s.status !== 'cancelled');
+}
+function offlineTime(ts){
+  if(!ts) return '—';
+  try{ return new Date(ts).toLocaleString('es', { day:'numeric', month:'short', hour:'2-digit', minute:'2-digit' }); }
+  catch(e){ return '—'; }
+}
+function queueStatsSafe(account){
+  try{ return account ? opQueue.stats(account) : { pending:0, conflicts:0, permanent:0, confirmed:0, lastConfirmedAt:null, lastError:null }; }
+  catch(e){ return { pending:0, conflicts:0, permanent:0, confirmed:0, lastConfirmedAt:null, lastError:null, error:true }; }
+}
+function enqueueSyncJob(account, st, reason){
+  if(!account || !window.Offline) return null;
+  try{
+    const job = opQueue.enqueue(account, {
+      kind: 'sync', target: 'doc', reason: reason || 'local-change',
+      revision: st && st.revision != null ? st.revision : 0,
+      digest: st && st.digest ? JSON.stringify(st.digest) : '',
+    });
+    registerBackgroundSync();
+    return job;
+  }catch(e){ return null; }
+}
+function beginSyncJob(account){
+  try{
+    let job = opQueue.next(account);
+    if(!job){
+      const st = cloudSync.state(account) || {};
+      job = enqueueSyncJob(account, st, 'sync');
+    }
+    return job ? opQueue.begin(job.id) : null;
+  }catch(e){ return null; }
+}
+function finishSyncJob(job, st){
+  if(!job || !job.id) return;
+  try{
+    if(st && Array.isArray(st.conflicts) && st.conflicts.length) opQueue.conflict(job.id);
+    else if(st && st.dirty) opQueue.pending(job.id, 'pending-local-changes');
+    else opQueue.confirm(job.id);
+  }catch(e){}
+}
+function registerBackgroundSync(){
+  try{
+    if(typeof navigator === 'undefined' || !('serviceWorker' in navigator) || !navigator.serviceWorker) return;
+    navigator.serviceWorker.ready.then(reg => {
+      if(reg && reg.sync && typeof reg.sync.register === 'function') reg.sync.register('draktrack-sync').catch(() => {});
+    }).catch(() => {});
+  }catch(e){}
+}
+function offlinePendingTotal(){
+  const stats = queueStatsSafe(currentUser);
+  const st = currentUser ? cloudSync.state(currentUser) : null;
+  const engineDirty = !!(st && st.dirty);
+  return stats.pending + (engineDirty && stats.pending === 0 ? 1 : 0);
+}
+function renderOfflineBar(){
+  const bar = $('#offline-bar');
+  if(!bar) return;
+  if(!currentUser){ bar.className = 'offline-bar hidden'; bar.innerHTML = ''; return; }
+  const stats = queueStatsSafe(currentUser);
+  const st = cloudSync.state(currentUser) || {};
+  const pending = offlinePendingTotal();
+  const conflicts = stats.conflicts + ((st.conflicts || []).length && !stats.conflicts ? (st.conflicts || []).length : 0);
+  const offline = (typeof navigator !== 'undefined' && navigator.onLine === false) || offlineState.online === false;
+  let text = '', tone = '', action = '';
+  if(offlineState.storageError){
+    text = 'Almacenamiento lleno o no disponible: exporta tus datos antes de seguir.';
+    tone = 'is-error';
+    action = '<button type="button" class="offline-btn" data-action="sb-export">Exportar</button>';
+  } else if(offlineState.updateReady){
+    text = hasUnfinishedSession() ? 'Nueva versión lista · termina tu entrenamiento para actualizar.' : 'Nueva versión de DrakoTrack disponible.';
+    tone = 'is-update';
+    action = '<button type="button" class="offline-btn" data-action="sw-update">' + (hasUnfinishedSession() ? 'Más tarde' : 'Actualizar') + '</button>';
+  } else if(offline){
+    text = 'Sin conexión · tus cambios se guardan en este dispositivo' + (pending ? ' (' + pending + ')' : '') + '.';
+    tone = 'is-offline';
+    action = '<button type="button" class="offline-btn" data-action="offline-retry">Reintentar</button>';
+  } else if(state.sb.status === 'syncing'){
+    text = 'Sincronizando cambios…'; tone = 'is-syncing';
+  } else if(conflicts){
+    text = conflicts + ' cambio(s) en conflicto entre dispositivos.';
+    tone = 'is-error';
+    action = '<button type="button" class="offline-btn" data-action="open-sync-conflicts">Revisar</button>';
+  } else if(stats.permanent){
+    text = 'La sincronización necesita atención: ' + stats.permanent + ' operación(es) no pudieron enviarse.';
+    tone = 'is-error';
+    action = '<button type="button" class="offline-btn" data-action="offline-retry">Reintentar</button>';
+  } else if(pending){
+    text = pending + ' cambio(s) pendiente(s) de subir.';
+    tone = 'is-pending';
+    action = '<button type="button" class="offline-btn" data-action="offline-retry">Sincronizar</button>';
+  }
+  if(!text){ bar.className = 'offline-bar hidden'; bar.innerHTML = ''; return; }
+  bar.className = 'offline-bar ' + tone;
+  bar.innerHTML = '<span class="offline-text">' + esc(text) + '</span><span class="offline-actions">' + action
+    + '<button type="button" class="offline-btn ghost" data-action="offline-details">Detalles</button></span>';
+}
+function markStorageError(result){
+  offlineState.storageError = true;
+  if(!_storageWarned){
+    _storageWarned = true;
+    toast(result && result.quota
+      ? 'El almacenamiento del navegador está lleno. Exporta tus datos y libera espacio; no se borró nada automáticamente.'
+      : 'No se pudo guardar en el almacenamiento de este dispositivo. Exporta tus datos antes de cerrar.', 'error');
+  }
+  renderOfflineBar();
+}
+function clearStorageError(){ offlineState.storageError = false; }
+
+async function handleConnectivity(source){
+  if(offlineState.checking) return offlineState.checking;
+  offlineState.checking = Offline.probe().then(ok => {
+    offlineState.online = ok;
+    offlineState.lastCheck = Date.now();
+    renderOfflineBar();
+    if(ok && currentUser && isCloud()){
+      try{ opQueue.recover(currentUser); }catch(e){}
+      const st = cloudSync.state(currentUser);
+      if(st && st.dirty) enqueueSyncJob(currentUser, st, source || 'connectivity');
+      runSync(false);
+    }
+    return ok;
+  }).catch(() => false).then(value => { offlineState.checking = null; return value; });
+  return offlineState.checking;
+}
+async function retryOfflineNow(){
+  if(!currentUser){ toast('Inicia sesión para sincronizar.', 'info'); return false; }
+  const stats = queueStatsSafe(currentUser);
+  try{
+    opQueue.list(currentUser).forEach(job => {
+      if(job.state === 'retry' || job.state === 'permanent' || job.state === 'conflict') opQueue.reopen(job.id);
+    });
+  }catch(e){}
+  const ok = await handleConnectivity('manual');
+  if(!ok){ toast('Sigue sin haber conexión con el servidor. Tus datos están guardados aquí.', 'error'); renderOfflineBar(); return false; }
+  if(isCloud()){ const done = await runSync(true); renderOfflineBar(); return done; }
+  toast(stats.pending ? 'No hay sesión de nube: los cambios quedan en este dispositivo.' : 'Todo guardado en este dispositivo.', 'info');
+  renderOfflineBar();
+  return true;
+}
+function offlineSettingsHTML(){
+  if(!currentUser) return '';
+  const stats = queueStatsSafe(currentUser);
+  const st = cloudSync.state(currentUser) || {};
+  const cloud = isCloud();
+  const pending = offlinePendingTotal();
+  const conflicts = stats.conflicts + ((st.conflicts || []).length && !stats.conflicts ? (st.conflicts || []).length : 0);
+  const last = state.sb.last || stats.lastConfirmedAt || st.lastSync || null;
+  const installBtn = offlineState.installPrompt
+    ? '<button type="button" class="btn btn-primary btn-sm" data-action="pwa-install">Instalar DrakoTrack</button>' : '';
+  return '<section class="settings-card offline-card">'
+    + '<h2>Conexión y sincronización</h2>'
+    + '<p class="muted small">Puedes entrenar sin Internet: cada serie se guarda en este dispositivo al instante. Al recuperar la conexión, los cambios pendientes se envían solos y se combinan con los de tus otros dispositivos.</p>'
+    + '<div class="offline-grid">'
+    + '<div><span class="muted">Conexión</span><b class="' + (offlineState.online ? 'ok-text' : 'warn-text') + '">' + (offlineState.online ? 'En línea' : 'Sin conexión') + '</b></div>'
+    + '<div><span class="muted">Cambios pendientes</span><b>' + pending + '</b></div>'
+    + '<div><span class="muted">Conflictos</span><b>' + conflicts + '</b></div>'
+    + '<div><span class="muted">Última sincronización</span><b>' + esc(offlineTime(last)) + '</b></div>'
+    + '<div><span class="muted">Cola persistente</span><b>' + (stats.total ? stats.total + ' operación(es)' : 'Vacía') + '</b></div>'
+    + '<div><span class="muted">Modo</span><b>' + (isStandaloneApp() ? 'Instalada' : 'Navegador') + '</b></div>'
+    + '</div>'
+    + (stats.lastError ? '<p class="muted small">Último aviso: ' + esc(stats.lastError) + '</p>' : '')
+    + '<div class="offline-actions">'
+    + '<button type="button" class="btn btn-ghost btn-sm" data-action="offline-check">Comprobar conexión</button>'
+    + (cloud ? '<button type="button" class="btn btn-ghost btn-sm" data-action="offline-retry">Sincronizar ahora</button>' : '')
+    + (stats.confirmed ? '<button type="button" class="btn btn-ghost btn-sm" data-action="offline-clear-confirmed">Limpiar confirmadas</button>' : '')
+    + (offlineState.sw ? '<button type="button" class="btn btn-ghost btn-sm" data-action="sw-check">Buscar actualización</button>' : '')
+    + (offlineState.sw ? '<button type="button" class="btn btn-ghost btn-sm" data-action="sw-rollback">Rollback de emergencia</button>' : '')
+    + installBtn
+    + '</div>'
+    + (isIos() && !isStandaloneApp() ? '<p class="muted small">En iPhone/iPad: Compartir → Añadir a pantalla de inicio para instalar la app.</p>' : '')
+    + (offlineState.sw ? '<p class="muted small">El rollback desregistra el Service Worker y borra solo las cachés de DrakoTrack; entrenamientos, copias y cambios pendientes siguen en este dispositivo. Solo se permite con conexión y sin trabajo abierto.</p>' : '')
+    + '<p class="muted small">La cola guarda solo metadatos de sincronización, nunca contraseñas ni tokens. Al cerrar sesión los cambios pendientes se conservan por cuenta y no se mezclan con otra.</p>'
+    + '</section>';
+}
+function offlineAction(action, el){
+  if(action === 'offline-retry'){ retryOfflineNow(); return true; }
+  if(action === 'offline-details'){ nav('#/settings'); return true; }
+  if(action === 'offline-check'){
+    handleConnectivity('manual').then(ok => toast(ok ? 'Conexión con el servidor confirmada.' : 'Sin conexión con el servidor. Los datos siguen guardados aquí.', ok ? 'info' : 'error'));
+    return true;
+  }
+  if(action === 'offline-clear-confirmed'){
+    try{ opQueue.clearConfirmed(currentUser); toast('Historial de operaciones confirmadas limpiado.', 'info'); }catch(e){}
+    renderOfflineBar(); if(parseHash().route === 'settings') render();
+    return true;
+  }
+  if(action === 'pwa-install'){ installPwa(); return true; }
+  if(action === 'sw-update'){ applyServiceWorkerUpdate(); return true; }
+  if(action === 'sw-rollback'){ openServiceWorkerRollback(); return true; }
+  if(action === 'sw-check'){
+    if(offlineState.sw && offlineState.sw.update) offlineState.sw.update().then(() => toast('Buscando actualización…', 'info')).catch(() => toast('No se pudo comprobar la actualización.', 'error'));
+    else toast('El navegador no permite comprobar actualizaciones desde aquí.', 'info');
+    return true;
+  }
+  return false;
+}
+async function installPwa(){
+  const prompt = offlineState.installPrompt;
+  if(!prompt){
+    toast(isIos() ? 'En iPhone/iPad, usa Compartir → Añadir a pantalla de inicio.' : 'Para instalar, usa el menú del navegador → Instalar aplicación.', 'info');
+    return;
+  }
+  try{
+    prompt.prompt();
+    const choice = await prompt.userChoice;
+    offlineState.installPrompt = null;
+    if(choice && choice.outcome === 'accepted') toast('DrakoTrack instalada.');
+    renderOfflineBar();
+    if(parseHash().route === 'settings') render();
+  }catch(e){ toast('No se pudo abrir la instalación.', 'error'); }
+}
+function offerServiceWorkerUpdate(){
+  if(offlineState.updateReady) return;
+  offlineState.updateReady = true;
+  renderOfflineBar();
+  if(parseHash().route === 'settings') render();
+}
+function applyServiceWorkerUpdate(){
+  const st = currentUser ? (cloudSync.state(currentUser) || {}) : {};
+  const stats = currentUser ? queueStatsSafe(currentUser) : { conflicts: 0 };
+  const conflicts = stats.conflicts + ((st.conflicts || []).length && !stats.conflicts ? (st.conflicts || []).length : 0);
+  const decision = Offline.updateDecision({
+    hasActiveSession: hasUnfinishedSession(),
+    pending: offlinePendingTotal(),
+    conflicts,
+  });
+  if(decision.defer){
+    offlineState.deferredUpdate = true;
+    toast(decision.reason === 'active-session'
+      ? 'Termina o cierra el entrenamiento activo antes de actualizar. No se perderá nada: se aplicará cuando quieras.'
+      : 'Hay cambios pendientes de sincronizar. Sincronízalos antes de actualizar para no arriesgar datos.', 'info');
+    return;
+  }
+  const reg = offlineState.sw;
+  if(reg && reg.waiting){ try{ reg.waiting.postMessage({ type: 'SKIP_WAITING' }); }catch(e){} }
+  else window.location.reload();
+}
+/* Rollback de emergencia. Un Service Worker roto puede seguir sirviendo una
+   shell inválida aunque la red ya tenga la versión buena. Desregistrar solo
+   este ámbito y borrar solo las cachés de DrakoTrack devuelve la app a la red
+   sin tocar los datos (localStorage) ni la cola de sincronización. */
+function rollbackBlockedMessage(reason){
+  if(reason === 'offline') return 'Necesitas conexión para hacer el rollback: si se borra la caché sin red, la app no podría cargar.';
+  if(reason === 'active-session') return 'Termina o cierra el entrenamiento activo antes de hacer el rollback.';
+  if(reason === 'pending-changes') return 'Sincroniza los cambios pendientes antes de hacer el rollback.';
+  if(reason === 'conflicts') return 'Resuelve los conflictos de sincronización antes de hacer el rollback.';
+  return 'Ahora no se puede hacer el rollback.';
+}
+async function rollbackServiceWorker(options){
+  const opts = options || {};
+  const warn = msg => { if(!opts.silent) toast(msg, 'error'); };
+  if(typeof navigator === 'undefined' || !navigator.serviceWorker){
+    warn('Este navegador no tiene un Service Worker que restablecer.');
+    return false;
+  }
+  const st = currentUser ? (cloudSync.state(currentUser) || {}) : {};
+  const stats = currentUser ? queueStatsSafe(currentUser) : { conflicts: 0 };
+  const conflicts = stats.conflicts + ((st.conflicts || []).length && !stats.conflicts ? (st.conflicts || []).length : 0);
+  let online = true;
+  try{ online = navigator.onLine !== false; }catch(e){}
+  if(online && typeof Offline.probe === 'function') online = await Offline.probe().catch(() => false);
+  const decision = Offline.rollbackDecision({
+    online,
+    hasActiveSession: hasUnfinishedSession(),
+    pending: offlinePendingTotal(),
+    conflicts,
+  });
+  if(!decision.allow){ warn(rollbackBlockedMessage(decision.reason)); return false; }
+  let registrations = [];
+  try{
+    if(typeof navigator.serviceWorker.getRegistrations === 'function') registrations = await navigator.serviceWorker.getRegistrations();
+    if(!Array.isArray(registrations) || !registrations.length){
+      const one = typeof navigator.serviceWorker.getRegistration === 'function' ? await navigator.serviceWorker.getRegistration() : null;
+      registrations = one ? [one] : [];
+    }
+  }catch(e){ warn('No se pudo consultar el Service Worker.'); return false; }
+  const scope = new URL('./', location.href).href;
+  const own = registrations.filter(reg => {
+    try{ return !!reg && reg.scope === scope; }catch(e){ return false; }
+  });
+  if(!own.length){ warn('No se encontró un Service Worker de esta app para desregistrar.'); return false; }
+  for(const reg of own){
+    let ok = false;
+    try{ ok = await reg.unregister(); }catch(e){}
+    if(!ok){ warn('El navegador no permitió desregistrar el Service Worker.'); return false; }
+  }
+  const cleared = await Offline.clearOwnCaches(window.caches, SW_CACHE_PREFIX);
+  if(cleared.total && !cleared.ok){ warn('No se pudieron borrar todas las cachés de DrakoTrack. No se recargó la app.'); return false; }
+  try{ sessionStorage.setItem(SW_ROLLBACK_KEY, '1'); }catch(e){}
+  if(opts.reload === false) return true;
+  try{
+    const url = new URL(location.href);
+    url.searchParams.set('sw_reset', String(Date.now()));
+    location.replace(url.href);
+  }catch(e){ location.reload(); }
+  return true;
+}
+function openServiceWorkerRollback(){
+  confirmModal('¿Hacer rollback del Service Worker?',
+    'Se desregistrará el Service Worker de DrakoTrack y se borrarán solo sus cachés. Tus entrenamientos, copias locales y cambios pendientes no se tocan. Después se recargará la app desde la red.',
+    'Hacer rollback', () => { closeModal(); rollbackServiceWorker(); });
+}
+function maybeNotifySwRollback(){
+  try{
+    if(!sessionStorage.getItem(SW_ROLLBACK_KEY)) return;
+    sessionStorage.removeItem(SW_ROLLBACK_KEY);
+    const u = new URL(location.href);
+    if(u.searchParams.has('sw_reset')){
+      u.searchParams.delete('sw_reset');
+      history.replaceState(null, '', u.pathname + u.search + u.hash);
+    }
+    toast('Service Worker restablecido. Tus datos siguen en este dispositivo.', 'info');
+  }catch(e){}
+}
+
+function setupPwa(){
   if(typeof navigator === 'undefined' || !('serviceWorker' in navigator)) return;
   if(location.protocol !== 'https:' && location.hostname !== 'localhost' && location.hostname !== '127.0.0.1') return;
-  window.addEventListener('load', () => {
-    navigator.serviceWorker.register('sw.js').catch(() => {});
+  navigator.serviceWorker.addEventListener('message', event => {
+    const data = event.data || {};
+    if(data.type === 'PROCESS_QUEUE') handleConnectivity('sw-message');
   });
-})();
+  navigator.serviceWorker.addEventListener('controllerchange', () => {
+    if(offlineState.refreshing) return;
+    offlineState.refreshing = true;
+    window.location.reload();
+  });
+  window.addEventListener('beforeinstallprompt', event => {
+    event.preventDefault();
+    offlineState.installPrompt = event;
+    if(parseHash().route === 'settings') render();
+  });
+  window.addEventListener('appinstalled', () => {
+    offlineState.installPrompt = null;
+    toast('DrakoTrack instalada. Ya puedes abrirla como una app.');
+    renderOfflineBar();
+  });
+  window.addEventListener('load', () => {
+    navigator.serviceWorker.register('sw.js', { scope: './', updateViaCache: 'none' }).then(reg => {
+      offlineState.sw = reg;
+      if(reg.waiting && navigator.serviceWorker.controller) offerServiceWorkerUpdate();
+      reg.addEventListener('updatefound', () => {
+        const worker = reg.installing;
+        if(!worker) return;
+        worker.addEventListener('statechange', () => {
+          if(worker.state === 'installed' && navigator.serviceWorker.controller) offerServiceWorkerUpdate();
+        });
+      });
+    }).catch(() => {});
+  });
+}
+function setupOffline(){
+  if(window.__dtOfflineReady) return;
+  window.__dtOfflineReady = true;
+  try{ if(currentUser) opQueue.recover(currentUser); }catch(e){}
+  renderOfflineBar();
+  /* online/offline/visibility/focus se registran una sola vez arriba, junto al
+     arranque; aquí solo se sincroniza el estado entre pestañas. */
+  window.addEventListener('storage', event => { if(event.key === 'draktrack_offline_v1') renderOfflineBar(); });
+}
+
+setupOffline();

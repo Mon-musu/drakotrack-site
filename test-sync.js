@@ -455,7 +455,7 @@ const engineFor = (server, account, extra = {}) => {
     eq(invalid.statusCode, 400, 'los datos inválidos se rechazan antes de la función');
     eq(api.calls, 0, 'no se llama a Supabase con datos inválidos');
 
-    const foreign = await api.call({ method: 'PUT', headers: { origin: 'https://evil.example' }, body: { data: docBase(), base_rev: 7 } });
+    const foreign = await api.call({ method: 'PUT', headers: { origin: 'https://evil.example', host: 'drakotrack.vercel.app' }, body: { data: docBase(), base_rev: 7 } });
     eq(foreign.statusCode, 403, 'otro origen no puede escribir');
 
     const get = await api.call({ method: 'GET' });
@@ -577,7 +577,7 @@ async function apiWith(options) {
     async call(req) {
       const { action, ...rest } = req;
       const res = response();
-      const base = { headers: { origin: 'https://drakotrack.vercel.app' }, query: { action: action || 'profile' } };
+      const base = { headers: { origin: 'https://drakotrack.vercel.app', host: 'drakotrack.vercel.app' }, query: { action: action || 'profile' } };
       await handler({ ...base, ...rest }, res);
       return res;
     },

@@ -76,10 +76,29 @@ async function signIn(email, password) {
   const response = await auth('/token?grant_type=password', { method: 'POST', body: { email, password } });
   return { response, data: response.ok ? await response.json() : null };
 }
-async function signUp(email, password, consent) {
+async function signUp(email, password, consent, username) {
   const body = { email, password };
-  if (consent) body.data = { drakotrack_consent: consent };
+  const metadata = {};
+  if (consent) metadata.drakotrack_consent = consent;
+  if (username) metadata.username = username;
+  if (Object.keys(metadata).length) body.data = metadata;
   const response = await auth('/signup', { method: 'POST', body });
+  return { response, data: response.ok ? await response.json() : null };
+}
+async function updateProfile(accessToken, username) {
+  /* GoTrue reemplaza user_metadata en cada PUT. Se lee primero para conservar
+     el consentimiento y cualquier otro metadato que no gestiona esta pantalla. */
+  const current = await auth('/user', { headers: { Authorization: `Bearer ${accessToken}` } });
+  if (!current.ok) return { response: current, data: null };
+  const account = await current.json().catch(() => null);
+  const metadata = account && account.user_metadata && typeof account.user_metadata === 'object' && !Array.isArray(account.user_metadata)
+    ? account.user_metadata
+    : {};
+  const response = await auth('/user', {
+    method: 'PUT',
+    headers: { Authorization: `Bearer ${accessToken}` },
+    body: { data: { ...metadata, username } },
+  });
   return { response, data: response.ok ? await response.json() : null };
 }
 async function refreshSession(token) {
@@ -90,4 +109,4 @@ async function refreshSession(token) {
 function setSession(res, data) { cookieSession(res, data); }
 function clearSession(res) { writeCookies(res, { access: null, refresh: null, recovery: null }); }
 
-module.exports = { URL, KEY, APP_ORIGIN, hasServerKey, auth, rest, rpc, rpcAuthed, userFromToken, currentUser, authenticatedSession, signIn, signUp, refreshSession, setSession, clearSession };
+module.exports = { URL, KEY, APP_ORIGIN, hasServerKey, auth, rest, rpc, rpcAuthed, userFromToken, currentUser, authenticatedSession, signIn, signUp, updateProfile, refreshSession, setSession, clearSession };

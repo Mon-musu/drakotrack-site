@@ -1,4 +1,7 @@
 'use strict';
+/* Clave pública ficticia: permite probar la fusión de metadata sin red ni
+   credenciales reales. Si el entorno ya trae una, se respeta. */
+process.env.SUPABASE_PUBLISHABLE_KEY = process.env.SUPABASE_PUBLISHABLE_KEY || 'sb_publishable_test_only';
 const assert = require('node:assert/strict');
 const security = require('./lib/security');
 const authHandler = require('./api/auth/[action]');
@@ -44,6 +47,13 @@ async function call(handler, req) {
   assert.equal(security.isSameOrigin({ headers: { origin: 'https://evil.example', host: 'drakotrack.vercel.app' } }), false);
   assert.equal(security.isSameOrigin({ headers: { host: 'drakotrack.vercel.app' } }), false, 'rejects absent origin for cookie mutations');
 
+  const originEnv = process.env.NODE_ENV;
+  process.env.NODE_ENV = 'production';
+  assert.equal(security.isSameOrigin({ headers: { origin: 'https://preview-abc.vercel.app', host: 'preview-abc.vercel.app' } }), true, 'allows same-host Vercel previews');
+  assert.equal(security.isSameOrigin({ headers: { origin: 'https://evil.example', host: 'preview-abc.vercel.app' } }), false, 'rejects a foreign origin even on a preview');
+  assert.equal(security.isSameOrigin({ headers: { origin: 'http://preview-abc.vercel.app', host: 'preview-abc.vercel.app' } }), false, 'requires HTTPS in production');
+  process.env.NODE_ENV = originEnv;
+
   const previousEnv = process.env.NODE_ENV;
   process.env.NODE_ENV = 'production';
   const cookieRes = response();
@@ -55,21 +65,29 @@ async function call(handler, req) {
   assert.equal(security.readCookie({ headers: { cookie: 'dt_access=legacy' } }, 'access'), null, 'does not accept unprefixed production cookies');
   process.env.NODE_ENV = previousEnv;
 
+  const previousDtProduction = process.env.DT_PRODUCTION;
+  process.env.DT_PRODUCTION = '1';
+  const secureRuntimeRes = response();
+  security.cookieSession(secureRuntimeRes, { access_token: 'a', refresh_token: 'r', expires_in: 3600 });
+  assert.ok(secureRuntimeRes.headers['set-cookie'].every(value => value.startsWith('__Host-dt_') && value.includes('Secure')), 'HTTPS runtime sets __Host- Secure cookies');
+  if (previousDtProduction === undefined) delete process.env.DT_PRODUCTION;
+  else process.env.DT_PRODUCTION = previousDtProduction;
+
   const origHasServerKey = sb.hasServerKey;
   const origIsSameOrigin = security.isSameOrigin;
   sb.hasServerKey = () => false;
   security.isSameOrigin = () => true;
-  let res = await call(authHandler, { method: 'POST', query: { action: 'signin' }, headers: { origin: 'https://drakotrack.vercel.app' }, body: {} });
+  let res = await call(authHandler, { method: 'POST', query: { action: 'signin' }, headers: { origin: 'https://drakotrack.vercel.app', host: 'drakotrack.vercel.app' }, body: {} });
   assert.equal(res.statusCode, 503, 'auth API fails closed when server Supabase key missing');
-  res = await call(dataHandler, { method: 'PUT', query: { action: 'profile' }, headers: { origin: 'https://drakotrack.vercel.app' }, body: {} });
+  res = await call(dataHandler, { method: 'PUT', query: { action: 'profile' }, headers: { origin: 'https://drakotrack.vercel.app', host: 'drakotrack.vercel.app' }, body: {} });
   assert.equal(res.statusCode, 503, 'data API fails closed when server Supabase key missing');
-  res = await call(accountHandler, { method: 'DELETE', headers: { origin: 'https://drakotrack.vercel.app' } });
+  res = await call(accountHandler, { method: 'DELETE', headers: { origin: 'https://drakotrack.vercel.app', host: 'drakotrack.vercel.app' } });
   assert.equal(res.statusCode, 503, 'account API fails closed when server Supabase key missing');
   sb.hasServerKey = origHasServerKey;
 
-  res = await call(authHandler, { method: 'POST', query: { action: 'signin' }, headers: { origin: 'https://evil.example' }, body: {} });
+  res = await call(authHandler, { method: 'POST', query: { action: 'signin' }, headers: { origin: 'https://evil.example', host: 'drakotrack.vercel.app' }, body: {} });
   assert.equal(res.statusCode, 403, 'auth API rejects cross-origin POST before auth upstream');
-  res = await call(dataHandler, { method: 'PUT', query: { action: 'profile' }, headers: { origin: 'https://evil.example' }, body: {} });
+  res = await call(dataHandler, { method: 'PUT', query: { action: 'profile' }, headers: { origin: 'https://evil.example', host: 'drakotrack.vercel.app' }, body: {} });
   assert.equal(res.statusCode, 403, 'data API rejects cross-origin write before auth upstream');
   security.isSameOrigin = origIsSameOrigin;
 
@@ -84,23 +102,58 @@ async function call(handler, req) {
   };
 
   const signupBody = { email: 'nuevo@drakotrack.test', password: 'correct-horse-battery', consent: valid.consent };
-  res = await call(authHandler, { method: 'POST', query: { action: 'signup' }, headers: { origin: 'https://drakotrack.vercel.app' }, body: signupBody });
+  res = await call(authHandler, { method: 'POST', query: { action: 'signup' }, headers: { origin: 'https://drakotrack.vercel.app', host: 'drakotrack.vercel.app' }, body: signupBody });
   assert.equal(res.statusCode, 201, 'signup creates the account without a captcha');
   assert.equal(signupCalls, 1, 'signup reaches Supabase on the first attempt');
   assert.equal(JSON.parse(res.body).user.email, 'nuevo@drakotrack.test', 'signup returns the safe user');
 
-  res = await call(authHandler, { method: 'POST', query: { action: 'signup' }, headers: { origin: 'https://drakotrack.vercel.app' }, body: { ...signupBody, altcha: 'stale-proof' } });
+  res = await call(authHandler, { method: 'POST', query: { action: 'signup' }, headers: { origin: 'https://drakotrack.vercel.app', host: 'drakotrack.vercel.app' }, body: { ...signupBody, altcha: 'stale-proof' } });
   assert.equal(res.statusCode, 201, 'a leftover captcha field is ignored, not rejected');
 
   res = await call(authHandler, { method: 'GET', query: { action: 'challenge' } });
   assert.equal(res.statusCode, 404, 'the captcha challenge endpoint is gone');
 
-  res = await call(authHandler, { method: 'POST', query: { action: 'signup' }, headers: { origin: 'https://drakotrack.vercel.app' }, body: { ...signupBody, password: 'short' } });
+  res = await call(authHandler, { method: 'POST', query: { action: 'signup' }, headers: { origin: 'https://drakotrack.vercel.app', host: 'drakotrack.vercel.app' }, body: { ...signupBody, password: 'short' } });
   assert.equal(res.statusCode, 400, 'short passwords are still rejected');
 
   sb.signUp = originalSignUp;
   sb.hasServerKey = origHasServerKey;
   security.isSameOrigin = origIsSameOrigin;
 
-  console.log('security tests: 19 profile/API assertions + 5 signup assertions passed');
+  /* ---------------- Cambiar el nombre no borra el consentimiento ---------------- */
+  const originalFetch = global.fetch;
+  const originalHasKey = sb.hasServerKey;
+  const profileCalls = [];
+  sb.hasServerKey = () => true;
+  global.fetch = async (url, options = {}) => {
+    profileCalls.push({ url: String(url), options });
+    if (!options.method || options.method === 'GET') {
+      return { ok: true, status: 200, json: async () => ({ id: 'u1', user_metadata: { drakotrack_consent: { version: '2026-10-28' }, tema: 'drako' } }) };
+    }
+    return { ok: true, status: 200, json: async () => ({ id: 'u1', user_metadata: JSON.parse(options.body).data }) };
+  };
+  try {
+    const updated = await sb.updateProfile('token', 'Nuevo Nombre');
+    assert.equal(updated.response.ok, true);
+    const put = profileCalls.find(call => call.options.method === 'PUT');
+    assert.ok(put, 'profile update reaches the upstream PUT');
+    const sent = JSON.parse(put.options.body).data;
+    assert.equal(sent.username, 'Nuevo Nombre');
+    assert.deepEqual(sent.drakotrack_consent, { version: '2026-10-28' }, 'keeps existing consent metadata');
+    assert.equal(sent.tema, 'drako', 'keeps unrelated metadata');
+
+    profileCalls.length = 0;
+    global.fetch = async (url, options = {}) => {
+      profileCalls.push({ url: String(url), options });
+      return { ok: false, status: 401, json: async () => ({}) };
+    };
+    const denied = await sb.updateProfile('expired', 'Nuevo Nombre');
+    assert.equal(denied.data, null);
+    assert.equal(profileCalls.filter(call => call.options.method === 'PUT').length, 0, 'does not write when the session is invalid');
+  } finally {
+    global.fetch = originalFetch;
+    sb.hasServerKey = originalHasKey;
+  }
+
+  console.log('security tests passed: profile/API, preview origin, metadata and signup assertions');
 })().catch(error => { console.error(error); process.exitCode = 1; });

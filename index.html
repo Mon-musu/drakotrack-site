@@ -13,7 +13,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="styles.css?v=25">
+<link rel="stylesheet" href="styles.css?v=30">
 </head>
 <body>
 <a class="skip-link" href="#main">Saltar al contenido</a>
@@ -44,6 +44,10 @@
           <span id="auth-user-label">Usuario o correo</span>
           <input id="auth-user" autocomplete="username" placeholder="tu@correo.com o entrenador_marco" spellcheck="false">
         </label>
+        <label class="field hidden" id="auth-name-field">
+          <span>Nombre de usuario en la nube</span>
+          <input id="auth-name" autocomplete="nickname" maxlength="40" placeholder="p. ej. Marco" spellcheck="false">
+        </label>
         <label class="field" id="auth-pass-field">
           <span>Contraseña</span>
           <input id="auth-pass" type="password" autocomplete="current-password" placeholder="••••••••">
@@ -68,7 +72,7 @@
         <button type="submit" class="btn btn-primary btn-block btn-lg" id="auth-submit">Iniciar sesión</button>
         <p class="auth-note" id="auth-note">Las cuentas locales viven solo en este dispositivo. Con <b>Nube</b> tus datos se guardan en Supabase y puedes restaurarlos desde cualquier dispositivo o si olvidas tu contraseña.</p>
       </form>
-      <a class="btn btn-ghost btn-block" href="https://github.com/Mon-musu/drakotrack-site/releases/latest" style="margin-top:14px">Descargar app Android (APK)</a>
+      <a class="btn btn-ghost btn-block" href="https://github.com/Mon-musu/drakotrack-site/releases/latest" rel="noopener" data-apk-download style="margin-top:14px">Descargar app Android (APK)</a>
 
       <footer class="site-footer">
         <nav class="footer-links" aria-label="Información legal y privacidad">
@@ -108,7 +112,7 @@
         <button type="button" data-action="open-change-pass">Cambiar contraseña</button>
         <button type="button" data-action="open-settings">Ajustes</button>
         <a href="legal.html" target="_blank" rel="noopener noreferrer">Información legal y privacidad</a>
-        <a href="https://github.com/Mon-musu/drakotrack-site/releases/latest">Descargar la app (APK)</a>
+        <a href="https://github.com/Mon-musu/drakotrack-site/releases/latest" rel="noopener" data-apk-download>Descargar la app (APK)</a>
         <button type="button" data-action="reset-data">Borrar mis datos de entrenamiento</button>
         <button type="button" data-action="open-delete-account">Eliminar mi cuenta y todos mis datos</button>
         <button type="button" data-action="logout">Cerrar sesión</button>
@@ -116,20 +120,22 @@
     </div>
   </header>
 
+  <div id="offline-bar" class="offline-bar hidden" role="status" aria-live="polite"></div>
+
   <nav class="sidebar" id="sidebar" aria-label="Secciones principales">
     <button class="nav-btn active" data-action="tab" data-route="workouts" aria-current="page"><span>Entrenamientos</span></button>
+    <button class="nav-btn" data-action="tab" data-route="plan"><span>Plan</span></button>
     <button class="nav-btn" data-action="tab" data-route="history"><span>Historial</span></button>
     <button class="nav-btn" data-action="tab" data-route="progress"><span>Progreso</span></button>
-    <button class="nav-btn" data-action="tab" data-route="prs"><span>Récords</span></button>
     <button class="nav-btn" data-action="tab" data-route="weight"><span>Peso</span></button>
     <div class="sidebar-foot">Entrena como un dragón.</div>
   </nav>
 
   <nav class="bottomnav" id="bottomnav" aria-label="Secciones principales (móvil)">
     <button class="nav-btn active" data-action="tab" data-route="workouts" aria-current="page"><span>Entrenamientos</span></button>
+    <button class="nav-btn" data-action="tab" data-route="plan"><span>Plan</span></button>
     <button class="nav-btn" data-action="tab" data-route="history"><span>Historial</span></button>
     <button class="nav-btn" data-action="tab" data-route="progress"><span>Progreso</span></button>
-    <button class="nav-btn" data-action="tab" data-route="prs"><span>Récords</span></button>
     <button class="nav-btn" data-action="tab" data-route="weight"><span>Peso</span></button>
   </nav>
 
@@ -140,10 +146,14 @@
 <div id="toast-root"></div>
 
 <script src="sync.js?v=2"></script>
-<script src="supabase.js?v=4"></script>
+<script src="supabase.js?v=5"></script>
 <script src="boostcamp.js?v=3"></script>
 <script src="share.js?v=4"></script>
-<script src="app.js?v=36"></script>
-<script src="update-check.js?v=1" defer></script>
+<script src="progress.js?v=1"></script>
+<script src="planner.js?v=1"></script>
+<script src="offline.js?v=2"></script>
+<script src="analytics.js?v=1"></script>
+<script src="app.js?v=43"></script>
+<script src="update-check.js?v=2" defer></script>
 </body>
 </html>

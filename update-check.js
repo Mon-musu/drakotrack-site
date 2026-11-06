@@ -76,6 +76,26 @@ window.DrakoUpdate = (function () {
     document.body.appendChild(bar);
   }
 
+  /* Los botones de descarga del sitio: se resuelven contra el feed para que
+     apunten siempre al archivo de la última release y se descargue solo
+     (GitHub sirve los assets con Content-Disposition: attachment). Si el feed
+     no responde, el <a> conserva el href de respaldo que trae el HTML. */
+  function wireDownloads() {
+    const links = document.querySelectorAll('a[data-apk-download]');
+    if (!links.length) return Promise.resolve();
+    return fetch(ENDPOINT, { cache: 'no-store', headers: { Accept: 'application/json' } })
+      .then(res => res.ok ? res.json() : null)
+      .then(info => {
+        if (!info || !info.apkUrl) return;
+        links.forEach(a => {
+          a.href = String(info.apkUrl);
+          a.setAttribute('download', '');
+          a.setAttribute('rel', 'noopener');
+        });
+      })
+      .catch(() => {});
+  }
+
   async function check() {
     const installed = installedCode();
     if (!installed) return;                          /* navegador: nada que comparar */
@@ -92,11 +112,16 @@ window.DrakoUpdate = (function () {
     render(info, installed);
   }
 
-  if (document.readyState === 'loading') {
-    document.addEventListener('DOMContentLoaded', check);
-  } else {
+  function start() {
+    wireDownloads();
     check();
   }
 
-  return { check, installedCode, isNewer };
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', start);
+  } else {
+    start();
+  }
+
+  return { check, wireDownloads, installedCode, isNewer };
 })();

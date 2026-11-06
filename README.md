@@ -1,7 +1,8 @@
 # DrakoTrack
 
-Strength-training tracker: a static single-page app plus a small Vercel API layer,
-with Supabase for cloud accounts. Ships on the web and as a sideloaded Android APK.
+Strength-training tracker: a static single-page app plus a small serverless API layer
+(Vercel functions, or Cloudflare Pages Functions), with Supabase for cloud accounts.
+Ships on the web and as a sideloaded Android APK.
 
 - **Web / app UI**: `index.html`, `app.js`, `styles.css`, `share.js`, `boostcamp.js`
 - **Cloud client**: `supabase.js` (talks only to the same-origin API — no tokens in the browser)
@@ -14,7 +15,8 @@ with Supabase for cloud accounts. Ships on the web and as a sideloaded Android A
 
 ```bash
 npm ci
-npm test        # app flows, profile/API assertions and rate limiting
+npm test                  # app flows, profile/API assertions and rate limiting
+npm run test:cloudflare   # build de dist/ + contrato de Cloudflare Pages
 ```
 
 ## Deploying the site
@@ -29,6 +31,18 @@ export VERCEL_TOKEN=...   # never commit it
 
 Environment variables (`SUPABASE_URL`, `SUPABASE_PUBLISHABLE_KEY`)
 live in the Vercel project, never in this repository.
+
+## Cloudflare Pages (alternativa, Vercel sigue siendo el respaldo)
+
+El mismo frontend y la misma API pueden servirse desde Cloudflare Pages. El
+build genera `dist/` (solo assets públicos) y `functions/api/[[path]].js`
+reutiliza los handlers de `api/`; Supabase no cambia. Pasos, variables,
+pruebas ejecutadas y rollback: [CLOUDFLARE.md](CLOUDFLARE.md).
+
+```bash
+npm run build:cloudflare   # genera dist/ con _headers y _routes.json
+npm run preview:cloudflare # Wrangler local
+```
 
 ## Sincronización entre dispositivos
 

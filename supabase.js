@@ -7,6 +7,7 @@ window.DrakoSB = (function () {
   const hasSession = () => !!(current && current.id);
   const email = () => current && current.email || null;
   const userId = () => current && current.id || null;
+  const name = () => current && typeof current.name === 'string' && current.name.trim() ? current.name.trim() : null;
   const setSession = session => { current = session && session.user ? session.user : (session && session.id ? session : null); };
   async function request(path, options = {}) {
     const response = await fetch(API + path, {
@@ -24,11 +25,21 @@ window.DrakoSB = (function () {
     if (response.status === 429) return 'Demasiados intentos — espera un minuto y vuelve a intentarlo.';
     return (data && data.message) || generic || 'No se pudo completar la solicitud.';
   }
-  async function signUp(mail, pass, consent) {
+  async function signUp(mail, pass, consent, username) {
     try {
-      const { response, data } = await request('/auth/signup', { body: { email: mail, password: pass, consent } });
+      const body = { email: mail, password: pass, consent };
+      if (username) body.username = username;
+      const { response, data } = await request('/auth/signup', { body });
       if (!response.ok) return authError(response, data, 'No se pudo crear la cuenta.');
       setSession(data);
+      return null;
+    } catch (_) { return 'Sin conexión con el servidor.'; }
+  }
+  async function updateProfile(username) {
+    try {
+      const { response, data } = await request('/auth/profile', { body: { username } });
+      if (!response.ok) return authError(response, data, 'No se pudo guardar el nombre de usuario.');
+      if (data && data.user) setSession({ user: data.user });
       return null;
     } catch (_) { return 'Sin conexión con el servidor.'; }
   }
@@ -126,6 +137,6 @@ window.DrakoSB = (function () {
       return null;
     } catch (_) { return 'Sin conexión con el servidor.'; }
   }
-  return { signIn, signUp, recover, updatePasswordFromToken, changePassword, signOut, loadData, saveData, dataHistory, restoreVersion, deleteAccount, refresh,
-    session: () => current ? { user: current } : null, email, userId, hasSession, loadSession, setSession };
+  return { signIn, signUp, updateProfile, recover, updatePasswordFromToken, changePassword, signOut, loadData, saveData, dataHistory, restoreVersion, deleteAccount, refresh,
+    session: () => current ? { user: current } : null, email, userId, name, hasSession, loadSession, setSession };
 })();

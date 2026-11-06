@@ -216,7 +216,7 @@ function response() {
 }
 async function call(req) {
   const res = response();
-  await dataHandler({ headers: { origin: 'https://drakotrack.vercel.app' }, query: { action: 'profile' }, ...req }, res);
+  await dataHandler({ headers: { origin: 'https://drakotrack.vercel.app', host: 'drakotrack.vercel.app' }, query: { action: 'profile' }, ...req }, res);
   return res;
 }
 
@@ -291,7 +291,7 @@ async function call(req) {
     passed += 1;
 
     sb.authenticatedSession = origSession;
-    res = await call({ method: 'PUT', headers: { origin: 'https://evil.example' }, body: { data: makeModernProfile() } });
+    res = await call({ method: 'PUT', headers: { origin: 'https://evil.example', host: 'drakotrack.vercel.app' }, body: { data: makeModernProfile() } });
     assert.equal(res.statusCode, 403, 'un origen ajeno no puede escribir');
     passed += 1;
   } finally {

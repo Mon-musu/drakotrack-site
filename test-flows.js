@@ -16,7 +16,8 @@ const dom = new JSDOM(html, {
 const { window } = dom;
 const ctx = dom.getInternalVMContext();
 
-for (const f of ['sync.js', 'supabase.js', 'boostcamp.js', 'share.js', 'app.js']) {
+for (const f of ['sync.js', 'supabase.js', 'boostcamp.js', 'share.js', 'progress.js', 'planner.js',
+    'offline.js', 'analytics.js', 'app.js']) {
   vm.runInContext(fs.readFileSync(path.join(__dirname, f), 'utf8'), ctx, { filename: f });
 }
 
@@ -1710,7 +1711,7 @@ const tick = ms => new Promise(r => setTimeout(r, ms));
   check('service worker precaches the shell', /const VERSION = /.test(swSource) && swSource.includes("'./index.html'") && swSource.includes('./app.js?v='));
   check('service worker leaves the API uncached', /startsWith\('\/api\/'\)/.test(swSource));
   check('service worker revalidates in the background', /cache\.put\(request, response\.clone\(\)\)/.test(swSource));
-  check('app registers the service worker', /serviceWorker\.register\('sw\.js'\)/.test(fs.readFileSync(path.join(__dirname, 'app.js'), 'utf8')));
+  check('app registers the service worker', /serviceWorker\.register\('sw\.js'(?:\s*,|\))/.test(fs.readFileSync(path.join(__dirname, 'app.js'), 'utf8')));
 
   // Validación del servidor: el documento que escribe la app debe pasar entero
   const { validateData, DATA_KEYS } = require('./lib/security');
@@ -1784,6 +1785,18 @@ const tick = ms => new Promise(r => setTimeout(r, ms));
   const probeProblems = scanUnknown(probe);
   check('the contract check reports a genuinely new field',
     probeProblems.some(p => /campoInventado/.test(p)));
+
+  // ===== Una foto local manipulada no puede inyectar atributos HTML =====
+  const photoPayload = 'data:image/png;base64,x" onerror="window.__photoXss=1';
+  g(`(function(){
+    currentUser = 'photo_xss';
+    const d = dataFor(currentUser);
+    d.photo = ${JSON.stringify(photoPayload)};
+    location.hash = '#/weight';
+    render();
+  })()`);
+  check('una foto manipulada no inyecta atributos', !/onerror/i.test(mainHtml()) && !g('window.__photoXss'));
+  check('una foto inválida cae en el botón de subir', /Subir foto/.test(mainHtml()));
 
   console.log(`\nRESULT: ${pass} passed, ${fail} failed`);
   process.exit(fail ? 1 : 0);

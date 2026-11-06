@@ -2,6 +2,11 @@ node_modules/
 .env
 .env.*
 !.env.example
+
+# Cloudflare build output and local Wrangler state
+dist/
+.wrangler/
+.dev.vars
 *.log
 test-users.json
 drakotrack-deploy.zip
@@ -26,3 +31,15 @@ chunks/
 bundle/
 *.idsig
 drakotrack-sync.bundle
+
+# Token local para publicar (nunca se versiona)
+vercel-token.txt
+
+# Entregas ZIP y carpetas de herramientas del asistente: no son código del
+# producto y no deben llegar al repositorio ni al build de Cloudflare
+drakotrack-codigo-*.zip
+.agents/
+.claude/
+agent/
+.mcp.json
+skills-lock.json

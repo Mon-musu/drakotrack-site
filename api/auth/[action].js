@@ -1,5 +1,5 @@
 'use strict';
-const { json, readJson, isSameOrigin, readCookie, cookieSession, clearCookies, safeUser } = require('../../lib/security');
+const { json, readJson, isSameOrigin, readCookie, cookieSession, clearCookies, safeUser, safeDisplayName } = require('../../lib/security');
 const sb = require('../_lib/supabase');
 const rateLimit = require('../_lib/rate-limit');
 
@@ -20,7 +20,7 @@ module.exports = async function handler(req, res) {
   res.setHeader('Referrer-Policy', 'strict-origin-when-cross-origin');
   res.setHeader('Strict-Transport-Security', 'max-age=63072000; includeSubDomains; preload');
   const action = getAction(req);
-  if (!['signup', 'signin', 'recover', 'reset', 'change-password', 'signout', 'session'].includes(action)) return json(res, 404, { error: 'not_found' });
+  if (!['signup', 'signin', 'recover', 'reset', 'change-password', 'profile', 'signout', 'session'].includes(action)) return json(res, 404, { error: 'not_found' });
   const readOnly = action === 'session';
   if ((readOnly && req.method !== 'GET') || (!readOnly && req.method !== 'POST')) return json(res, 405, { error: 'method_not_allowed' });
   if (await rateLimit.enforce(req, res, 'api:ip')) return;
@@ -44,7 +44,12 @@ module.exports = async function handler(req, res) {
     const body = await readJson(req, 16 * 1024);
     if (action === 'signup' || action === 'signin') {
       if (!validEmail(body.email) || typeof body.password !== 'string' || body.password.length < (action === 'signup' ? 8 : 1) || body.password.length > 256 || (action === 'signup' && !validConsent(body.consent))) return json(res, 400, { error: 'invalid_input', message: 'Correo, contraseña o consentimiento no válidos.' });
-      const { response, data } = action === 'signup' ? await sb.signUp(body.email.trim().toLowerCase(), body.password, body.consent) : await sb.signIn(body.email.trim().toLowerCase(), body.password);
+      let username = null;
+      if (action === 'signup' && body.username !== undefined && body.username !== null && body.username !== '') {
+        username = safeDisplayName(body.username);
+        if (!username) return json(res, 400, { error: 'invalid_username', message: 'El nombre de usuario debe tener entre 2 y 40 caracteres.' });
+      }
+      const { response, data } = action === 'signup' ? await sb.signUp(body.email.trim().toLowerCase(), body.password, body.consent, username) : await sb.signIn(body.email.trim().toLowerCase(), body.password);
       if (!response.ok) {
         if (response.status === 429) return json(res, 429, { error: action === 'signin' ? 'invalid_credentials' : 'auth_failed', message: action === 'signin' ? 'Demasiados intentos. Espera un momento e inténtalo de nuevo.' : 'No se pudo crear la cuenta por ahora. Inténtalo de nuevo más tarde.' });
         if (action === 'signin' && response.status === 400) {
@@ -71,6 +76,16 @@ module.exports = async function handler(req, res) {
       if (!response.ok) return json(res, response.status === 429 ? 429 : 400, { error: 'reset_failed', message: 'No se pudo cambiar la contraseña. Solicita un enlace nuevo.' });
       clearCookies(res);
       return json(res, 200, { ok: true });
+    }
+    if (action === 'profile') {
+      const session = await sb.authenticatedSession(req);
+      if (!session) { clearCookies(res); return json(res, 401, { error: 'unauthorized' }); }
+      if (await rateLimit.enforce(req, res, 'auth:profile', { userId: session.user.id })) return;
+      const username = safeDisplayName(body.username);
+      if (!username) return json(res, 400, { error: 'invalid_username', message: 'El nombre de usuario debe tener entre 2 y 40 caracteres.' });
+      const { response, data } = await sb.updateProfile(session.accessToken, username);
+      if (!response.ok) return json(res, response.status === 429 ? 429 : 400, { error: 'profile_update_failed', message: 'No se pudo guardar el nombre de usuario.' });
+      return json(res, 200, { user: safeUser(data) });
     }
     if (action === 'change-password') {
       const session = await sb.authenticatedSession(req);

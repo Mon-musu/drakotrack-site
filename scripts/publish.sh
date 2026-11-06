@@ -39,7 +39,7 @@ BRANCH="$(git rev-parse --abbrev-ref HEAD)"
 # Archivos que forman el despliegue: la web, las funciones de api/ y su código.
 DEPLOY_FILES=(
   index.html app.js sync.js styles.css share.js supabase.js boostcamp.js
-  legal.html legal.js logo.png update-check.js
+  legal.html legal.js logo.png update-check.js progress.js planner.js analytics.js offline.js offline.html
   manifest.webmanifest sw.js icons
   vercel.json package.json package-lock.json api lib programs apk/version.json
 )
@@ -72,12 +72,17 @@ if [ "$MODE" != "push" ]; then
   trap 'rm -rf "$STAGE"' EXIT
   for f in "${DEPLOY_FILES[@]}"; do
     [ -e "$f" ] || die "falta $f: no se despliega un árbol incompleto"
-    cp -r "$f" "$STAGE"/
+    # Se conserva la ruta (apk/version.json sigue siendo /apk/version.json):
+    # cp -r de un archivo suelto lo dejaría en la raíz y la app no lo encuentra.
+    mkdir -p "$STAGE/$(dirname "$f")"
+    cp -r "$f" "$STAGE/$(dirname "$f")/"
   done
   mkdir -p "$STAGE/.vercel"
   printf '{"projectId":"%s","orgId":"%s"}\n' "$PROJECT_ID" "$ORG_ID" > "$STAGE/.vercel/project.json"
 
-  OUT="$(npx --yes vercel@latest deploy --prod --yes --token "$VERCEL_TOKEN" --cwd "$STAGE" 2>&1)"
+  # Vercel CLI lee VERCEL_TOKEN del entorno. No se pasa por argv para que el
+  # token no quede visible en la lista de procesos de la máquina.
+  OUT="$(VERCEL_TOKEN="$VERCEL_TOKEN" npx --yes vercel@latest deploy --prod --yes --cwd "$STAGE" 2>&1)"
   printf '%s\n' "$OUT" | tail -6
   URL="$(printf '%s\n' "$OUT" | grep -Eo 'https://[a-z0-9-]+\.vercel\.app' | tail -1 || true)"
   [ -n "$URL" ] || die "Vercel no devolvió una URL de despliegue (revisa la salida de arriba)"
@@ -90,6 +95,13 @@ if [ "$MODE" != "push" ]; then
     429) echo "aviso: el cortafuegos de Vercel está desafiando a curl (x-vercel-mitigated). Abrí la web en el navegador para confirmar." ;;
     *)   echo "aviso: la home respondió $CODE; revisá el despliegue en el panel de Vercel." ;;
   esac
+
+  FEED_CODE="$(curl -sS -A 'Mozilla/5.0' -o /tmp/drakotrack-feed.json -w '%{http_code}' "$SITE/apk/version.json" || true)"
+  if [ "$FEED_CODE" = "200" ] && python3 -c 'import json;json.load(open("/tmp/drakotrack-feed.json"))' 2>/dev/null; then
+    echo "feed del APK: $(python3 -c 'import json;d=json.load(open("/tmp/drakotrack-feed.json"));print("build", d["versionCode"], d["versionName"])')"
+  else
+    echo "aviso: $SITE/apk/version.json respondió $FEED_CODE; sin ese archivo la app no avisa de actualizaciones ni el botón descarga directo."
+  fi
   echo "desplegado: $URL"
 fi
 
