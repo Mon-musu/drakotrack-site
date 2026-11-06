@@ -4941,18 +4941,31 @@ document.addEventListener('click', e => {
   }
   if(a === 'logout'){ logout().finally(() => render()); return; }
   if(a === 'reset-data'){
-    /* Texto exacto: la cuenta NO se elimina y, en cuentas de nube, la copia
-       remota también se vacía (antes el aviso decía solo «este dispositivo»). */
+    /* La cuenta NO se elimina. En cuentas de nube el borrado se hace primero
+       en el servidor (dt_delete_app_data: copia e historial) y solo si
+       responde bien se vacía lo local: no se anuncia un borrado que no ocurrió. */
     const cloud = isCloud();
     confirmModal('¿Borrar mis datos de entrenamiento?',
       (cloud
-        ? 'Se borrarán todos tus entrenamientos, sesiones, récords, registros de peso y la foto de esta cuenta. Tu copia de la nube también se vaciará. La cuenta seguirá existiendo y podrás empezar de cero.'
+        ? 'Se borrarán todos tus entrenamientos, sesiones, récords, registros de peso y la foto de esta cuenta. Tu copia de la nube y las versiones anteriores guardadas también se borrarán. La cuenta seguirá existiendo y podrás empezar de cero.'
         : 'Se borrarán todos tus entrenamientos, sesiones, récords, registros de peso y la foto de este dispositivo. Tu cuenta local seguirá existiendo y podrás empezar de cero.') +
-      ' Si quieres eliminar también la cuenta, usa «Eliminar mi cuenta y todos mis datos».', 'Borrar datos', () => {
+      ' Si quieres eliminar también la cuenta, usa «Eliminar mi cuenta y todos mis datos».', 'Borrar datos', async () => {
+      if(cloud){
+        /* Un guardado pendiente que llegara después del borrado devolvería los
+           datos: se deja terminar antes de borrar en el servidor. */
+        if(cloudSync && cloudSync.sync){ try { await cloudSync.sync(currentUser, dataFor(currentUser)); } catch(_){} }
+        const err = typeof DrakoSB.deleteData === 'function' ? await DrakoSB.deleteData() : 'No se pudo borrar la copia de la nube.';
+        if(err){ closeModal(); toast(err, 'error'); return; }
+        /* El servidor ya no tiene copia: se olvida la revisión anterior para no
+           reenviar cambios sobre una versión que ya no existe. */
+        if(cloudSync && cloudSync.reset) cloudSync.reset(currentUser);
+      }
       dataFor(currentUser); // asegura que exista
       const prev = db.data[currentUser] || {};
       db.data[currentUser] = { workouts:[], sessions:[], prs:[], weights:[], photo:null, hiddenLib:[], consent: prev.consent || null };
-      saveDB(); closeModal(); toast('Tus datos de entrenamiento fueron borrados. La cuenta sigue activa.', 'info'); render();
+      /* En la nube no se vuelve a subir nada: el servidor quedó vacío. */
+      if(cloud) persistLocal(); else saveDB();
+      closeModal(); toast('Tus datos de entrenamiento fueron borrados. La cuenta sigue activa.', 'info'); render();
     });
     return;
   }

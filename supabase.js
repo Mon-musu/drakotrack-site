@@ -128,6 +128,16 @@ window.DrakoSB = (function () {
       return null;
     } catch (_) { return 'Sin conexión con el servidor.'; }
   }
+  /* Borra la copia de la nube y las versiones anteriores (dt_delete_app_data).
+     No elimina la cuenta. Devuelve un mensaje de error, o null si fue bien. */
+  async function deleteData() {
+    if (!hasSession()) return 'No hay sesión activa en la nube.';
+    try {
+      const { response, data } = await request('/data/profile', { method: 'DELETE' });
+      if (!response.ok) return authError(response, data, 'No se pudo borrar la copia de la nube.');
+      return null;
+    } catch (_) { return 'Sin conexión con el servidor.'; }
+  }
   async function deleteAccount() {
     if (!hasSession()) return 'No hay sesión activa en la nube.';
     try {
@@ -137,6 +147,6 @@ window.DrakoSB = (function () {
       return null;
     } catch (_) { return 'Sin conexión con el servidor.'; }
   }
-  return { signIn, signUp, updateProfile, recover, updatePasswordFromToken, changePassword, signOut, loadData, saveData, dataHistory, restoreVersion, deleteAccount, refresh,
+  return { signIn, signUp, updateProfile, recover, updatePasswordFromToken, changePassword, signOut, loadData, saveData, dataHistory, restoreVersion, deleteData, deleteAccount, refresh,
     session: () => current ? { user: current } : null, email, userId, name, hasSession, loadSession, setSession };
 })();

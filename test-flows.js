@@ -708,6 +708,81 @@ const tick = ms => new Promise(r => setTimeout(r, ms));
   check('cloud account and local cache removed', g("!db.data['borrar@drakotrack.test']") && g('currentUser') === null);
   check('cloud account deletion leaves other accounts intact', g("!!db.users['tester_01']") || g("!!db.users['pw_change']"));
 
+  // ===== borrar datos: en cuentas de nube se borra también en el servidor =====
+  g('window.__realFetch = window.fetch;');
+  g(`(function(){
+    const real = window.fetch;
+    window.__deletedData = 0;
+    window.__deletedMethod = null;
+    window.fetch = async (url, opts) => {
+      const method = (opts && opts.method) || 'POST';
+      if (String(url) === '/api/data/profile' && method === 'DELETE') {
+        window.__deletedData++;
+        window.__deletedMethod = method;
+        return { ok: true, status: 204, json: async () => { throw new Error('sin cuerpo'); } };
+      }
+      return real(url, opts);
+    };
+    DrakoSB.setSession({ access_token:'at', refresh_token:'rt', expires_at:null, user:{ id:'u-nube', email:'nube@drakotrack.test' } });
+  })()`);
+  const dataDelErr = await g('DrakoSB.deleteData()');
+  check('cloud data deletion calls DELETE /api/data/profile', dataDelErr === null && g('window.__deletedData') === 1 && g('window.__deletedMethod') === 'DELETE');
+  g(`window.fetch = async () => ({ ok: false, status: 502, json: async () => ({ error:'data_delete_failed' }) });`);
+  const dataDelFail = await g('DrakoSB.deleteData()');
+  check('cloud data deletion reports server failures', typeof dataDelFail === 'string' && dataDelFail.length > 0);
+  g('window.fetch = window.__realFetch; DrakoSB.setSession(null);');
+  check('cloud data deletion needs a session', String(await g('DrakoSB.deleteData()')).length > 0);
+
+  // motor: olvidar la revisión de una cuenta que el servidor borró
+  g(`(function(){
+    const engine = DrakoSync.createEngine({ storage: DrakoSync.memoryStorage(), remote: { load: async () => null, save: async () => ({ rev: 1 }) } });
+    engine.markDirty('cuenta');
+    const existia = !!engine.state('cuenta');
+    engine.reset('cuenta');
+    window.__resetState = { existia, despues: engine.state('cuenta') };
+  })()`);
+  check('engine reset forgets a deleted account state', g('window.__resetState.existia') === true && g('window.__resetState.despues') === null);
+
+  // flujo real: el botón borra en el servidor antes de vaciar lo local
+  g(`(function(){
+    window.__dataDeletes = 0;
+    DrakoSB.setSession({ access_token:'at', refresh_token:'rt', expires_at:null, user:{ id:'u-reset', email:'reset@drakotrack.test' } });
+    DrakoSB.deleteData = async () => { window.__dataDeletes++; return null; };
+    currentUser = 'reset@drakotrack.test';
+    localStorage.setItem(SESSION_KEY, currentUser);
+    const d = dataFor(currentUser);
+    d.workouts.push({ id:'rw1', name:'Prueba de borrado', exercises:[] });
+    d.weights.push({ id:'rw2', date:'2026-02-01', weight:80 });
+    saveDB();
+  })()`);
+  g('render()');
+  await tick(80);
+  window.document.querySelector('[data-action="reset-data"]').click();
+  await tick(80);
+  const resetModalEl = window.document.querySelector('.modal');
+  check('cloud reset warns about cloud copy and old versions', !!resetModalEl && /nube/i.test(resetModalEl.textContent) && /versiones anteriores/i.test(resetModalEl.textContent));
+  window.document.querySelector('.modal [data-action="confirm-do"]').click();
+  await tick(250);
+  check('cloud reset deletes the server copy', g('window.__dataDeletes') === 1);
+  check('cloud reset empties the local document', g("(function(){const d = db.data['reset@drakotrack.test']; return d.workouts.length === 0 && d.weights.length === 0 && !d.photo;})()"));
+  check('cloud reset forgets the old sync revision', g("cloudSync.state('reset@drakotrack.test')") === null);
+
+  // si el servidor no confirma el borrado, no se toca nada en local
+  g(`(function(){
+    window.__dataDeletes = 0;
+    DrakoSB.deleteData = async () => { window.__dataDeletes++; return 'Sin conexión con el servidor.'; };
+    const d = dataFor('reset@drakotrack.test');
+    d.workouts.push({ id:'rw3', name:'Se queda', exercises:[] });
+    saveDB();
+  })()`);
+  window.document.querySelector('[data-action="reset-data"]').click();
+  await tick(80);
+  window.document.querySelector('.modal [data-action="confirm-do"]').click();
+  await tick(250);
+  check('failed server deletion keeps the local data', g("db.data['reset@drakotrack.test'].workouts.some(w => w.id === 'rw3')"));
+  check('failed server deletion shows an error toast', !!window.document.querySelector('.toast.error'));
+  g('closeModal(); DrakoSB.setSession(null);');
+
   // ===== modelo de series individuales (aceptación) =====
   // la sección anterior deja la app sin sesión: se vuelve a entrar como cuenta local
   g(`(function(){ closeModal(); currentUser = 'sets_tester'; dataFor(currentUser); localStorage.setItem(SESSION_KEY, currentUser); saveDB(); })()`);

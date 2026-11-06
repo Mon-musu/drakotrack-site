@@ -844,9 +844,21 @@
       persist(account, st, false);
     }
 
+    /* Se olvida el estado de una cuenta: la próxima sincronización vuelve a
+       empezar de cero. Se usa cuando el servidor borró la copia, para no
+       reenviar revisiones que ya no existen. */
+    function reset(account) {
+      const all = readAll();
+      if (Object.prototype.hasOwnProperty.call(all, account)) {
+        delete all[account];
+        writeAll(all);
+      }
+      return true;
+    }
+
     return {
       state, markDirty, sync, forcePull, backup, restoreBackup,
-      resolveConflict, clearConflicts, digest, key,
+      resolveConflict, clearConflicts, reset, digest, key,
     };
   }
 
