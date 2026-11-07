@@ -155,6 +155,9 @@ async function appTests() {
   ok(!!s.rest && s.rest.duration === 90, 'T1b. El descanso manual usa el descanso planificado del ejercicio');
   ok(!!doc.querySelector('#rest-time'), 'T1c. La barra muestra la cuenta atrás');
   ok(/En curso/.test(doc.querySelector('#rest-slot').textContent), 'T1d. El estado se muestra como «en curso»');
+  ok(!doc.querySelector('#rest-slot [role="timer"]').hasAttribute('aria-live'), 'T1e. El reloj no es una región viva');
+  await tick(60);
+  ok(/Descanso iniciado/.test(doc.querySelector('#rest-status').textContent), 'T1f. El inicio se anuncia una sola vez en su región');
 
   click('[data-action="rest-pause"]');
   await tick(30);

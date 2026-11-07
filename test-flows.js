@@ -540,6 +540,12 @@ const tick = ms => new Promise(r => setTimeout(r, ms));
     return !!a && a.getAttribute('href') === '#main';
   })());
   check('main is focusable for skip navigation', window.document.querySelector('#main').getAttribute('tabindex') === '-1');
+  check('landing has a focusable skip target', window.document.querySelector('#auth-content').getAttribute('tabindex') === '-1');
+  g("$('#app').classList.add('hidden'); $('#auth-screen').classList.remove('hidden'); syncSkipLink();");
+  check('skip link targets the landing form when the app is hidden', window.document.querySelector('.skip-link').getAttribute('href') === '#auth-content');
+  g("document.querySelector('.skip-link').click()");
+  check('skip link moves focus to the landing form', window.document.activeElement === window.document.querySelector('#auth-content'));
+  g("$('#auth-screen').classList.add('hidden'); $('#app').classList.remove('hidden'); syncSkipLink();");
   check('toasts are announced (status / alert per type)', (() => {
     window.document.querySelector('#toast-root').innerHTML = '';
     g("toast('ok')");
@@ -553,6 +559,8 @@ const tick = ms => new Promise(r => setTimeout(r, ms));
   const currentNav = window.document.querySelector('.sidebar .nav-btn.active');
   check('nav marks the current page', !!currentNav && currentNav.getAttribute('aria-current') === 'page'
     && currentNav.dataset.route === 'history');
+  check('view title names the section', window.document.title === 'DrakoTrack — Historial');
+  check('main is labelled with the section', window.document.querySelector('#main').getAttribute('aria-label') === 'Historial');
   check('nav landmarks are labelled', (window.document.querySelector('#sidebar').getAttribute('aria-label') || '').length > 3
     && (window.document.querySelector('#bottomnav').getAttribute('aria-label') || '').length > 3);
   check('user chip exposes menu state', window.document.querySelector('#user-chip').getAttribute('aria-expanded') === 'false'

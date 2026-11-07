@@ -1613,6 +1613,21 @@ function parseHash(){
   const parts = h.split('/');
   return { route: parts[0] || 'workouts', rest: parts.slice(1) };
 }
+/* Nombre de cada vista para el título del documento y para el `main`. */
+const VIEW_TITLES = {
+  workouts: 'Entrenamientos',
+  plan: 'Plan',
+  history: 'Historial',
+  progress: 'Progreso',
+  analytics: 'Análisis',
+  weight: 'Peso',
+  settings: 'Ajustes',
+  session: 'Entrenamiento',
+  editor: 'Editar entrenamiento',
+  start: 'Empezar entrenamiento',
+  program: 'Programa',
+  library: 'Biblioteca'
+};
 function nav(hash){
   if(location.hash === '#' + hash || location.hash === hash) render();
   else location.hash = hash;
@@ -1629,10 +1644,12 @@ function render(){
     authScreen.classList.remove('hidden');
     app.classList.add('hidden');
     document.title = 'DrakoTrack — Iniciar sesión';
+    syncSkipLink();
     return;
   }
   authScreen.classList.add('hidden');
   app.classList.remove('hidden');
+  syncSkipLink();
   if(!window.__dtMigrated){ window.__dtMigrated = true; try{ migrateAllData(); }catch(err){} }
   document.title = 'DrakoTrack — Seguimiento de entrenamiento';
   syncAccountTheme();
@@ -1656,6 +1673,9 @@ function render(){
   else if(route === 'program') renderProgram(main, rest[0]);
   else if(route === 'library') renderLibrary(main);
   else                         renderWorkouts(main);
+  const viewName = VIEW_TITLES[route] || ((main.querySelector('h1') || {}).textContent || '').trim() || 'Entrenamientos';
+  document.title = 'DrakoTrack — ' + viewName;
+  main.setAttribute('aria-label', viewName);
   maybeBackupReminder();
   maybePlanReminder();
   maybeNotifySwRollback();
@@ -2217,6 +2237,15 @@ function stopRestClock(){
   _restGen++;
   if(_restClock){ clearInterval(_restClock); _restClock = null; }
 }
+/* El reloj no es una región viva: si lo fuera, leería cada segundo. Los
+   cambios importantes (inicio, pausa, reanudación, ajuste y fin) se anuncian
+   aquí una sola vez. */
+function announceRest(message){
+  const region = $('#rest-status');
+  if(!region || !message) return;
+  region.textContent = '';
+  setTimeout(() => { const live = $('#rest-status'); if(live) live.textContent = message; }, 40);
+}
 function fmtClock(sec){
   const s = Math.max(0, Math.round(sec));
   const m = Math.floor(s / 60), r = s % 60;
@@ -2459,6 +2488,7 @@ function startRestTimer(s, seconds, ex, st){
   s.lastSavedAt = nowIso();
   saveDB();
   renderRestBar(s);
+  announceRest('Descanso iniciado: ' + fmtClock(s.rest.duration) + '.');
   return s.rest;
 }
 /* Pausar guarda el tiempo restante exacto en milisegundos; reanudar calcula un
@@ -2474,6 +2504,7 @@ function pauseRestTimer(s){
   s.lastSavedAt = nowIso();
   saveDB();
   renderRestBar(s);
+  announceRest('Descanso en pausa. Quedan ' + fmtClock(restRemaining(s)) + '.');
   return true;
 }
 function resumeRestTimer(s){
@@ -2489,6 +2520,7 @@ function resumeRestTimer(s){
   s.lastSavedAt = nowIso();
   saveDB();
   renderRestBar(s);
+  announceRest('Descanso reanudado. Quedan ' + fmtClock(restRemaining(s)) + '.');
   return true;
 }
 function resetRestTimer(s, seconds){
@@ -2618,8 +2650,10 @@ function renderRestBar(s){
   const left = restRemaining(s);
   const status = restState(s);
   if(status === 'done'){
+    const firstEnd = !s.rest.notifiedAt;
     notifyRestEnd(s);
-    slot.innerHTML = '<div class="rest-bar done" role="status">'
+    if(firstEnd) announceRest('Descanso completado.');
+    slot.innerHTML = '<div class="rest-bar done" role="group" aria-label="Descanso completado">'
       + '<div class="rest-main"><span class="rest-label">Descanso completado</span>'
       + (s.rest.heavy ? '<span class="rest-heavy">Serie pesada</span>' : '')
       + restMenuHTML(s, false, true)
@@ -2629,7 +2663,7 @@ function renderRestBar(s){
   }
   const paused = status === 'paused';
   const pct = Math.min(100, Math.max(0, Math.round((1 - left / Math.max(1, s.rest.duration)) * 100)));
-  slot.innerHTML = '<div class="rest-bar' + (paused ? ' paused' : '') + '" role="timer" aria-live="polite">'
+  slot.innerHTML = '<div class="rest-bar' + (paused ? ' paused' : '') + '" role="timer">'
     + '<div class="rest-main"><span class="rest-label">Descanso</span>'
     + '<span class="rest-state">' + (paused ? 'En pausa' : 'En curso') + '</span>'
     + (s.rest.heavy ? '<span class="rest-heavy">Serie pesada</span>' : '')
@@ -5186,6 +5220,7 @@ document.addEventListener('click', e => {
     }
     saveDB();
     renderRestBar(s);
+    announceRest((a === 'rest-plus' ? 'Añadidos 15 segundos. ' : 'Quitados 15 segundos. ') + 'Quedan ' + fmtClock(restRemaining(s)) + '.');
     return;
   }
   if(a === 'rest-alerts'){ toggleRestAlerts(); return; }
@@ -6256,6 +6291,24 @@ document.addEventListener('keydown', e => {
 applyTheme();
 /* Al cambiar de vista el foco va al contenido: navegación por teclado y
    lectores de pantalla anuncian la nueva página. */
+function skipTarget(){
+  const app = $('#app');
+  return app && !app.classList.contains('hidden') ? $('#main') : $('#auth-content');
+}
+function syncSkipLink(){
+  const link = $('.skip-link');
+  const target = skipTarget();
+  if(link && target && target.id) link.setAttribute('href', '#' + target.id);
+}
+document.addEventListener('click', function(e){
+  const link = e.target && e.target.closest ? e.target.closest('.skip-link') : null;
+  if(!link) return;
+  const target = skipTarget();
+  if(!target) return;
+  e.preventDefault();
+  try{ target.focus({ preventScroll: true }); }catch(err){ target.focus(); }
+  if(target.scrollIntoView) target.scrollIntoView({ block: 'start' });
+});
 function focusMain(){
   const m = $('#main');
   if(m && !$('#app').classList.contains('hidden')){

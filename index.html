@@ -79,7 +79,7 @@
         </div>
       </div>
     </div>
-    <div class="auth-card">
+    <div class="auth-card" id="auth-content" role="region" tabindex="-1" aria-label="Formulario de acceso">
       <div class="auth-tabs" role="group" aria-label="Tipo de acceso">
         <button type="button" class="auth-tab active" data-auth="login" aria-pressed="true">Iniciar sesión</button>
         <button type="button" class="auth-tab" data-auth="signup" aria-pressed="false">Crear cuenta</button>
@@ -187,6 +187,7 @@
   </nav>
 
   <main id="main" class="main" tabindex="-1"></main>
+  <p class="sr-only" id="rest-status" role="status" aria-live="polite" aria-atomic="true"></p>
 </div>
 
 <div id="modal-root"></div>
