@@ -27,7 +27,7 @@ const SHELL = [
   './offline.html',
   './styles.css?v=31',
   './landing.js?v=1',
-  './vendor/swiper/swiper-bundle.min.css?v=11',
+  './vendor/swiper/swiper-bundle.min.css?v=12',
   './vendor/swiper/swiper-bundle.min.js?v=11',
   './sync.js?v=2',
   './offline.js?v=2',
