@@ -19,13 +19,13 @@ const VERSION = 'drakotrack-v14';
 const CACHE_PREFIX = 'drakotrack-';
 const OFFLINE_URL = './offline.html';
 
-const ESSENTIAL = ['./index.html', './app.js?v=43', './styles.css?v=31', './offline.html'];
+const ESSENTIAL = ['./index.html', './app.js?v=43', './styles.css?v=32', './offline.html'];
 
 const SHELL = [
   './',
   './index.html',
   './offline.html',
-  './styles.css?v=31',
+  './styles.css?v=32',
   './landing.js?v=1',
   './vendor/swiper/swiper-bundle.min.css?v=12',
   './vendor/swiper/swiper-bundle.min.js?v=11',
