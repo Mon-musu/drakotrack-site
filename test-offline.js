@@ -134,7 +134,7 @@ console.log('\n=== Conectividad y almacenamiento ===');
   check('index incluye la barra de estado offline', index.includes('id="offline-bar"') && index.includes('role="status"'));
   check('offline.js se carga antes de app.js', index.indexOf('offline.js?v=2') > 0 && index.indexOf('offline.js?v=2') < index.indexOf('app.js?v=43'));
   const sw = fs.readFileSync(path.join(__dirname, 'sw.js'), 'utf8');
-  check('el service worker tiene versión de caché', /const VERSION = 'drakotrack-v13'/.test(sw));
+  check('el service worker tiene versión de caché', /const VERSION = 'drakotrack-v14'/.test(sw));
   check('el shell incluye offline y la app', sw.includes("'./offline.html'") && sw.includes("'./offline.js?v=2'") && sw.includes("'./app.js?v=43'"));
   check('una shell incompleta no reemplaza la versión anterior', /const ESSENTIAL/.test(sw) && /incomplete_shell/.test(sw) && /throw new Error/.test(sw));
   check('el service worker aplica network-first a navegación', /networkFirstNavigation/.test(sw) && /request\.mode === 'navigate'/.test(sw));

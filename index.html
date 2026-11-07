@@ -13,7 +13,8 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="styles.css?v=30">
+<link rel="stylesheet" href="vendor/swiper/swiper-bundle.min.css?v=11">
+<link rel="stylesheet" href="styles.css?v=31">
 </head>
 <body>
 <a class="skip-link" href="#main">Saltar al contenido</a>
@@ -21,16 +22,49 @@
 
 <!-- ============ PANTALLA DE ACCESO ============ -->
 <div id="auth-screen" class="screen" role="main">
+  <div class="auth-grid" aria-hidden="true"></div>
   <div class="auth-wrap">
     <div class="auth-brand">
       <div class="brand-mark"><img src="logo.png?v=5" alt=""></div>
       <h1>Drako<span class="accent">Track</span></h1>
       <p>Tu compañero de gimnasio. Entrenamientos, récords y peso corporal — en este dispositivo y, si quieres, en la nube para recuperarlos.</p>
-      <ul class="auth-points">
-        <li>Carga una sesión del entrenador en un toque</li>
-        <li>Registra récords con una gráfica mensual</li>
-        <li>Lleva tu peso y fotos de progreso</li>
-      </ul>
+      <div class="auth-features">
+        <div class="auth-swiper swiper" role="region" aria-roledescription="carrusel" aria-label="Qué puedes hacer con DrakoTrack">
+          <div class="swiper-wrapper">
+            <div class="swiper-slide">
+              <article class="glow-card">
+                <span class="glow-ico" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><path d="M4 7h16M4 12h11M4 17h7"/><path d="m17 14 2 2 3-4"/></svg></span>
+                <div><b>Sesiones del entrenador</b><span class="glow-copy">Carga una rutina del catálogo y empieza a registrar en un toque.</span></div>
+              </article>
+            </div>
+            <div class="swiper-slide">
+              <article class="glow-card">
+                <span class="glow-ico" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><path d="M4 17l5-6 4 3 6-8"/><path d="M4 21h16"/></svg></span>
+                <div><b>Récords y progreso</b><span class="glow-copy">Cada marca queda guardada, con su gráfica mensual y tu mejor serie.</span></div>
+              </article>
+            </div>
+            <div class="swiper-slide">
+              <article class="glow-card">
+                <span class="glow-ico" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="4" width="16" height="16" rx="4"/><path d="M8 9h8M12 9v6"/></svg></span>
+                <div><b>Peso y fotos de progreso</b><span class="glow-copy">Sigue tu peso y tu foto; puedes borrarlos cuando quieras.</span></div>
+              </article>
+            </div>
+            <div class="swiper-slide">
+              <article class="glow-card">
+                <span class="glow-ico" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12a7 7 0 0 1 11.5-5.4M19 12a7 7 0 0 1-11.5 5.4"/><path d="M3 3l18 18"/></svg></span>
+                <div><b>Entrena sin conexión</b><span class="glow-copy">Instálala como app: la sesión sigue aunque no haya cobertura.</span></div>
+              </article>
+            </div>
+            <div class="swiper-slide">
+              <article class="glow-card">
+                <span class="glow-ico" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><path d="M7 18h9.5a3.5 3.5 0 0 0 .4-7 5.2 5.2 0 0 0-10-1.2A3.9 3.9 0 0 0 7 18Z"/><path d="M12 15v-4M10 13l2-2 2 2"/></svg></span>
+                <div><b>Copia en la nube</b><span class="glow-copy">Con cuenta en la nube recuperas tus datos en otro móvil o si olvidas la contraseña.</span></div>
+              </article>
+            </div>
+          </div>
+          <div class="swiper-pagination"></div>
+        </div>
+      </div>
     </div>
     <div class="auth-card">
       <div class="auth-tabs" role="group" aria-label="Tipo de acceso">
@@ -154,6 +188,8 @@
 <script src="offline.js?v=2"></script>
 <script src="analytics.js?v=1"></script>
 <script src="app.js?v=43"></script>
+<script src="vendor/swiper/swiper-bundle.min.js?v=11" defer></script>
+<script src="landing.js?v=1" defer></script>
 <script src="update-check.js?v=2" defer></script>
 </body>
 </html>

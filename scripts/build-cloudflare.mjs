@@ -7,6 +7,7 @@ const out = join(root, "dist");
 
 const FILES = [
   "index.html",
+  "landing.js",
   "app.js",
   "sync.js",
   "styles.css",
@@ -26,7 +27,7 @@ const FILES = [
   "sw.js",
   "apk/version.json",
 ];
-const DIRECTORIES = ["icons", "sounds", "programs"];
+const DIRECTORIES = ["icons", "sounds", "programs", "vendor"];
 
 rmSync(out, { recursive: true, force: true });
 mkdirSync(out, { recursive: true });
@@ -113,6 +114,9 @@ const headers = `/*
 
 /sounds/*
   Cache-Control: public, max-age=86400
+
+/vendor/*
+  Cache-Control: public, max-age=0, must-revalidate
 
 /programs/*
   Cache-Control: public, max-age=3600, stale-while-revalidate=86400

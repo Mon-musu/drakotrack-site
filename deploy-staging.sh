@@ -11,6 +11,7 @@ mkdir -p "$DST"
 
 WEB_FILES=(
   index.html
+  landing.js
   app.js
   sync.js
   styles.css
@@ -33,6 +34,15 @@ for f in "${WEB_FILES[@]}"; do
     exit 1
   fi
 done
+
+if [ -d vendor ]; then
+  rm -rf "$DST/vendor"
+  cp -R vendor "$DST/vendor"
+  echo "copied: vendor/"
+else
+  echo "missing source: vendor/"
+  exit 1
+fi
 
 echo "deploy stage текущий:"
 ls -1 "$DST"
