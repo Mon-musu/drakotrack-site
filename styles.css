@@ -1378,7 +1378,8 @@ input[type=number]{-moz-appearance:textfield;appearance:textfield}
 
 /* Carrusel de funciones de la portada */
 .auth-features{max-width:520px;margin-top:4px}
-.auth-swiper{overflow:hidden;padding-bottom:30px}
+.auth-swiper{overflow:hidden;padding-bottom:34px}
+.auth-swiper:focus-visible{outline:2px solid var(--orange);outline-offset:6px;border-radius:14px}
 .auth-swiper .swiper-wrapper{align-items:stretch}
 .auth-swiper .swiper-slide{height:auto}
 .glow-card{
@@ -1404,18 +1405,42 @@ input[type=number]{-moz-appearance:textfield;appearance:textfield}
 .glow-card .glow-copy{display:block;font-size:13.5px;color:var(--muted);line-height:1.45}
 
 /* Puntos del carrusel con el acento de la app */
-.auth-swiper .swiper-pagination{bottom:0;left:0;width:100%;display:flex;justify-content:flex-start;align-items:center;gap:7px}
+.auth-swiper .swiper-pagination{bottom:0;left:0;width:100%;padding-right:112px;display:flex;justify-content:flex-start;align-items:center;gap:2px}
+/* Cada punto es un botón de 24 px: se puede tabular y activar con Enter. */
 .auth-swiper .swiper-pagination-bullet{
-  width:8px;height:8px;margin:0!important;border-radius:99px;
-  background:var(--muted-2);opacity:.45;
-  transition:width .2s ease,opacity .2s ease,background .2s ease;
+  width:24px;height:24px;margin:0!important;padding:0;border:0;border-radius:99px;
+  background:transparent;opacity:1;display:grid;place-items:center;cursor:pointer;
 }
-.auth-swiper .swiper-pagination-bullet-active{width:24px;background:var(--orange);opacity:1}
+.auth-swiper .swiper-pagination-bullet::before{
+  content:"";width:8px;height:8px;border-radius:99px;background:var(--muted-2);opacity:.45;
+  transition:width .2s ease,background .2s ease,opacity .2s ease;
+}
+.auth-swiper .swiper-pagination-bullet:hover::before{opacity:.85}
+.auth-swiper .swiper-pagination-bullet:focus-visible{outline:2px solid var(--orange);outline-offset:1px}
+.auth-swiper .swiper-pagination-bullet-active::before{width:24px;background:var(--orange);opacity:1}
+
+/* Flechas y pausa: el carrusel se maneja con teclado y lector de pantalla */
+.swiper-controls{position:absolute;right:0;bottom:2px;display:flex;align-items:center;gap:6px;z-index:2}
+.swiper-btn{
+  width:30px;height:30px;display:grid;place-items:center;padding:0;
+  border-radius:9px;border:1px solid var(--border-strong);
+  background:rgba(255,255,255,.04);color:var(--text);cursor:pointer;
+  transition:background .18s ease,border-color .18s ease,color .18s ease;
+}
+.swiper-btn svg{width:15px;height:15px;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
+.swiper-btn .ico-play{fill:currentColor;stroke:none}
+.swiper-btn:hover{background:rgba(255,122,0,.14);border-color:rgba(255,122,0,.42);color:var(--accent-text)}
+.swiper-btn:focus-visible{outline:2px solid var(--orange);outline-offset:2px}
+.swiper-btn[hidden]{display:none}
+.swiper-toggle[aria-pressed="true"]{color:var(--accent-text);border-color:rgba(255,122,0,.45);background:rgba(255,122,0,.12)}
+.swiper-toggle .ico-play{display:none}
+.swiper-toggle[aria-pressed="true"] .ico-pause{display:none}
+.swiper-toggle[aria-pressed="true"] .ico-play{display:block}
 
 @media (max-width:960px){
   .auth-features{margin-left:auto;margin-right:auto}
-  .auth-swiper .swiper-pagination{justify-content:center}
+  .auth-swiper .swiper-pagination{padding-right:104px}
 }
 @media (prefers-reduced-motion:reduce){
-  .glow-card::after,.auth-swiper .swiper-pagination-bullet{transition:none}
+  .glow-card::after,.auth-swiper .swiper-pagination-bullet::before,.swiper-btn{transition:none}
 }
