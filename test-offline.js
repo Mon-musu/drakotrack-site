@@ -125,17 +125,28 @@ console.log('\n=== Conectividad y almacenamiento ===');
   const manifest = JSON.parse(fs.readFileSync(path.join(__dirname, 'manifest.webmanifest'), 'utf8'));
   check('el manifest declara DrakoTrack', manifest.name === 'DrakoTrack' && manifest.short_name === 'DrakoTrack');
   check('el manifest es instalable en standalone', manifest.display === 'standalone' && manifest.start_url === './' && manifest.scope === './');
-  check('el manifest define colores, orientación e idioma', manifest.theme_color === '#0a0a0c' && manifest.background_color === '#0a0a0c' && manifest.orientation === 'portrait' && manifest.lang === 'es');
+  check('el manifest define colores, orientación e idioma', manifest.theme_color === '#111318' && manifest.background_color === '#111318' && manifest.orientation === 'portrait' && manifest.lang === 'es');
   check('hay iconos 192, 512 y maskable', ['icons/icon-192.png', 'icons/icon-512.png', 'icons/icon-maskable-512.png'].every(src => fs.existsSync(path.join(__dirname, src))));
   check('el icono maskable está declarado como tal', manifest.icons.some(i => i.purpose === 'maskable' && i.sizes === '512x512'));
   check('el icono de Apple existe', fs.existsSync(path.join(__dirname, 'icons/apple-touch-icon-180.png')));
   const index = fs.readFileSync(path.join(__dirname, 'index.html'), 'utf8');
   check('index enlaza el manifest y el color de tema', index.includes('rel="manifest"') && index.includes('id="theme-color"'));
   check('index incluye la barra de estado offline', index.includes('id="offline-bar"') && index.includes('role="status"'));
-  check('offline.js se carga antes de app.js', index.indexOf('offline.js?v=2') > 0 && index.indexOf('offline.js?v=2') < index.indexOf('app.js?v=48'));
+  /* Las versiones se leen de index.html para que el service worker no se quede
+     atrás al subir la caché: la comprobación es la coincidencia, no un número fijo. */
+  const appV = (index.match(/app\.js\?v=(\d+)/) || [])[1];
+  const cssV = (index.match(/styles\.css\?v=(\d+)/) || [])[1];
+  const offlineV = (index.match(/offline\.js\?v=(\d+)/) || [])[1];
+  check('index.html declara versiones para app, estilos y offline', !!appV && !!cssV && !!offlineV);
+  check('offline.js se carga antes de app.js', index.indexOf('offline.js?v=' + offlineV) > 0
+    && index.indexOf('offline.js?v=' + offlineV) < index.indexOf('app.js?v=' + appV));
   const sw = fs.readFileSync(path.join(__dirname, 'sw.js'), 'utf8');
-  check('el service worker tiene versión de caché', /const VERSION = 'drakotrack-v21'/.test(sw));
-  check('el shell incluye offline y la app', sw.includes("'./offline.html'") && sw.includes("'./offline.js?v=2'") && sw.includes("'./app.js?v=48'"));
+  const swVer = (sw.match(/const VERSION = 'drakotrack-v(\d+)'/) || [])[1];
+  check('el service worker tiene versión de caché', !!swVer && Number(swVer) >= 16);
+  check('el shell incluye offline y las mismas versiones que index.html', sw.includes("'./offline.html'")
+    && sw.includes("'./offline.js?v=" + offlineV + "'")
+    && sw.includes("'./app.js?v=" + appV + "'")
+    && sw.includes("'./styles.css?v=" + cssV + "'"));
   check('una shell incompleta no reemplaza la versión anterior', /const ESSENTIAL/.test(sw) && /incomplete_shell/.test(sw) && /throw new Error/.test(sw));
   check('el service worker aplica network-first a navegación', /networkFirstNavigation/.test(sw) && /request\.mode === 'navigate'/.test(sw));
   check('el service worker aplica cache-first y SWR', /cacheFirst/.test(sw) && /staleWhileRevalidate/.test(sw));

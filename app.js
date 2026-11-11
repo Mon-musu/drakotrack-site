@@ -2374,7 +2374,7 @@ function ringSVG(pct){
     <circle cx="32" cy="32" r="${r}" fill="none" stroke="url(#ringGrad)" stroke-width="6" stroke-linecap="round"
       stroke-dasharray="${c}" stroke-dashoffset="${c * (1 - pct/100)}" transform="rotate(-90 32 32)"/>
     <defs><linearGradient id="ringGrad" x1="0" y1="0" x2="1" y2="1">
-      <stop offset="0%" stop-color="#ffa040"/><stop offset="100%" stop-color="#f05100"/>
+      <stop offset="0%" stop-color="var(--accent-strong)"/><stop offset="100%" stop-color="var(--accent-deep)"/>
     </linearGradient></defs>
   </svg>`;
 }
@@ -5056,11 +5056,11 @@ function lineChart(el, data, emptyMsg){
   el.innerHTML = `
   <svg viewBox="0 0 ${W} ${H}" class="linechart" role="img" aria-label="${esc(summary)}">
     <defs><linearGradient id="chartFill" x1="0" y1="0" x2="0" y2="1">
-      <stop offset="0%" stop-color="#ff7a00" stop-opacity=".32"/><stop offset="100%" stop-color="#ff7a00" stop-opacity="0"/>
+      <stop offset="0%" stop-color="var(--accent)" stop-opacity=".32"/><stop offset="100%" stop-color="var(--accent)" stop-opacity="0"/>
     </linearGradient></defs>
     ${grid}
     <path d="${area}" fill="url(#chartFill)"/>
-    <path d="${path}" fill="none" stroke="#ff7a00" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>
+    <path d="${path}" fill="none" stroke="var(--accent)" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>
     <path d="${path}" fill="none" stroke="#ffb36b" stroke-width="6" stroke-linecap="round" stroke-linejoin="round" opacity=".15"/>
     <g>${dots}</g>
     <text x="${P}" y="${H-2}" class="axis">${fmtDate(data[0].label)}</text>

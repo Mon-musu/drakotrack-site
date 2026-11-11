@@ -204,3 +204,96 @@ hoy la portada interna es prácticamente una lista infinita.
 - El despliegue en `https://drakotrack-app.mn-manzur.workers.dev`: F0 no publica. La rama de
   trabajo no se ha subido al remoto todavía.
 - La vista `#/program` con un programa activo.
+
+---
+
+# F1 — Sistema de diseño, acento naranja y navegación
+
+- Rama: `fase/rediseno-arena`
+- Base: `325bda5` (cierre de F0)
+- Alcance real de esta entrega: capa semántica de tokens, unificación del acento, primitivas
+  compartidas, mínimos de accesibilidad y los desbordamientos horizontales que F0 dejó medidos.
+
+## 10. Qué cambia
+
+**Tokens.** `styles.css` pasa a tener una capa semántica explícita, manteniendo los 33 nombres
+anteriores como alias para no romper ninguna regla existente:
+
+| Grupo | Tokens nuevos |
+|---|---|
+| Superficies | `--surface` (`#1c222b`), `--surface-2` (`#242c38`), `--bg` (`#111318`), `--bg-2` (`#0d0f14`) |
+| Texto | `--text` (`#f2f4f7`), `--muted`, `--muted-2` con contraste AA sobre panel |
+| Acento | `--accent` (`#f28c28`), `--accent-strong`, `--accent-deep`, `--accent-ink`, `--accent-text`, `--accent-rgb` |
+| Estados | `--ok`, `--warn`, `--danger`, `--danger-text`, `--focus` |
+| Escalas | `--space-1…8`, `--radius-xs/sm/md/lg/pill`, `--font-size-xs…2xl` |
+
+Los alias (`--panel`, `--orange`, `--orange-grad`, `--green`, `--red`, `--radius`, `--shadow`)
+siguen existiendo y apuntan a la capa nueva, así que las 502 clases actuales no cambian de
+significado. El tema claro redefine todos los colores y estados; las escalas se comparten desde
+`:root` y se heredan.
+
+**Acento.** El naranja anterior (`#ff7a00`, `#ffa040`, `#f05100`) desaparece de `styles.css` y de
+`app.js`: 0 apariciones de esos literales. Los tintes `rgba(255,122,0,α)` pasan a
+`rgba(var(--accent-rgb),α)` y los degradados a `--accent-strong → --accent → --accent-deep`.
+El turquesa `#19D3C5` no existía ya en ningún archivo y sigue sin aparecer.
+
+**Primitivas nuevas** (al final de `styles.css`, sin reescribir reglas previas): `.btn-secondary`,
+`.card-head`, `.badge` con `.badge-ok/.badge-warn/.badge-danger/.badge-accent`, `.alert` con sus
+cuatro tonos y `.skeleton` (respeta `prefers-reduced-motion`).
+
+**Accesibilidad.** `min-height:44px` en `.btn`, `.nav-btn`, `.theme-btn` y `.user-chip`; anillo de
+foco explícito también en `.icon-btn` y en la barra inferior (`outline-offset:-3px`); ningún
+`font-size` declarado por debajo de 12 px (se subieron los valores de 10–11,5 px a 12 px).
+
+**Color del navegador.** `theme-color` de `index.html` y `theme_color`/`background_color` del
+manifest pasan de `#0a0a0c` a `#111318`, el mismo valor que `--bg` oscuro.
+
+**Versiones.** `styles.css?v=37`, `app.js?v=49`, caché del service worker `drakotrack-v22`, con
+`ESSENTIAL` y `SHELL` apuntando a las versiones que sirve `index.html`.
+
+## 11. Desbordamiento horizontal (medido, no estimado)
+
+`scripts/medidas.mjs` (nuevo) sirve el sitio, siembra una cuenta local de usar y tirar, bloquea
+fuentes y Supabase y mide `scrollWidth` frente a `clientWidth` en 320, 375, 768 y 1440 px,
+señalando la caja que se sale cuando la hay.
+
+| Vista | F0 (375 px) | F1 (320 / 375 / 768 / 1440) |
+|---|---|---|
+| portada | 545 px | 320 / 375 / 768 / 1440 — sin desbordamiento |
+| `#/workouts` | 469 px | sin desbordamiento en los cuatro anchos |
+| `#/analytics` | 615 px | sin desbordamiento (filas con `minmax(0,…)`) |
+| `#/editor/:id` | — | 320 px corregido (acciones del editor con `flex-wrap`) |
+| resto de rutas | correctas | correctas |
+
+Causas corregidas: `.auth-wrap`/`.auth-brand` no encogían como ítems de rejilla (`.ana-row` tenía
+mínimos fijos de 140 + 3 × 70 px) y las acciones del editor no admitían salto de línea.
+
+## 12. Pruebas ejecutadas
+
+| Comprobación | Resultado real |
+|---|---|
+| `npm test` | **exit 0**, 0 `FAIL` |
+| `test-design.js` (nuevo, en la cadena de `npm test`) | **92 ok, 0 fallos** |
+| `test-offline.js` | **101 ok, 0 fallos** (las versiones ahora se comparan con `index.html`, no con un número fijo) |
+| `build-cloudflare` | `dist ready (20 files, 4 directories)` |
+| `test-cloudflare.js` | **111 aserciones**, todas correctas |
+| `scripts/medidas.mjs` | «Ninguna vista desborda» en 320/375/768/1440 |
+
+`test-design.js` comprueba: ausencia de turquesa, tokens semánticos en ambos temas, acento
+`#f28c28`, ausencia de los naranjas anteriores, `:focus-visible` y sustituto de `outline:none`,
+suelo de 12 px, los 5 destinos de navegación con `aria-current`, coherencia `theme-color`/manifest,
+44 px de objetivo táctil, movimiento reducido y existencia de las primitivas.
+
+## 13. Lo que esta fase no incluye o no se ha verificado
+
+- **No se añadió «Arena» ni «Perfil»** a la navegación: el encargo prohíbe inventar pantallas antes
+  de que existan sus fases (F2 y F6). Los 5 destinos siguen siendo Entrenamientos, Plan, Historial,
+  Progreso y Peso.
+- **No hay despliegue ni push**: publicar en producción requiere autorización explícita del usuario.
+  Todo está verificado en local y en el build de `dist/`.
+- **Recorrido con teclado**: la prueba automática verifica que existe foco visible y objetivos de
+  44 px, pero no se hizo una pasada manual con Tab en navegador real ni en móvil físico.
+- **Tema claro**: no se revisó visualmente cada componente en `data-theme="light"`; el contraste de
+  los tokens de texto está cubierto por `test-flows.js` (AA ≥ 4,5:1 sobre panel y fondo).
+- **Animaciones**: `prefers-reduced-motion` sigue desactivando transiciones y animaciones, pero no se
+  midió en un dispositivo de gama baja.
