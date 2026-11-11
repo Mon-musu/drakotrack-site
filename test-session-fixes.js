@@ -158,6 +158,7 @@ async function appTests() {
   ok(!doc.querySelector('#rest-slot [role="timer"]').hasAttribute('aria-live'), 'T1e. El reloj no es una región viva');
   await tick(60);
   ok(/Descanso iniciado/.test(doc.querySelector('#rest-status').textContent), 'T1f. El inicio se anuncia una sola vez en su región');
+  ok(doc.activeElement === doc.querySelector('[data-action="rest-pause"]'), 'T1g. Iniciar el descanso deja el foco en «Pausar»');
 
   click('[data-action="rest-pause"]');
   await tick(30);

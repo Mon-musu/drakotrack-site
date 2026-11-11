@@ -1772,6 +1772,7 @@ function nav(hash){
 }
 
 /* ---------------- Render principal ---------------- */
+let _renderedHash = null;
 function render(){
   stopSessionClock();
   stopRestClock();
@@ -1783,6 +1784,7 @@ function render(){
     app.classList.add('hidden');
     document.title = 'DrakoTrack — Iniciar sesión';
     syncSkipLink();
+    _renderedHash = location.hash;
     return;
   }
   authScreen.classList.add('hidden');
@@ -1817,6 +1819,7 @@ function render(){
   maybeBackupReminder();
   maybePlanReminder();
   maybeNotifySwRollback();
+  _renderedHash = location.hash;
 }
 /* Al entrar o salir de la sesión el foco no debe quedarse en un control que
    acaba de desaparecer. El título del documento ya cambia en render(). */
@@ -2626,7 +2629,7 @@ function toggleRestAlerts(){
   toast(d.prefs.restAlerts ? 'Aviso de descanso activado.' : 'Aviso de descanso silenciado.', 'info');
   render();
 }
-function startRestTimer(s, seconds, ex, st){
+function startRestTimer(s, seconds, ex, st, focusAction){
   if(!s || s.finished) return null;
   const duration = Math.max(5, Math.min(600, Math.round(Number(seconds) || DEFAULT_REST_SECONDS)));
   const startedAt = Date.now();
@@ -2641,7 +2644,7 @@ function startRestTimer(s, seconds, ex, st){
   };
   s.lastSavedAt = nowIso();
   saveDB();
-  renderRestBar(s);
+  renderRestBar(s, focusAction ? { restoreFocus: true, focusAction } : {});
   announceRest('Descanso iniciado: ' + fmtClock(s.rest.duration) + '.');
   return s.rest;
 }
@@ -2682,10 +2685,10 @@ function resetRestTimer(s, seconds){
   const duration = Math.max(5, Math.min(600, Math.round(Number(seconds) || (s.rest && s.rest.duration) || DEFAULT_REST_SECONDS)));
   return startRestTimer(s, duration, null, null);
 }
-function startRestForCurrent(s, seconds){
+function startRestForCurrent(s, seconds, focusAction){
   if(!s || s.finished) return null;
   const ex = (s.exercises || []).find(e => e && e.id === s.currentExerciseId) || (s.exercises || [])[0] || null;
-  return startRestTimer(s, seconds || restSecondsFor(s, ex, null), ex, null);
+  return startRestTimer(s, seconds || restSecondsFor(s, ex, null), ex, null, focusAction);
 }
 /* Grupos de superserie: ejercicios CONSECUTIVOS marcados como superset.
    Cada grupo recibe una letra (A, B, C…) y sus miembros se numeran A1, A2… */
@@ -2788,7 +2791,7 @@ function restMenuHTML(s, paused, done){
 }
 function restoreRestFocus(slot, action){
   if(!slot || !action) return;
-  const map = { 'rest-pause': 'rest-resume', 'rest-resume': 'rest-pause' };
+  const map = { 'rest-start': 'rest-pause', 'rest-pause': 'rest-resume', 'rest-resume': 'rest-pause' };
   const target = slot.querySelector('[data-action="' + (map[action] || action) + '"]');
   if(!target) return;
   try{ target.focus({ preventScroll: true }); }catch(e){ try{ target.focus(); }catch(_){} }
@@ -5393,7 +5396,7 @@ document.addEventListener('click', e => {
   if(a === 'rest-start'){
     const s = getSession(el.dataset.sid);
     if(!s || s.finished) return;
-    startRestForCurrent(s);
+    startRestForCurrent(s, undefined, 'rest-start');
     return;
   }
   if(a === 'rest-pause'){
@@ -6574,7 +6577,12 @@ function focusMain(){
     try{ m.focus({ preventScroll: true }); }catch(e){ m.focus(); }
   }
 }
-window.addEventListener('hashchange', () => { render(); focusMain(); });
+window.addEventListener('hashchange', () => {
+  /* Un evento tardío del mismo hash no debe repintar la vista ni mover el foco. */
+  if(location.hash === _renderedHash) return;
+  render();
+  focusMain();
+});
 (async function boot(){
   try{ migrateAllData(); }catch(err){}
   /* ¿Volvió de un enlace de recuperación de contraseña? */
