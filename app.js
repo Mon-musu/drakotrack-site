@@ -5152,9 +5152,8 @@ function renderProgram(main, slug){
   main.innerHTML = `
     <div class="page-head">
       <button class="btn btn-ghost btn-sm" data-action="back" type="button">← Entrenamientos</button>
-      <h1>Cargando programa…</h1>
     </div>
-    <div id="program-body"><div class="empty-state">Descargando los datos del programa…</div></div>`;
+    <div id="program-body"><div class="empty-state" role="status">Cargando programa…</div></div>`;
   DrakoBC.catalog().then(cat => { bcCache = cat; }).catch(() => {});
   DrakoBC.program(slug).then(p => {
     if(state.bc && state.bc.slug === slug){
