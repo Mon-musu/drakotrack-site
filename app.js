@@ -940,6 +940,7 @@ function dataFor(user){
   if(!Array.isArray(db.data[user].programs)) db.data[user].programs = [];
   if(!Array.isArray(db.data[user].planner)) db.data[user].planner = [];
   if(!db.data[user].prefs || typeof db.data[user].prefs !== 'object') db.data[user].prefs = {};
+  if(!db.data[user].profile || typeof db.data[user].profile !== 'object') db.data[user].profile = {};
   if(!('consent' in db.data[user])) db.data[user].consent = null;
   return db.data[user];
 }
@@ -1760,6 +1761,7 @@ const VIEW_TITLES = {
   analytics: 'Análisis',
   weight: 'Peso',
   settings: 'Ajustes',
+  profile: 'Perfil',
   session: 'Entrenamiento',
   editor: 'Editar entrenamiento',
   start: 'Empezar entrenamiento',
@@ -1807,6 +1809,7 @@ function render(){
   else if(route === 'progress') renderProgress(main);
   else if(route === 'analytics') renderAnalytics(main);
   else if(route === 'settings') renderSettings(main);
+  else if(route === 'profile')  renderProfile(main);
   else if(route === 'weight')  renderWeight(main);
   else if(route === 'history') renderHistory(main);
   else if(route === 'plan')    renderPlan(main);
@@ -2098,6 +2101,202 @@ function legacyToSets(ex){
   ex.legacyNote = 'Convertido desde un registro anterior: una sola serie con los valores guardados.';
   ex.done = ex.sets[0].completed;
 }
+/* ---------------- Perfil deportivo (F2) ----------------
+   El perfil vive en app_data (d.profile) y se sincroniza como el resto del
+   documento: no cambia ni sustituye el nombre de la cuenta en la nube.
+   Por defecto no publica nada más que el apodo o las iniciales. */
+const PROFILE_NAME_MAX = 24;
+const PROFILE_VISIBILITY = [
+  ['stats', 'Entrenamientos y récords'],
+  ['routine', 'Rutina activa'],
+  ['since', 'Fecha de alta'],
+];
+/* Campos públicos admitidos. Cualquier otro se descarta al normalizar. */
+const PROFILE_FIELDS = ['displayName', 'avatar', 'joinedAt', 'visibility'];
+function normalizeProfile(raw){
+  const src = raw && typeof raw === 'object' ? raw : {};
+  const out = { displayName: '', avatar: '', joinedAt: Date.now(), visibility: {} };
+  if(typeof src.displayName === 'string') out.displayName = src.displayName.trim().slice(0, PROFILE_NAME_MAX);
+  if(typeof src.avatar === 'string'
+    && /^data:image\/(png|jpeg|webp);base64,[A-Za-z0-9+/=]+$/.test(src.avatar)
+    && src.avatar.length <= 400000) out.avatar = src.avatar;
+  if(isFinite(src.joinedAt) && src.joinedAt > 0) out.joinedAt = Math.round(src.joinedAt);
+  if(src.visibility && typeof src.visibility === 'object'){
+    PROFILE_VISIBILITY.forEach(([key]) => { if(src.visibility[key] === true) out.visibility[key] = true; });
+  }
+  return out;
+}
+function profileFor(user){
+  const d = dataFor(user || currentUser);
+  const raw = d.profile && typeof d.profile === 'object' ? d.profile : {};
+  const prev = raw.pub && typeof raw.pub === 'object' ? raw.pub : null;
+  const pub = normalizeProfile(prev);
+  /* joinedAt no se reescribe al normalizar: la fecha de alta se conserva. */
+  if(prev && isFinite(prev.joinedAt) && prev.joinedAt > 0) pub.joinedAt = Math.round(prev.joinedAt);
+  raw.pub = pub;
+  d.profile = raw;
+  return pub;
+}
+function profileVisible(key, user){
+  return profileFor(user || currentUser).visibility[key] === true;
+}
+function profileInitials(name){
+  const base = String(name || accountDisplayName() || '?').trim();
+  const letters = base.split(/[\s._-]+/).filter(Boolean).map(w => w[0] || '').join('').slice(0, 2);
+  return (letters || '?').toUpperCase();
+}
+function profileName(){
+  if(!currentUser) return '';
+  const p = profileFor(currentUser);
+  return p.displayName || accountDisplayName();
+}
+function profileAvatarHTML(p, small){
+  const cls = 'profile-avatar' + (small ? ' sm' : '');
+  if(p.avatar) return `<span class="${cls}"><img src="${esc(p.avatar)}" alt="Avatar de ${esc(profileName())}"></span>`;
+  return `<span class="${cls}" aria-hidden="true">${esc(profileInitials(profileName()))}</span>`;
+}
+/* La rutina activa solo se nombra si el planificador expone una de verdad. */
+function activeRoutineName(d){
+  try{
+    if(window.PL && typeof PL.activeProgram === 'function'){
+      const prog = PL.activeProgram(d);
+      if(prog) return String(prog.name || prog.title || '');
+    }
+  }catch(e){}
+  return '';
+}
+function profileError(msg){
+  const box = $('#profile-err');
+  if(box){ box.textContent = msg; box.classList.remove('hidden'); }
+}
+function savePublicProfile(){
+  const p = profileFor(currentUser);
+  const input = $('#profile-name');
+  p.displayName = (input ? input.value : '').trim().slice(0, PROFILE_NAME_MAX);
+  saveDB();
+  toast('Perfil actualizado.', 'success');
+  render();
+}
+function renderProfile(main){
+  const d = dataFor(currentUser);
+  const p = profileFor(currentUser);
+  const st = workoutStats();
+  const routine = activeRoutineName(d);
+  const joined = p.joinedAt ? fmtDateLong(new Date(p.joinedAt).toISOString().slice(0, 10)) : '';
+  const showsStats = p.visibility.stats === true;
+  const showsRoutine = !!routine && p.visibility.routine === true;
+  const showsSince = p.visibility.since === true && !!joined;
+  main.innerHTML = `
+    <div class="page-head">
+      <h1>Mi perfil</h1>
+      <p class="muted">Tu apodo y lo que decides mostrar. El peso, las medidas, el correo y la foto de progreso no forman parte del perfil.</p>
+    </div>
+    <section class="card profile-head">
+      ${profileAvatarHTML(p)}
+      <div class="profile-id">
+        <h2>${esc(profileName())}</h2>
+        <p class="muted small">${p.displayName ? 'Apodo público' : 'Se muestra el nombre de tu cuenta'}</p>
+      </div>
+      <label class="btn btn-secondary profile-avatar-pick" for="profile-avatar-input">Cambiar avatar</label>
+      <input type="file" id="profile-avatar-input" accept="image/png,image/jpeg,image/webp" hidden>
+      ${p.avatar ? '<button class="btn btn-ghost" data-action="profile-avatar-clear" type="button">Quitar avatar</button>' : ''}
+    </section>
+    <section class="card">
+      <div class="card-head"><h2>Apodo</h2></div>
+      <label class="field"><span>Nombre público (máximo ${PROFILE_NAME_MAX} caracteres)</span>
+        <input id="profile-name" maxlength="${PROFILE_NAME_MAX}" value="${esc(p.displayName)}" placeholder="${esc(accountDisplayName())}" autocomplete="nickname"></label>
+      <div id="profile-err" class="auth-err hidden" role="alert"></div>
+      <div class="profile-actions">
+        <button class="btn btn-primary" data-action="profile-save" type="button">Guardar apodo</button>
+      </div>
+    </section>
+    <section class="card">
+      <div class="card-head"><h2>Lo que se muestra</h2><span class="badge">Por defecto, nada</span></div>
+      <p class="muted small">Solo afecta a tu perfil. Tus entrenamientos, tu peso y tu foto siguen siendo privados.</p>
+      <label class="set-row"><span class="set-text">Entrenamientos y récords<small>${st.done} entrenamientos terminados · ${st.recordsNow} récords vigentes</small></span>
+        <input class="set-check" type="checkbox" data-profile-vis="stats" aria-label="Mostrar entrenamientos y récords"${showsStats ? ' checked' : ''}></label>
+      ${routine ? `<label class="set-row"><span class="set-text">Rutina activa<small>${esc(routine)}</small></span>
+        <input class="set-check" type="checkbox" data-profile-vis="routine" aria-label="Mostrar rutina activa"${p.visibility.routine === true ? ' checked' : ''}></label>` : ''}
+      <label class="set-row"><span class="set-text">Fecha de alta<small>${esc(joined)}</small></span>
+        <input class="set-check" type="checkbox" data-profile-vis="since" aria-label="Mostrar fecha de alta"${showsSince ? ' checked' : ''}></label>
+    </section>
+    <section class="card">
+      <div class="card-head"><h2>Vista pública</h2></div>
+      <div class="profile-public">
+        ${profileAvatarHTML(p, true)}
+        <div>
+          <strong>${esc(profileName())}</strong>
+          ${showsSince ? `<p class="muted small">En DrakoTrack desde ${esc(joined)}</p>` : ''}
+          ${showsStats ? `<p class="muted small">${st.done} entrenamientos · ${st.recordsNow} récords</p>` : ''}
+          ${showsRoutine ? `<p class="muted small">Rutina: ${esc(routine)}</p>` : ''}
+          ${!showsStats && !showsSince && !showsRoutine ? '<p class="muted small">Solo tu apodo.</p>' : ''}
+        </div>
+      </div>
+    </section>`;
+  const file = $('#profile-avatar-input');
+  if(file) file.addEventListener('change', () => {
+    const f = file.files && file.files[0];
+    if(!f) return;
+    if(!/^image\/(png|jpeg|webp)$/.test(f.type)){ profileError('Elige una imagen PNG, JPEG o WebP.'); return; }
+    if(f.size > 300000){ profileError('La imagen pesa demasiado (máximo 300 KB).'); return; }
+    const reader = new FileReader();
+    reader.onload = () => {
+      profileFor(currentUser).avatar = String(reader.result || '');
+      saveDB(); render();
+    };
+    reader.readAsDataURL(f);
+  });
+  $$('[data-profile-vis]').forEach(cb => cb.addEventListener('change', () => {
+    profileFor(currentUser).visibility[cb.dataset.profileVis] = !!cb.checked;
+    saveDB(); render();
+  }));
+}
+function homeHeroHTML(greet){
+  const today = new Date().toLocaleDateString('es', { weekday: 'long', day: 'numeric', month: 'long' });
+  return `
+    <section class="hero-card">
+      <div>
+        <p class="eyebrow">${greet}, ${esc(profileName())} · ${esc(today)}</p>
+        <h1>¿Entrenamos?</h1>
+        <p class="hero-sub">Empieza una sesión y registra tus series; el progreso se calcula solo con tus datos reales.</p>
+      </div>
+      <div class="home-actions">
+        <button class="btn btn-primary btn-lg" data-action="tab" data-route="start" type="button">Empezar entrenamiento</button>
+        <button class="btn btn-secondary" data-action="open-profile" type="button">Mi perfil</button>
+      </div>
+    </section>`;
+}
+function homeSummaryHTML(d, st){
+  const finished = d.sessions
+    .filter(s => s.finished && s.status !== 'cancelled')
+    .sort((a, b) => String(b.date || '').localeCompare(String(a.date || '')));
+  const last = finished[0] || null;
+  return `
+    <section class="home-summary">
+      <button class="home-card" data-action="tab" data-route="progress" type="button">
+        <span class="home-kicker">Esta semana</span>
+        <strong>${st.week} ${st.week === 1 ? 'entrenamiento' : 'entrenamientos'}</strong>
+        <span class="muted small">${st.hasVolume ? fmtKg(st.weekVol) + ' kg de volumen' : 'Sin volumen registrado todavía'}</span>
+      </button>
+      ${last
+        ? `<button class="home-card" data-action="tab" data-route="history" type="button">
+            <span class="home-kicker">Último entrenamiento</span>
+            <strong>${esc(last.workoutName || 'Entrenamiento')}</strong>
+            <span class="muted small">${esc(fmtDate(last.date))}${last.durationSec ? ' · ' + Math.round(last.durationSec / 60) + ' min' : ''}</span>
+          </button>`
+        : `<div class="home-card is-empty">
+            <span class="home-kicker">Último entrenamiento</span>
+            <strong>Aún no hay sesiones</strong>
+            <span class="muted small">Termina tu primer entrenamiento para verlo aquí.</span>
+            <button class="btn btn-primary btn-sm" data-action="tab" data-route="start" type="button">Empezar ahora</button>
+          </div>`}
+      <button class="home-card" data-action="tab" data-route="progress" type="button">
+        <span class="home-kicker">Récords vigentes</span>
+        <strong>${st.recordsNow}</strong>
+        <span class="muted small">${st.recordsNow ? 'Desde tus series efectivas' : 'Todavía no hay marcas'}</span>
+      </button>
+    </section>`;
+}
 function renderWorkouts(main){
   const d = dataFor(currentUser);
   const st = workoutStats();
@@ -2105,13 +2304,9 @@ function renderWorkouts(main){
   const hour = new Date().getHours();
   const greet = hour < 12 ? 'Buenos días' : hour < 18 ? 'Buenas tardes' : 'Buenas noches';
   main.innerHTML = `
-    <section class="hero-card">
-      <div>
-        <p class="eyebrow">${greet}, ${esc(accountDisplayName())}</p>
-        <h1>A darlo todo hoy</h1>
-        <p class="hero-sub">Carga una sesión de la biblioteca del entrenador o crea tu propio entrenamiento.</p>
-      </div>
-    </section>
+    ${homeHeroHTML(greet)}
+
+    ${homeSummaryHTML(d, st)}
 
     ${dashboardAnalyticsHTML(d)}
 
@@ -2120,14 +2315,6 @@ function renderWorkouts(main){
     ${planCardHTML(d)}
 
     ${dashboardProgressHTML(st)}
-
-    <section class="stats-grid five small">
-      <div class="stat-card"><p class="stat-value">${st.week}</p><p class="stat-label">Entrenos esta semana</p></div>
-      <div class="stat-card"><p class="stat-value">${st.month}</p><p class="stat-label">Este mes</p></div>
-      <div class="stat-card"><p class="stat-value">${st.hasVolume ? fmtKg(st.weekVol) + ' kg' : '—'}</p><p class="stat-label">Volumen semanal</p></div>
-      <div class="stat-card"><p class="stat-value">${st.recordsNow}</p><p class="stat-label">Récords vigentes</p></div>
-      <div class="stat-card"><p class="stat-value">${st.curW != null ? fmtKg(st.curW) + ' kg' : '—'}</p><p class="stat-label">Peso actual</p></div>
-    </section>
 
     <section class="section">
       <div class="section-head">
@@ -3966,7 +4153,7 @@ function profileDone(d){ return !!userProfile(d); }
 function saveProfile(patch){
   const d = currentUser ? dataFor(currentUser) : null;
   if(!d) return null;
-  const next = Object.assign({}, userProfile(d) || {}, patch || {});
+  const next = Object.assign({}, d.profile || {}, userProfile(d) || {}, patch || {});
   if(!next.at) next.at = todayISO();
   d.profile = next;
   saveDB();
@@ -4032,7 +4219,13 @@ function finishOnboarding(){
 /* Omitir no bloquea nada ni vuelve a preguntar: el plan queda a un toque en Ajustes. */
 function skipOnboarding(){
   const d = currentUser ? dataFor(currentUser) : null;
-  if(d){ d.profile = { skipped: true, at: todayISO() }; saveDB(); }
+  if(d){
+    /* Omitir borra el plan elegido, pero no el perfil público (d.profile.pub). */
+    const pub = d.profile && d.profile.pub;
+    d.profile = { skipped: true, at: todayISO() };
+    if(pub) d.profile.pub = pub;
+    saveDB();
+  }
   state.onb = null;
   toast('Puedes configurar tu plan cuando quieras desde Ajustes.', 'info');
   nav('#/workouts');
@@ -5172,6 +5365,21 @@ document.addEventListener('click', e => {
     if(menu) menu.classList.remove('open');
     if(chip) chip.setAttribute('aria-expanded', 'false');
     nav('#/settings');
+    return;
+  }
+  if(a === 'open-profile'){
+    const menu = $('#user-menu'), chip = $('#user-chip');
+    if(menu) menu.classList.remove('open');
+    if(chip) chip.setAttribute('aria-expanded', 'false');
+    nav('#/profile');
+    return;
+  }
+  if(a === 'profile-save'){ savePublicProfile(); return; }
+  if(a === 'profile-avatar-clear'){
+    profileFor(currentUser).avatar = '';
+    saveDB();
+    toast('Avatar eliminado.', 'info');
+    render();
     return;
   }
   if(a === 'logout'){

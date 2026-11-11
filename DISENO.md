@@ -297,3 +297,42 @@ suelo de 12 px, los 5 destinos de navegación con `aria-current`, coherencia `th
   los tokens de texto está cubierto por `test-flows.js` (AA ≥ 4,5:1 sobre panel y fondo).
 - **Animaciones**: `prefers-reduced-motion` sigue desactivando transiciones y animaciones, pero no se
   midió en un dispositivo de gama baja.
+
+---
+
+# F2 — Inicio con datos reales y perfil deportivo
+
+## 14. Inicio
+
+- Cabecera con saludo, nombre del perfil y fecha local; botón principal «Empezar entrenamiento»
+  (`#/start`) y acceso directo a «Mi perfil».
+- Tres tarjetas de resumen calculadas con datos reales (`workoutStats()`): entrenamientos de la
+  semana con su volumen, último entrenamiento terminado (nombre, fecha y duración) y récords
+  vigentes. Cada tarjeta navega a Progreso o Historial y es un `button`, así que responde al teclado.
+- **Cuenta nueva**: la tarjeta de último entrenamiento se sustituye por un estado vacío explícito
+  («Aún no hay sesiones») con la acción «Empezar ahora»; no se inventan ceros ni marcas.
+- Se retiró la rejilla duplicada de cinco estadísticas: los mismos números ya aparecen en las
+  tarjetas nuevas y en el panel de progreso.
+
+## 15. Perfil
+
+- `d.profile.pub` se guarda en el mismo documento (dentro de `d.profile`, que ya usaba el planificador) `app_data`, que ya viaja a la nube: la
+  sincronización lo trata como objeto por clave (`sync.js` ya lo tenía en `KEYED_OBJECTS`), sin
+  tocar el nombre de la cuenta ni `profiles.display_name`.
+- Campos admitidos y únicos que se renderizan: `displayName` (máx. 24 caracteres), `avatar`
+  (PNG/JPEG/WebP en data URL, ≤ 400 000 caracteres), `joinedAt` y `visibility`. Cualquier otro
+  campo se descarta en `normalizeProfile()`.
+- Avatar opcional con iniciales por defecto; sin imagen se muestran las iniciales del apodo.
+- **Nunca** aparecen peso, medidas, correo ni foto de progreso.
+- Visibilidad con tres interruptores (entrenamientos y récords, rutina activa, fecha de alta), por
+  defecto **todos apagados**: la vista pública muestra solo el apodo salvo que el usuario active
+  algo. El interruptor de rutina solo se pinta si el planificador expone una rutina activa real.
+- Los cambios se guardan con `saveDB()`, de modo que entran en la revisión de sincronización.
+
+## 16. Pruebas de F2
+
+- `test-profile.js` (nuevo, dentro de `npm test`): perfil mínimo por defecto, normalización que
+  descarta campos desconocidos y avatares inválidos, recorte del apodo a 24 caracteres, iniciales,
+  persistencia en `localStorage` tras guardar, visibilidad apagada por defecto y encendida tras el
+  cambio, y comprobación de que el HTML del perfil no contiene ni el peso ni la foto de progreso.
+- `npm test` completo en verde (exit 0) y `scripts/medidas.mjs` sin desbordamiento en 320/375/768/1440 px.
