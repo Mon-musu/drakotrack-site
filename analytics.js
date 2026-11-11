@@ -266,15 +266,19 @@
     const prevRows = o.range && o.range.prevFrom ? rowsIn(all, { from: o.range.prevFrom, to: o.range.prevTo }) : [];
     const total = sum(rows, r => r.volume);
     const prevTotal = sum(prevRows, r => r.volume);
+    const groupResolver = typeof o.groupsOf === 'function' ? o.groupsOf : null;
     const byExercise = new Map();
-    const noGroup = [];
     rows.forEach(r => (r.exercises || []).forEach(ex => {
       if (!(ex.volume > 0) && !(ex.sets > 0)) return;
       const key = ex.key || ex.name;
       if (!key) return;
+      const single = typeof groupOf === 'function' ? groupOf(key) : '';
+      let shares = groupResolver ? groupResolver(key) : null;
+      if (!Array.isArray(shares) || !shares.length) shares = single ? [{ id: single, weight: 1 }] : [];
       const item = byExercise.get(key) || {
         key, name: ex.name || key, volume: 0, sets: 0, reps: 0,
-        sessions: new Set(), group: typeof groupOf === 'function' ? groupOf(key) : '',
+        sessions: new Set(), group: shares.length ? shares[0].id : '',
+        muscleGroups: shares.map(sh => sh.id), shares,
       };
       item.volume += ex.volume || 0;
       item.sets += ex.sets || 0;
@@ -291,17 +295,26 @@
     const bodyweightSets = sum(rows, r => r.bodyweightSets);
     const weightedSets = sum(rows, r => r.weightedSets);
     const groups = new Map();
+    const noGroup = [];
     exercises.forEach(x => {
-      const id = x.group || '';
-      if (!id) { noGroup.push(x); return; }
-      const g = groups.get(id) || { id, volume: 0, sets: 0, sessions: 0, exercises: [] };
-      g.volume += x.volume; g.sets += x.sets; g.sessions += x.sessions;
-      g.exercises.push(x.key);
-      groups.set(id, g);
+      const shares = Array.isArray(x.shares) ? x.shares : [];
+      if (!shares.length) { noGroup.push(x); return; }
+      shares.forEach(sh => {
+        const weight = Number(sh.weight) || 0;
+        if (!(weight > 0)) return;
+        const g = groups.get(sh.id) || { id: sh.id, volume: 0, sets: 0, sessions: 0, exercises: [] };
+        g.volume += x.volume * weight;
+        g.sets += x.sets * weight;
+        g.sessions += x.sessions;
+        if (!g.exercises.includes(x.key)) g.exercises.push(x.key);
+        groups.set(sh.id, g);
+      });
     });
-    const classifiedVolume = [...groups.values()].reduce((a, g) => a + g.volume, 0);
+    const unclassifiedVolume = round0(sum(noGroup, x => x.volume));
+    const roundedTotal = round0(total);
+    const classifiedVolume = Math.max(0, roundedTotal - unclassifiedVolume);
     return {
-      range, total: round0(total), prevTotal: round0(prevTotal),
+      range, total: roundedTotal, prevTotal: round0(prevTotal),
       delta: round0(total - prevTotal), pct: pctChange(total, prevTotal),
       sets: sum(rows, r => r.sets), reps: sum(rows, r => r.reps),
       weightedSets, bodyweightSets,
@@ -311,10 +324,13 @@
       monthly: PG && PG.buckets ? PG.buckets(rows, 'month').filter(b => inRange(b.key + '-01', range)) : [],
       byExercise: exercises,
       groups: [...groups.values()].map(g => Object.assign(g, {
-        volume: round0(g.volume), pct: classifiedVolume > 0 ? round1(g.volume / classifiedVolume * 100) : null,
+        volume: round0(g.volume),
+        sets: round1(g.sets),
+        pct: classifiedVolume > 0 ? round1(g.volume / classifiedVolume * 100) : null,
       })).sort((a, b) => b.volume - a.volume),
-      unclassified: { volume: round0(sum(noGroup, x => x.volume)), exercises: noGroup },
-      classifiedPct: total > 0 ? round1(classifiedVolume / total * 100) : null,
+      unclassified: { volume: unclassifiedVolume, exercises: noGroup },
+      classifiedPct: roundedTotal > 0 ? round1(classifiedVolume / roundedTotal * 100) : null,
+      weightedGroups: !!groupResolver,
       compatible: true,
     };
   }
@@ -379,11 +395,15 @@
 
   function muscleAnalysis(d, PG, resolve, groupOf, opts) {
     const vol = volumeAnalysis(d, PG, resolve, groupOf, opts);
+    const weighted = !!(opts && opts.groupsOf);
     return {
       range: vol.range, groups: vol.groups, unclassified: vol.unclassified,
       classifiedPct: vol.classifiedPct,
-      note: 'Cada ejercicio del catálogo tiene un grupo muscular principal y su volumen se asigna una sola vez a ese grupo. El modelo actual no admite varios grupos por ejercicio, así que no se inventan repartos. Los ejercicios sin grupo aparecen como «Sin clasificar».',
+      note: weighted
+        ? 'El diccionario muscular asigna músculos primarios y secundarios. Cada serie se reparte entre ellos con peso 1 para el primario y 0,5 para el secundario, normalizado para que la suma coincida con el volumen total. Los ejercicios que el diccionario no identifica aparecen como «Sin clasificar» y no se reparten.'
+        : 'Cada ejercicio del catálogo tiene un grupo muscular principal y su volumen se asigna una sola vez a ese grupo. Los ejercicios sin grupo aparecen como «Sin clasificar».',
       total: vol.total,
+      weightedGroups: vol.weightedGroups,
     };
   }
 

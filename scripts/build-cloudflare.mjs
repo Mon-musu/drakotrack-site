@@ -27,7 +27,7 @@ const FILES = [
   "sw.js",
   "apk/version.json",
 ];
-const DIRECTORIES = ["icons", "sounds", "programs", "vendor"];
+const DIRECTORIES = ["icons", "sounds", "programs", "vendor", "data"];
 
 rmSync(out, { recursive: true, force: true });
 mkdirSync(out, { recursive: true });
@@ -119,6 +119,9 @@ const headers = `/*
   Cache-Control: public, max-age=0, must-revalidate
 
 /programs/*
+  Cache-Control: public, max-age=3600, stale-while-revalidate=86400
+
+/data/*
   Cache-Control: public, max-age=3600, stale-while-revalidate=86400
 
 /apk/version.json

@@ -138,6 +138,17 @@ check('cada grupo tiene porcentaje válido', m.groups.every(g => g.pct == null |
 check('los grupos exponen sus ejercicios', m.groups.find(g => g.id === 'pecho').exercises.includes('bench'));
 const mEmpty = AN.muscleAnalysis(empty, PG, n => n, groupOf, { range: month });
 check('sin datos no hay grupos ni porcentaje', mEmpty.groups.length === 0 && mEmpty.classifiedPct === null);
+const sharesOf = key => key === 'bench'
+  ? [{ id: 'pecho', weight: 0.5 }, { id: 'triceps', weight: 0.5 }]
+  : key === 'squat' ? [{ id: 'cuadriceps', weight: 0.5 }, { id: 'gluteos', weight: 0.5 }] : [];
+const vw = AN.volumeAnalysis(d, PG, n => n, () => '', { range: r90, groupsOf: sharesOf });
+check('el reparto ponderado no duplica el volumen',
+  vw.groups.reduce((n, g) => n + g.volume, 0) + vw.unclassified.volume === vw.total
+  && vw.weightedGroups === true && vw.classifiedPct === 96.1);
+check('el reparto ponderado conserva los grupos publicados',
+  vw.groups.find(g => g.id === 'pecho').volume === 2220
+  && vw.groups.find(g => g.id === 'triceps').volume === 2220
+  && vw.groups.find(g => g.id === 'cuadriceps').volume === 250);
 
 console.log('\n=== Peso corporal ===');
 const bw = AN.bodyweightAnalysis(d, PG, { range: r90, now: NOW });

@@ -144,6 +144,15 @@ const EXERCISE_CATALOG = [
 ];
 const CUSTOM_PREFIX = 'custom:';
 
+/* Diccionario muscular publicado. Es la fuente única para el mapa: no se
+   deduce el músculo desde el grupo antiguo de la biblioteca. */
+const MUSCLE_DICT_URL = 'data/muscles.json?v=2';
+const MUSCLE_PRIMARY_WEIGHT = 1;
+const MUSCLE_SECONDARY_WEIGHT = 0.5;
+let MUSCLE_DICT = null;
+let MUSCLE_DICT_STATE = 'idle';
+let MUSCLE_DICT_PROMISE = null;
+
 /* Normaliza texto para comparar: sin acentos, sin mayúsculas, sin signos.
    «Press de banca» y «press  de BANCA» deben encontrar lo mismo. */
 function foldText(s){
@@ -154,7 +163,11 @@ function foldText(s){
 function slugify(s){
   return foldText(s).replace(/ /g, '-').replace(/^-+|-+$/g, '').slice(0, 60);
 }
-function groupLabel(id){ const g = MUSCLE_GROUPS.find(x => x.id === id); return g ? g.label : ''; }
+function groupLabel(id){
+  const g = MUSCLE_GROUPS.find(x => x.id === id);
+  if(g) return g.label;
+  return MUSCLE_DICT && MUSCLE_DICT.groups && MUSCLE_DICT.groups[id] ? MUSCLE_DICT.groups[id] : '';
+}
 function equipLabel(id){ const e = EQUIPMENT.find(x => x.id === id); return e ? e.label : ''; }
 function groupOptions(sel, allLabel){
   const head = allLabel === false
@@ -256,6 +269,109 @@ function filterExercises(d, query, group, equip){
     if(!q) return true;
     return [x.name].concat(x.aliases || []).some(n => foldText(n).indexOf(q) >= 0);
   }).sort((a, b) => a.name.localeCompare(b.name, 'es'));
+}
+
+/* ---------------- Diccionario muscular publicado ---------------- */
+/* La normalización es la misma que usa scripts/muscle-coverage.mjs:
+   minúsculas, sin acentos, sin paréntesis de equipamiento, sin material y
+   con los signos convertidos en espacios. */
+function normalizeMuscleName(name){
+  let s = String(name == null ? '' : name);
+  s = s.normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+  s = s.toLowerCase();
+  s = s.replace(/\([^)]*\)/g, ' ');
+  s = s.replace(/\b(barbell|dumbbells?|cable|machine|ez[-\s]?bar|smith machine|kettlebells?|bands?|bodyweight|landmine|trap bar|hex bar)\b/g, ' ');
+  s = s.replace(/[^a-z0-9]+/g, ' ');
+  return s.replace(/\s+/g, ' ').trim();
+}
+function muscleDictEntry(names){
+  if(!MUSCLE_DICT) return null;
+  for(const name of names || []){
+    const key = normalizeMuscleName(name);
+    if(key && MUSCLE_DICT.exercises[key]) return MUSCLE_DICT.exercises[key];
+  }
+  return null;
+}
+function muscleEntryForExercise(ex, d){
+  if(!MUSCLE_DICT || !ex) return null;
+  const entry = exerciseEntryFor(ex, d);
+  const names = [ex.name, entry && entry.name].concat((entry && entry.aliases) || []);
+  return muscleDictEntry(names);
+}
+/* Reparte una unidad (una serie, un kilo de volumen) entre los músculos que
+   publica el diccionario. Primario pesa 1 y secundario 0,5; después se
+   normaliza para que la suma sea exactamente 1 y no se duplique volumen. */
+function muscleShares(entry){
+  if(!MUSCLE_DICT || !entry) return [];
+  const raw = [];
+  (entry.primary || []).forEach(id => {
+    if(MUSCLE_DICT.groups[id]) raw.push({ id, weight: MUSCLE_PRIMARY_WEIGHT, role: 'primary' });
+  });
+  (entry.secondary || []).forEach(id => {
+    if(MUSCLE_DICT.groups[id] && !raw.some(x => x.id === id)) raw.push({ id, weight: MUSCLE_SECONDARY_WEIGHT, role: 'secondary' });
+  });
+  const total = raw.reduce((n, x) => n + x.weight, 0);
+  return total ? raw.map(x => ({ id: x.id, weight: x.weight / total, role: x.role })) : [];
+}
+function muscleBreakdownForExercise(ex, d){
+  return muscleShares(muscleEntryForExercise(ex, d));
+}
+function muscleBreakdownForKey(key, d){
+  if(!MUSCLE_DICT || !key) return [];
+  const entry = findExercise(key, d);
+  if(entry) return muscleShares(muscleDictEntry([entry.name].concat(entry.aliases || [])));
+  const raw = String(key).replace(/^custom:/, '').replace(/-/g, ' ');
+  return muscleShares(muscleDictEntry([raw]));
+}
+function refreshMuscleViews(){
+  if(!currentUser) return;
+  const route = parseHash().route;
+  if(route === 'progress' || route === 'analytics') render();
+}
+function loadMuscleDictionary(){
+  if(MUSCLE_DICT_STATE === 'ready') return Promise.resolve(true);
+  if(MUSCLE_DICT_PROMISE) return MUSCLE_DICT_PROMISE;
+  if(typeof fetch !== 'function'){
+    MUSCLE_DICT_STATE = 'error';
+    return Promise.resolve(false);
+  }
+  MUSCLE_DICT_STATE = 'loading';
+  MUSCLE_DICT_PROMISE = fetch(MUSCLE_DICT_URL, { credentials: 'same-origin' })
+    .then(res => {
+      if(!res || !res.ok) throw new Error('muscle_dictionary_unavailable');
+      return res.json();
+    })
+    .then(raw => {
+      if(!raw || !raw.groups || !raw.exercises) throw new Error('muscle_dictionary_invalid');
+      MUSCLE_DICT = {
+        version: raw.version,
+        updated: raw.updated,
+        groups: raw.groups,
+        patterns: raw.patterns || {},
+        exercises: raw.exercises,
+      };
+      MUSCLE_DICT_STATE = 'ready';
+      try{ if(window.AN && window.AN.clearCache) window.AN.clearCache(); }catch(e){}
+      refreshMuscleViews();
+      return true;
+    })
+    .catch(() => {
+      MUSCLE_DICT_STATE = 'error';
+      MUSCLE_DICT_PROMISE = null;
+      refreshMuscleViews();
+      return false;
+    });
+  return MUSCLE_DICT_PROMISE;
+}
+/* Un fallo de red no debe dejar el mapa bloqueado hasta recargar. */
+function retryMuscleDictionary(){
+  if(MUSCLE_DICT_STATE === 'loading') return false;
+  MUSCLE_DICT = null;
+  MUSCLE_DICT_STATE = 'idle';
+  MUSCLE_DICT_PROMISE = null;
+  refreshMuscleViews();
+  loadMuscleDictionary();
+  return true;
 }
 
 /* ---------------- Tema claro/oscuro ---------------- */
@@ -1358,12 +1474,29 @@ function repsText(sets, reps){
 function repsPickerHtml(value, attrs, ariaLabel){
   const cur = repLabel(value) || '···';
   const sel = String(value);
+  const accessible = ariaLabel + ': ' + (cur === '···' ? 'sin valor' : cur);
   return `<div class="reps-picker"${attrs || ''}>
-        <button type="button" class="reps-toggle" data-action="reps-toggle" aria-haspopup="listbox" aria-expanded="false" aria-label="${esc(ariaLabel)}">${esc(cur)} <span class="reps-arrow" aria-hidden="true">▾</span></button>
+        <button type="button" class="reps-toggle" data-action="reps-toggle" data-label="${esc(ariaLabel)}" aria-haspopup="listbox" aria-expanded="false" aria-label="${esc(accessible)}">${esc(cur)} <span class="reps-arrow" aria-hidden="true">▾</span></button>
         <div class="reps-menu hidden" role="listbox" aria-label="Repeticiones de 1 a 15 o AMRAP">
-          ${REPS_CHOICES.map(v => `<button type="button" class="reps-opt${sel === String(v) ? ' active' : ''}" role="option" aria-selected="${sel === String(v) ? 'true' : 'false'}" data-action="reps-choose" data-value="${v}">${v}</button>`).join('')}
+          ${REPS_CHOICES.map(v => `<button type="button" class="reps-opt${sel === String(v) ? ' active' : ''}" role="option" tabindex="-1" aria-selected="${sel === String(v) ? 'true' : 'false'}" data-action="reps-choose" data-value="${v}">${v}</button>`).join('')}
         </div>
       </div>`;
+}
+function repsToggleName(toggle, value){
+  if(!toggle || !toggle.dataset) return;
+  const base = toggle.dataset.label || 'Repeticiones';
+  toggle.setAttribute('aria-label', base + ': ' + (repLabel(value) || 'sin valor'));
+}
+function closeRepsMenus(){
+  $$('.reps-menu').forEach(menu => menu.classList.add('hidden'));
+  $$('.reps-toggle').forEach(toggle => toggle.setAttribute('aria-expanded', 'false'));
+}
+function openRepsMenu(toggle, menu){
+  closeRepsMenus();
+  menu.classList.remove('hidden');
+  toggle.setAttribute('aria-expanded', 'true');
+  const selected = menu.querySelector('[role="option"][aria-selected="true"]') || menu.querySelector('[role="option"]');
+  if(selected) selected.focus({ preventScroll: true });
 }
 
 /* ---------------- Utilidades ---------------- */
@@ -1407,11 +1540,11 @@ function readConsent(){
 function requireConsent(){
   const c = readConsent();
   if(!c.terms){
-    showAuthError('Para crear la cuenta debes aceptar los Términos del Servicio y la Política de Privacidad.');
+    showAuthError('Para crear la cuenta debes aceptar los Términos del Servicio y la Política de Privacidad.', 'consent-terms');
     return null;
   }
   if(!c.age){
-    showAuthError('Debes confirmar que tienes 16 años o más para crear una cuenta.');
+    showAuthError('Debes confirmar que tienes 16 años o más para crear una cuenta.', 'consent-age');
     return null;
   }
   return { version: LEGAL_VERSION, at: new Date().toISOString(), terms: true, age16: true, health: true };
@@ -1569,6 +1702,11 @@ async function logout(){
 }
 
 /* ---------------- Avisos y ventanas modales ---------------- */
+function toastDuration(msg, type='success'){
+  const base = type === 'error' ? 6000 : type === 'info' ? 4200 : 2800;
+  const reading = 900 + String(msg || '').length * 45;
+  return Math.min(10000, Math.max(base, reading));
+}
 function toast(msg, type='success'){
   const t = document.createElement('div');
   t.className = 'toast ' + type;
@@ -1579,7 +1717,7 @@ function toast(msg, type='success'){
   setTimeout(() => {
     t.classList.remove('show');
     setTimeout(() => t.remove(), 400);
-  }, 2800);
+  }, toastDuration(msg, type));
 }
 /* Accesibilidad: el diálogo se anuncia, atrapa el foco y lo devuelve al cerrar. */
 let _lastFocus = null;
@@ -1679,6 +1817,22 @@ function render(){
   maybeBackupReminder();
   maybePlanReminder();
   maybeNotifySwRollback();
+}
+/* Al entrar o salir de la sesión el foco no debe quedarse en un control que
+   acaba de desaparecer. El título del documento ya cambia en render(). */
+function focusMain(){
+  const main = $('#main');
+  if(!main || !document.contains(main) || main.closest('.hidden')) return;
+  try{ main.focus({ preventScroll: true }); }catch(e){ try{ main.focus(); }catch(_){} }
+}
+function focusAuthTitle(){
+  const title = $('#auth-title');
+  if(!title || !document.contains(title) || title.closest('.hidden')) return;
+  try{ title.focus({ preventScroll: true }); }catch(e){ try{ title.focus(); }catch(_){} }
+}
+function focusAfterAuth(){
+  if($('.modal')) return;   /* una confirmación o el onboarding manda el foco */
+  focusMain();
 }
 
 function renderHeader(){
@@ -2494,7 +2648,7 @@ function startRestTimer(s, seconds, ex, st){
 /* Pausar guarda el tiempo restante exacto en milisegundos; reanudar calcula un
    fin nuevo a partir de ese resto. Ni bloquear el móvil ni cambiar de pantalla
    regalan ni roban segundos. */
-function pauseRestTimer(s){
+function pauseRestTimer(s, focusAction){
   if(!s || !s.rest || restPaused(s)) return false;
   const end = isFinite(s.rest.endsAt) ? s.rest.endsAt : Date.now();
   s.rest.remainingMs = Math.max(0, end - Date.now());
@@ -2503,11 +2657,11 @@ function pauseRestTimer(s){
   s.rest.notifiedAt = null;
   s.lastSavedAt = nowIso();
   saveDB();
-  renderRestBar(s);
+  renderRestBar(s, focusAction ? { restoreFocus: true, focusAction } : {});
   announceRest('Descanso en pausa. Quedan ' + fmtClock(restRemaining(s)) + '.');
   return true;
 }
-function resumeRestTimer(s){
+function resumeRestTimer(s, focusAction){
   if(!s || !s.rest || !restPaused(s)) return false;
   const leftMs = Math.max(1000, Number(s.rest.remainingMs) || 0);
   const totalMs = Math.max(leftMs, (Number(s.rest.duration) || 0) * 1000);
@@ -2519,7 +2673,7 @@ function resumeRestTimer(s){
   s.rest.notifiedAt = null;
   s.lastSavedAt = nowIso();
   saveDB();
-  renderRestBar(s);
+  renderRestBar(s, focusAction ? { restoreFocus: true, focusAction } : {});
   announceRest('Descanso reanudado. Quedan ' + fmtClock(restRemaining(s)) + '.');
   return true;
 }
@@ -2632,10 +2786,20 @@ function restMenuHTML(s, paused, done){
     + '<div class="rest-menu-extra">' + restAlertsBtn() + restAlertLengthSelect() + '</div>'
     + '</div></details>';
 }
-function renderRestBar(s){
+function restoreRestFocus(slot, action){
+  if(!slot || !action) return;
+  const map = { 'rest-pause': 'rest-resume', 'rest-resume': 'rest-pause' };
+  const target = slot.querySelector('[data-action="' + (map[action] || action) + '"]');
+  if(!target) return;
+  try{ target.focus({ preventScroll: true }); }catch(e){ try{ target.focus(); }catch(_){} }
+}
+function renderRestBar(s, opts){
   stopRestClock();
   const slot = $('#rest-slot');
   if(!slot || !s) return;
+  const restore = !!(opts && opts.restoreFocus);
+  const active = restore && slot.contains(document.activeElement) ? document.activeElement : null;
+  const activeAction = (active && active.getAttribute('data-action')) || (opts && opts.focusAction) || null;
   const sid = esc(s.id);
   const locked = !!s.finished || s.status === 'completed' || s.status === 'cancelled';
   if(!s.rest){
@@ -2672,6 +2836,7 @@ function renderRestBar(s){
     + restMenuHTML(s, paused, false)
     + '</div></div>';
   bindRestMenu(slot, s);
+  if(restore) restoreRestFocus(slot, activeAction);
   if(paused) return;   /* en pausa no hay nada que repintar cada segundo */
   const gen = _restGen;
   _restClock = setInterval(() => {
@@ -2885,7 +3050,7 @@ function renderSession(main, sid){
           const badge = grp ? grp.letter + (grp.members.findIndex(m => m.id === e.id) + 1) : String(idx + 1);
           return `<button type="button" class="ex-chip is-${status.key}${e.id===currentExId?' is-current':''}" role="listitem"
             data-action="session-goto-ex" data-sid="${esc(s.id)}" data-ex="${esc(e.id)}"
-            aria-current="${e.id===currentExId?'true':'false'}"
+            ${e.id===currentExId?'aria-current="step"':''}
             aria-label="${esc((idx + 1) + '. ' + e.name + ': ' + status.label)}">
             <span class="ex-chip-badge">${esc(badge)}</span>
             <span class="ex-chip-name">${esc(e.name)}</span>
@@ -3971,54 +4136,89 @@ function effectiveSets(ex){
   }
   return out;
 }
-function groupOfExercise(ex, d){
-  const entry = exerciseEntryFor(ex, d);
-  return entry && entry.group ? entry.group : 'sin-grupo';
-}
 function weekMuscleVolume(d, weekISO){
   const to = shiftISO(weekISO, 6);
   const map = new Map();
+  let totalSets = 0, classifiedSets = 0, totalVolume = 0;
+  const add = (id, sets, volume) => {
+    const cur = map.get(id) || { id, sets: 0, volume: 0 };
+    cur.sets += sets;
+    cur.volume += volume;
+    map.set(id, cur);
+  };
   finishedSessions(d).forEach(s => {
     const day = String(s.date).slice(0, 10);
     if(day < weekISO || day > to) return;
     (s.exercises || []).forEach(ex => {
       const t = effectiveSets(ex);
       if(!t.sets) return;
-      const id = groupOfExercise(ex, d);
-      const cur = map.get(id) || { id, sets: 0, volume: 0 };
-      cur.sets += t.sets;
-      cur.volume += t.volume;
-      map.set(id, cur);
+      totalSets += t.sets;
+      totalVolume += t.volume;
+      const shares = muscleBreakdownForExercise(ex, d);
+      if(!shares.length){
+        /* El diccionario no lo clasifica: no se reparte a ciegas. */
+        add('sin-clasificar', t.sets, t.volume);
+      } else {
+        classifiedSets += t.sets;
+        shares.forEach(sh => add(sh.id, t.sets * sh.weight, t.volume * sh.weight));
+      }
     });
   });
-  return [...map.values()]
-    .map(r => ({ id: r.id, sets: r.sets, volume: Math.round(r.volume) }))
+  const rows = [...map.values()]
+    .map(r => ({ id: r.id, sets: Math.round(r.sets * 10) / 10, volume: Math.round(r.volume * 10) / 10 }))
     .sort((a, b) => b.sets - a.sets || b.volume - a.volume);
+  rows.meta = {
+    totalSets: Math.round(totalSets * 10) / 10,
+    classifiedSets: Math.round(classifiedSets * 10) / 10,
+    totalVolume: Math.round(totalVolume),
+  };
+  return rows;
 }
-function groupName(id){ return id === 'sin-grupo' ? 'Sin grupo' : (groupLabel(id) || id); }
+function groupName(id){
+  if(id === 'sin-clasificar') return 'Sin clasificar';
+  return groupLabel(id) || id;
+}
+function fmtMuscleSets(v){
+  const n = Math.round(Number(v) * 10) / 10;
+  return String(n).replace('.', ',');
+}
+function setCountLabel(v){
+  const n = Math.round(Number(v) * 10) / 10;
+  return fmtMuscleSets(n) + (n === 1 ? ' serie' : ' series');
+}
 function muscleVolumeCardHTML(d){
   const thisWeek = weekStartISO(todayISO());
   if(!thisWeek) return '';
   const rows = weekMuscleVolume(d, thisWeek);
+  const meta = rows.meta || { totalSets: 0, classifiedSets: 0, totalVolume: 0 };
   const before = new Map(weekMuscleVolume(d, shiftISO(thisWeek, -7)).map(r => [r.id, r.sets]));
-  const total = rows.reduce((a, r) => a + r.sets, 0);
-  const totalVol = rows.reduce((a, r) => a + r.volume, 0);
-  const max = Math.max(6, ...rows.map(r => r.sets));
+  const max = Math.max(1, ...rows.map(r => r.sets));
+  const groupCount = MUSCLE_DICT && MUSCLE_DICT.groups ? Object.keys(MUSCLE_DICT.groups).length : 16;
+  const loading = MUSCLE_DICT_STATE === 'idle' || MUSCLE_DICT_STATE === 'loading';
+  const failed = MUSCLE_DICT_STATE === 'error';
+  const unclassified = rows.find(r => r.id === 'sin-clasificar');
+  const pct = meta.totalSets ? Math.round(meta.classifiedSets / meta.totalSets * 100) : 0;
   return `
     <section class="mv-card">
-      <div class="section-head"><h2>Volumen por grupo muscular</h2><span class="muted">Semana del ${esc(fmtDate(thisWeek))} al ${esc(fmtDate(shiftISO(thisWeek, 6)))}</span></div>
-      ${rows.length
-        ? `<ul class="mv-list">${rows.map(r => {
-            const diff = r.sets - (before.get(r.id) || 0);
-            return `<li class="mv-row">
-            <span class="mv-name">${esc(groupName(r.id))}</span>
-            <span class="mv-track"><span class="mv-bar" style="width:${Math.round(r.sets / max * 100)}%"></span></span>
-            <span class="mv-val">${r.sets} serie${r.sets === 1 ? '' : 's'}</span>
-            <span class="mv-delta ${diff > 0 ? 'up' : diff < 0 ? 'down' : 'flat'}">${diff > 0 ? '+' + diff : diff < 0 ? String(diff) : '='}</span>
-          </li>`;
-          }).join('')}</ul>
-          <p class="muted small">${total} series efectivas y ${esc(fmtKg(Math.round(totalVol)))} kg de volumen esta semana. La columna de la derecha compara con la semana anterior.</p>`
-        : '<p class="muted small">Esta semana todavía no hay series registradas. Completa una sesión y aquí verás el reparto por grupo muscular.</p>'}
+      <div class="section-head"><h2>Mapa muscular de la semana</h2><span class="muted">${groupCount} grupos · diccionario publicado</span></div>
+      ${loading
+        ? '<p class="muted small" role="status">Cargando las clasificaciones musculares publicadas…</p>'
+        : failed
+          ? '<div class="mv-error" role="status"><p class="muted small">No se pudo cargar el diccionario muscular. El mapa no reparte los ejercicios sin clasificar.</p><button class="btn btn-ghost btn-sm" type="button" data-action="muscle-retry">Reintentar</button></div>'
+          : rows.length
+            ? `<ul class="mv-list">${rows.map(r => {
+                const diff = Math.round((r.sets - (before.get(r.id) || 0)) * 10) / 10;
+                const diffText = diff > 0 ? '+' + fmtMuscleSets(diff) : diff < 0 ? '−' + fmtMuscleSets(Math.abs(diff)) : '=';
+                return `<li class="mv-row">
+                <span class="mv-name">${esc(groupName(r.id))}</span>
+                <span class="mv-track"><span class="mv-bar" style="width:${Math.round(r.sets / max * 100)}%"></span></span>
+                <span class="mv-val">${setCountLabel(r.sets)}</span>
+                <span class="mv-delta ${diff > 0 ? 'up' : diff < 0 ? 'down' : 'flat'}">${diffText}</span>
+              </li>`;
+              }).join('')}</ul>
+              <p class="muted small">${fmtMuscleSets(meta.classifiedSets)} de ${fmtMuscleSets(meta.totalSets)} series efectivas clasificadas (${pct} %). ${meta.totalVolume ? esc(fmtKg(meta.totalVolume)) + ' kg de volumen total.' : ''} El reparto pondera primario 1 y secundario 0,5, y se ajusta para que cada serie sume una sola vez.</p>`
+              + (unclassified ? `<p class="muted small">${setCountLabel(unclassified.sets)} sin clasificar no se ${unclassified.sets === 1 ? 'reparte' : 'reparten'} entre músculos: el diccionario no las identifica.</p>` : '')
+            : '<p class="muted small">Esta semana todavía no hay series registradas. Completa una sesión y aquí verás el reparto por grupo muscular.</p>'}
     </section>`;
 }
 
@@ -4148,7 +4348,7 @@ function renderSettings(main){
       <div class="settings-inline">
         <button class="btn btn-ghost btn-sm" type="button" data-action="rest-sound-test">Probar sonido</button>
       </div>
-      <p class="muted sound-credit">Audios: <a href="https://freesound.org/people/Chelly01/sounds/541077/" target="_blank" rel="noopener noreferrer">Chelly01</a> (CC0), <a href="https://freesound.org/people/zanox/sounds/233645/" target="_blank" rel="noopener noreferrer">zanox</a> (CC BY-NC 4.0) y <a href="https://freesound.org/people/zharvill/sounds/721826/" target="_blank" rel="noopener noreferrer">zharvill</a> (CC0).</p>
+      <p class="muted sound-credit">Audios: <a href="https://freesound.org/people/Chelly01/sounds/541077/" target="_blank" rel="noopener noreferrer">Chelly01<span class="sr-only"> (se abre en una pestaña nueva)</span></a> (CC0), <a href="https://freesound.org/people/zanox/sounds/233645/" target="_blank" rel="noopener noreferrer">zanox<span class="sr-only"> (se abre en una pestaña nueva)</span></a> (CC BY-NC 4.0) y <a href="https://freesound.org/people/zharvill/sounds/721826/" target="_blank" rel="noopener noreferrer">zharvill<span class="sr-only"> (se abre en una pestaña nueva)</span></a> (CC0).</p>
     </section>
 
     <section class="settings-card">
@@ -4676,7 +4876,7 @@ function bcRenderBody(meta, p){
   const st = state.bc;
   const chips = [meta.equip].filter(Boolean).concat((meta.diff || []).slice(0, 3));
   const sourceNote = p.src === 'ms'
-    ? `Fuente: <a href="${esc(p.url || 'https://www.muscleandstrength.com/workouts')}" target="_blank" rel="noopener noreferrer">muscleandstrength.com</a> — estructura publicada allí, con enlace al programa original. Anota el peso concreto que uses en cada sesión.`
+    ? `Fuente: <a href="${esc(p.url || 'https://www.muscleandstrength.com/workouts')}" target="_blank" rel="noopener noreferrer">muscleandstrength.com<span class="sr-only"> (se abre en una pestaña nueva)</span></a> — estructura publicada allí, con enlace al programa original. Anota el peso concreto que uses en cada sesión.`
     : `Fuente: catálogo público de boostcamp.app${p.author ? ' — programa de ' + esc(p.author) : ''}. Los porcentajes se calculan sobre tu 1RM; anota el peso concreto que uses en cada sesión.`;
   const v = p.vars[st.vi];
   if(!v){ body.innerHTML = '<div class="empty-state">Este programa no tiene sesiones disponibles.</div>'; return; }
@@ -4873,6 +5073,8 @@ document.addEventListener('click', e => {
   const menu = $('#user-menu');
   if(menu && menu.classList.contains('open') && !e.target.closest('.user-menu-wrap')){
     menu.classList.remove('open');
+    const chip = $('#user-chip');
+    if(chip) chip.setAttribute('aria-expanded', 'false');
   }
   /* cerrar los selectores de repeticiones abiertos al tocar fuera */
   if(!e.target.closest('.reps-picker')){
@@ -4883,6 +5085,7 @@ document.addEventListener('click', e => {
   const el = e.target.closest('[data-action]');
   if(!el) return;
   const a = el.dataset.action;
+  if(a === 'muscle-retry'){ retryMuscleDictionary(); return; }
   if(a.indexOf('ana-') === 0 && analyticsAction(a, el)) return;
   if(a.indexOf('offline-') === 0 || a.indexOf('pwa-') === 0 || a.indexOf('sw-') === 0){ if(offlineAction(a, el)) return; }
 
@@ -4918,13 +5121,8 @@ document.addEventListener('click', e => {
     const wrap = el.closest('.reps-picker');
     const menu = wrap && wrap.querySelector('.reps-menu');
     if(!menu) return;
-    const willOpen = menu.classList.contains('hidden');
-    $$('.reps-menu').forEach(m => m.classList.add('hidden'));
-    $$('.reps-toggle').forEach(b => b.setAttribute('aria-expanded', 'false'));
-    if(willOpen){
-      menu.classList.remove('hidden');
-      el.setAttribute('aria-expanded', 'true');
-    }
+    if(menu.classList.contains('hidden')) openRepsMenu(el, menu);
+    else closeRepsMenus();
     return;
   }
   if(a === 'reps-choose'){
@@ -4932,18 +5130,18 @@ document.addEventListener('click', e => {
     if(!wrap) return;
     const raw = el.dataset.value;
     const value = raw === 'AMRAP' ? 'AMRAP' : Number(raw);
-    const menu = wrap.querySelector('.reps-menu');
-    if(menu) menu.classList.add('hidden');
     const toggle = wrap.querySelector('.reps-toggle');
     if(toggle){
       toggle.innerHTML = esc(repLabel(value)) + ' <span class="reps-arrow" aria-hidden="true">▾</span>';
-      toggle.setAttribute('aria-expanded', 'false');
+      repsToggleName(toggle, value);
     }
     $$('.reps-opt', wrap).forEach(o => {
       const on = o.dataset.value === String(value);
       o.classList.toggle('active', on);
       o.setAttribute('aria-selected', on ? 'true' : 'false');
     });
+    closeRepsMenus();
+    if(toggle) toggle.focus({ preventScroll: true });
     if(wrap.dataset.session){
       const s = getSession(wrap.dataset.session);
       const target = s && s.exercises.find(x => x.id === wrap.dataset.ex);
@@ -4973,7 +5171,14 @@ document.addEventListener('click', e => {
     nav('#/settings');
     return;
   }
-  if(a === 'logout'){ logout().finally(() => render()); return; }
+  if(a === 'logout'){
+    logout().finally(() => {
+      render();
+      toast('Sesión cerrada.', 'info');
+      focusAuthTitle();
+    });
+    return;
+  }
   if(a === 'reset-data'){
     /* La cuenta NO se elimina. En cuentas de nube el borrado se hace primero
        en el servidor (dt_delete_app_data: copia e historial) y solo si
@@ -5193,12 +5398,12 @@ document.addEventListener('click', e => {
   }
   if(a === 'rest-pause'){
     const s = getSession(el.dataset.sid);
-    if(s) pauseRestTimer(s);
+    if(s) pauseRestTimer(s, 'rest-pause');
     return;
   }
   if(a === 'rest-resume'){
     const s = getSession(el.dataset.sid);
-    if(s) resumeRestTimer(s);
+    if(s) resumeRestTimer(s, 'rest-resume');
     return;
   }
   if(a === 'rest-reset'){
@@ -6083,6 +6288,9 @@ document.addEventListener('submit', async e => {
   const form = e.target;
   if(form.id === 'auth-form'){
     e.preventDefault();
+    const errBox = $('#auth-err');
+    if(errBox){ errBox.classList.add('hidden'); errBox.textContent = ''; }
+    clearAuthFieldErrors();
     let mode = state.authMode;
     const u = $('#auth-user').value;
     const p = $('#auth-pass').value;
@@ -6102,11 +6310,11 @@ document.addEventListener('submit', async e => {
     if(mode === 'signup'){
       /* Cuenta en la nube (por defecto): se crea directamente en Supabase */
       const mail = u.trim().toLowerCase();
-      if(!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(mail)){ showAuthError('Introduce un correo válido.'); return; }
-      if(p.length < 8){ showAuthError('La contraseña debe tener al menos 8 caracteres.'); return; }
+      if(!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(mail)){ showAuthError('Introduce un correo válido.', 'auth-user'); return; }
+      if(p.length < 8){ showAuthError('La contraseña debe tener al menos 8 caracteres.', 'auth-pass'); return; }
       const nameEl = $('#auth-name');
       const cloudName = nameEl ? nameEl.value.trim().replace(/\s+/g, ' ') : '';
-      if(cloudName && (cloudName.length < 2 || cloudName.length > 40)){ showAuthError('El nombre de usuario debe tener entre 2 y 40 caracteres.'); return; }
+      if(cloudName && (cloudName.length < 2 || cloudName.length > 40)){ showAuthError('El nombre de usuario debe tener entre 2 y 40 caracteres.', 'auth-name'); return; }
       const btn = $('#auth-submit'); btn.disabled = true;
       const err = await DrakoSB.signUp(mail, p, consent, cloudName || undefined);
       btn.disabled = false;
@@ -6115,6 +6323,7 @@ document.addEventListener('submit', async e => {
       form.reset();
       toast('¡Cuenta en la nube creada! Tus datos se respaldan y puedes restaurarlos.');
       await enterCloud(mail);
+      focusAfterAuth();
       saveConsent(consent);
       openOnboarding();
       return;
@@ -6122,8 +6331,8 @@ document.addEventListener('submit', async e => {
 
     if(mode === 'cloud'){
       const mail = u.trim().toLowerCase();
-      if(!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(mail)){ showAuthError('Introduce un correo válido.'); return; }
-      if(!p.length){ showAuthError('Introduce tu contraseña.'); return; }
+      if(!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(mail)){ showAuthError('Introduce un correo válido.', 'auth-user'); return; }
+      if(!p.length){ showAuthError('Introduce tu contraseña.', 'auth-pass'); return; }
       const btn = $('#auth-submit'); btn.disabled = true;
       const err = await DrakoSB.signIn(mail, p);
       btn.disabled = false;
@@ -6133,12 +6342,13 @@ document.addEventListener('submit', async e => {
       form.reset();
       toast('¡Hola de nuevo!');
       await enterCloud(mail);
+      focusAfterAuth();
       return;
     }
 
     if(mode === 'forgot'){
       const mail = u.trim().toLowerCase();
-      if(!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(mail)){ showAuthError('Introduce un correo válido.'); return; }
+      if(!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(mail)){ showAuthError('Introduce un correo válido.', 'auth-user'); return; }
       const btn = $('#auth-submit'); btn.disabled = true;
       const err = await DrakoSB.recover(mail);
       btn.disabled = false;
@@ -6151,12 +6361,13 @@ document.addEventListener('submit', async e => {
     }
 
     const err = mode === 'signup-local' ? await signup(u, p) : await login(u, p);
-    if(err){ showAuthError(err); return; }
+    if(err){ showAuthError(err, mode === 'signup-local' ? localAuthErrorField(err) : null); return; }
     $('#auth-err').classList.add('hidden');
     form.reset();
     if(mode === 'signup-local') saveConsent(consent);
     toast(mode === 'signup-local' ? '¡Cuenta local creada! (solo en este dispositivo)' : '¡Hola de nuevo!');
     render();
+    focusAfterAuth();
     if(mode === 'signup-local') openOnboarding();
   }
 });
@@ -6169,7 +6380,9 @@ function setAuthMode(mode){
     t.classList.toggle('active', on);
     t.setAttribute('aria-pressed', on ? 'true' : 'false');
   });
-  const errBox = $('#auth-err'); if(errBox) errBox.classList.add('hidden');
+  const errBox = $('#auth-err');
+  if(errBox){ errBox.classList.add('hidden'); errBox.textContent = ''; }
+  clearAuthFieldErrors();
   const submit = $('#auth-submit'); if(!submit) return;
   const userLabel = $('#auth-user-label'), userInput = $('#auth-user');
   const passField = $('#auth-pass-field'), passInput = $('#auth-pass');
@@ -6255,10 +6468,33 @@ async function saveCloudName(){
   render();
   toast('Nombre de usuario guardado.');
 }
-function showAuthError(msg){
+function clearAuthFieldError(field){
+  if(!field || !field.removeAttribute) return;
+  field.removeAttribute('aria-invalid');
+  if(field.getAttribute('aria-describedby') === 'auth-err') field.removeAttribute('aria-describedby');
+}
+function clearAuthFieldErrors(){
+  ['auth-user','auth-name','auth-pass','consent-terms','consent-age'].forEach(id => clearAuthFieldError(document.getElementById(id)));
+}
+function localAuthErrorField(msg){
+  if(/usuario/i.test(msg)) return 'auth-user';
+  if(/contraseña/i.test(msg)) return 'auth-pass';
+  return null;
+}
+function showAuthError(msg, fieldId){
   const box = $('#auth-err');
+  if(!box) return;
+  clearAuthFieldErrors();
   box.textContent = msg;
   box.classList.remove('hidden');
+  const field = fieldId ? (typeof fieldId === 'string' ? document.getElementById(fieldId) : fieldId) : null;
+  if(field){
+    field.setAttribute('aria-invalid', 'true');
+    field.setAttribute('aria-describedby', 'auth-err');
+    try{ field.focus({ preventScroll: true }); }catch(e){ field.focus(); }
+  } else {
+    try{ box.focus({ preventScroll: true }); }catch(e){ box.focus(); }
+  }
 }
 
 /* ---------------- Teclado: diálogos, menú y foco ---------------- */
@@ -6284,6 +6520,29 @@ document.addEventListener('keydown', e => {
       const chip = $('#user-chip');
       if(chip){ chip.setAttribute('aria-expanded', 'false'); chip.focus(); }
     }
+  }
+  /* Listbox de repeticiones: flechas, Inicio/Fin, Escape y salida con Tab. */
+  const repsMenu = document.activeElement && document.activeElement.closest ? document.activeElement.closest('.reps-menu') : null;
+  if(repsMenu){
+    const options = [...repsMenu.querySelectorAll('[role="option"]')];
+    if(!options.length) return;
+    const idx = options.indexOf(document.activeElement);
+    if(e.key === 'Escape'){
+      e.preventDefault();
+      const wrap = repsMenu.closest('.reps-picker');
+      const toggle = wrap && wrap.querySelector('.reps-toggle');
+      closeRepsMenus();
+      if(toggle) toggle.focus({ preventScroll: true });
+      return;
+    }
+    if(e.key === 'Tab'){ closeRepsMenus(); return; }
+    let next = null;
+    if(e.key === 'ArrowDown' || e.key === 'ArrowRight') next = options[(idx + 1) % options.length];
+    else if(e.key === 'ArrowUp' || e.key === 'ArrowLeft') next = options[(idx - 1 + options.length) % options.length];
+    else if(e.key === 'Home') next = options[0];
+    else if(e.key === 'End') next = options[options.length - 1];
+    if(next){ e.preventDefault(); next.focus({ preventScroll: true }); }
+    return;
   }
 });
 
@@ -6479,7 +6738,7 @@ function planWeekHTML(d){
     +   '<button class="btn btn-ghost btn-sm" type="button" data-action="plan-copy-prev">Copiar semana anterior</button>'
     + '</div>'
     + '<div class="plan-week">' + rows + '</div>'
-    + '<section class="card plan-reminder"><h3>Recordatorios</h3>' + planReminderHTML() + '</section>';
+    + '<section class="card plan-reminder"><h2>Recordatorios</h2>' + planReminderHTML() + '</section>';
 }
 function planMonthHTML(d){
   const ps = planState();
@@ -6531,7 +6790,7 @@ function planDayDetailHTML(d){
   const entries = day.entries.map(item => planEntryHTML(d, item.entry)).join('');
   const done = day.done.map(s => '<div class="pr-item"><span>' + esc(s.workoutName) + '</span><span class="muted small">' + esc(SESSION_STATUS_LABELS[s.status] || 'Completada') + '</span><button class="btn btn-ghost btn-sm" type="button" data-action="open-session" data-id="' + esc(s.id) + '">Ver sesión</button></div>').join('');
   const extra = day.extra.length ? '<p class="muted small">' + day.extra.length + ' de estas sesiones no estaban planificadas: se conservan tal cual.</p>' : '';
-  return '<section class="card plan-day-detail"><h3>' + esc(fmtDateLong(day.date)) + '</h3>'
+  return '<section class="card plan-day-detail"><h2>' + esc(fmtDateLong(day.date)) + '</h2>'
     + (entries || '<p class="muted small">Nada planificado para este día.</p>')
     + (done ? '<div class="pr-list plan-done-list">' + done + '</div>' : '')
     + extra
@@ -6559,7 +6818,7 @@ function planProgramCard(d, program){
   if(program.status !== 'completed') statusButtons.push('<button class="btn btn-ghost btn-sm" type="button" data-action="program-status" data-id="' + esc(program.id) + '" data-status="completed">Completar</button>');
   if(program.status !== 'archived') statusButtons.push('<button class="btn btn-ghost btn-sm" type="button" data-action="program-status" data-id="' + esc(program.id) + '" data-status="archived">Archivar</button>');
   return '<article class="card plan-program">'
-    + '<div class="plan-program-head"><h3>' + esc(program.name) + '</h3><span class="plan-chip is-' + esc(program.status) + '">' + esc(PL.statusLabel(program.status)) + '</span></div>'
+    + '<div class="plan-program-head"><h2>' + esc(program.name) + '</h2><span class="plan-chip is-' + esc(program.status) + '">' + esc(PL.statusLabel(program.status)) + '</span></div>'
     + (program.description ? '<p class="muted small">' + esc(program.description) + '</p>' : '')
     + '<p class="muted small">' + esc(fmtDate(program.startDate)) + (program.endDate ? ' → ' + esc(fmtDate(program.endDate)) : '') + ' · ' + program.weeks + ' semanas · ' + program.daysPerWeek + ' días/semana · ' + (program.workoutIds || []).length + ' rutinas · ' + sessions + ' sesiones hechas</p>'
     + '<div class="plan-progress"><span style="width:' + progress.pct + '%"></span></div><p class="muted small">Semana ' + progress.elapsed + ' de ' + progress.weeks + (progress.remaining ? ' · quedan ' + progress.remaining : '') + '</p>'
@@ -6613,7 +6872,7 @@ function planEditorHTML(d, edit){
     return '<label class="field"><span>' + esc(PL.WEEKDAY_LABELS[i]) + '</span><select data-pf-tpl="' + i + '">' + opts + '</select></label>';
   }).join('');
   return '<div class="card plan-editor">'
-    + '<h3>' + (isNew ? 'Nuevo programa' : 'Editar programa') + '</h3>'
+    + '<h2>' + (isNew ? 'Nuevo programa' : 'Editar programa') + '</h2>'
     + '<div class="plan-form">'
     + '<label class="field"><span>Nombre</span><input id="pf-name" maxlength="120" value="' + esc(program.name) + '" placeholder="Bloque de fuerza 8 semanas"></label>'
     + '<label class="field"><span>Descripción</span><textarea id="pf-desc" maxlength="600" rows="2">' + esc(program.description || '') + '</textarea></label>'
@@ -6624,11 +6883,11 @@ function planEditorHTML(d, edit){
     + '<label class="field"><span>Días por semana</span><input id="pf-days" type="number" min="1" max="7" value="' + esc(String(program.daysPerWeek || 3)) + '"></label>'
     + '<label class="field"><span>Estado</span><select id="pf-status">' + PL.STATUSES.map(x => '<option value="' + esc(x.id) + '"' + (x.id === program.status ? ' selected' : '') + '>' + esc(x.label) + '</option>').join('') + '</select></label>'
     + '</div>'
-    + '<h4>Rutinas del programa</h4><div class="plan-checks">' + (workoutChecks || '<p class="muted small">No hay rutinas disponibles todavía.</p>') + '</div>'
-    + '<h4>Plantilla semanal</h4><p class="muted small">Se aplica a una semana concreta con «Aplicar plantilla»; cambiar la plantilla no modifica semanas ya planificadas.</p><div class="plan-template">' + templateRows + '</div>'
-    + '<h4>Fases</h4><div id="pf-phases" class="plan-rows">' + (program.phases || []).map(planPhaseRowHTML).join('') + '</div>'
+    + '<h3>Rutinas del programa</h3><div class="plan-checks">' + (workoutChecks || '<p class="muted small">No hay rutinas disponibles todavía.</p>') + '</div>'
+    + '<h3>Plantilla semanal</h3><p class="muted small">Se aplica a una semana concreta con «Aplicar plantilla»; cambiar la plantilla no modifica semanas ya planificadas.</p><div class="plan-template">' + templateRows + '</div>'
+    + '<h3>Fases</h3><div id="pf-phases" class="plan-rows">' + (program.phases || []).map(planPhaseRowHTML).join('') + '</div>'
     + '<button class="btn btn-ghost btn-sm" type="button" data-action="program-add-phase">+ Añadir fase</button>'
-    + '<h4>Objetivos</h4><div id="pf-goals" class="plan-rows">' + (program.goals || []).map(g => planGoalRowHTML(g, d)).join('') + '</div>'
+    + '<h3>Objetivos</h3><div id="pf-goals" class="plan-rows">' + (program.goals || []).map(g => planGoalRowHTML(g, d)).join('') + '</div>'
     + '<button class="btn btn-ghost btn-sm" type="button" data-action="program-add-goal">+ Añadir objetivo</button>'
     + '<p class="muted small">Los objetivos se comprueban con tus sesiones y récords reales. Un objetivo sin datos aparece como «Sin datos», nunca como cumplido.</p>'
     + '<div class="plan-actions"><button class="btn btn-primary" type="button" data-action="program-save">Guardar programa</button><button class="btn btn-ghost" type="button" data-action="program-cancel">Cancelar</button></div>'
@@ -6769,21 +7028,19 @@ function anaSaveConfig(d, cfg){
   saveDB();
   return d.prefs.dashboard;
 }
-function anaGroupOf(d){
-  return key => {
-    const entry = findExercise(key, d);
-    return entry && entry.group ? entry.group : '';
-  };
+function anaGroupsOf(d){
+  return key => muscleBreakdownForKey(key, d);
 }
 function anaOpts(d, preset, extra){
-  return Object.assign({
+  const opts = {
     preset: preset || 'month',
     now: todayISO(),
     PG: PG,
     PL: PL,
     resolve: name => resolveExerciseId(name, d),
-    groupOf: anaGroupOf(d),
-  }, extra || {});
+  };
+  if(MUSCLE_DICT_STATE === 'ready') opts.groupsOf = anaGroupsOf(d);
+  return Object.assign(opts, extra || {});
 }
 function anaCardHTML(c){
   const cmp = c.comparable && c.comparison
@@ -6851,7 +7108,7 @@ function anaConsistencyHTML(a){
 }
 function anaVolumeHTML(a){
   const v = a.volume;
-  const rows = v.byExercise.slice(0, 12).map(x => '<div class="ana-row"><span>' + esc(x.name) + '<br><span class="muted small">' + esc(x.group || 'Sin clasificar') + '</span></span><span>' + AN.formatKg(x.volume) + ' kg</span><span>' + x.sets + ' series</span><span>' + x.sessions + ' ses.</span></div>').join('');
+  const rows = v.byExercise.slice(0, 12).map(x => '<div class="ana-row"><span>' + esc(x.name) + '<br><span class="muted small">' + esc(x.muscleGroups && x.muscleGroups.length ? x.muscleGroups.map(g => groupLabel(g)).join(' · ') : 'Sin clasificar') + '</span></span><span>' + AN.formatKg(x.volume) + ' kg</span><span>' + x.sets + ' series</span><span>' + x.sessions + ' ses.</span></div>').join('');
   return '<section class="ana-sec"><div class="section-head"><h2>Volumen</h2><span class="muted">Solo peso externo × repeticiones</span></div>'
     + '<div class="stats-grid small five">'
     + '<div class="stat-card"><p class="stat-value">' + AN.formatKg(v.total) + ' kg</p><p class="stat-label">Total del período</p></div>'
@@ -6881,16 +7138,24 @@ function anaStrengthHTML(a, ana){
 }
 function anaMusclesHTML(a, ana){
   const g = a.muscles;
+  const dictStatus = MUSCLE_DICT_STATE === 'error'
+    ? '<div class="ana-warn" role="status"><b>Diccionario muscular no disponible.</b> No se pudo cargar la clasificación publicada; los ejercicios no se reparten entre grupos. <button class="btn btn-ghost btn-sm" type="button" data-action="muscle-retry">Reintentar</button></div>'
+    : (MUSCLE_DICT_STATE === 'idle' || MUSCLE_DICT_STATE === 'loading')
+      ? '<div class="ana-warn" role="status">Cargando el diccionario muscular publicado…</div>'
+      : '';
+  if(dictStatus){
+    return '<section class="ana-sec"><div class="section-head"><h2>Grupos musculares</h2><span class="muted">Diccionario muscular</span></div>' + dictStatus + '</section>';
+  }
   const max = Math.max.apply(null, g.groups.map(x => x.volume).concat([1]));
   const chosen = ana.group && g.groups.find(x => x.id === ana.group);
   const bars = g.groups.map(x => '<button type="button" class="ana-bar-row' + (ana.group === x.id ? ' is-active' : '') + '" data-action="ana-group" data-group="' + esc(x.id) + '"><span>' + esc(groupLabel(x.id)) + '</span><span class="ana-bar"><i style="width:' + Math.round(x.volume / max * 100) + '%"></i></span><span>' + AN.formatKg(x.volume) + ' kg · ' + x.sessions + ' ses.</span></button>').join('');
   const detail = chosen ? '<div class="ana-table"><div class="ana-row ana-head"><span>Ejercicio</span><span>Volumen</span><span>Series</span><span>Sesiones</span></div>'
-    + a.volume.byExercise.filter(x => x.group === chosen.id).map(x => '<div class="ana-row"><span>' + esc(x.name) + '</span><span>' + AN.formatKg(x.volume) + ' kg</span><span>' + x.sets + '</span><span>' + x.sessions + '</span></div>').join('') + '</div>' : '';
+    + a.volume.byExercise.filter(x => (x.muscleGroups || []).includes(chosen.id) || x.group === chosen.id).map(x => '<div class="ana-row"><span>' + esc(x.name) + '</span><span>' + AN.formatKg(x.volume) + ' kg</span><span>' + x.sets + '</span><span>' + x.sessions + '</span></div>').join('') + '</div>' : '';
   return '<section class="ana-sec"><div class="section-head"><h2>Grupos musculares</h2><span class="muted">' + (g.classifiedPct == null ? 'Sin datos clasificados' : g.classifiedPct + ' % del volumen clasificado') + '</span></div>'
     + (bars || '<div class="empty-state">Los ejercicios de este período no tienen grupo muscular asignado.</div>')
     + (detail || '')
-    + (g.unclassified.exercises.length ? '<div class="ana-warn"><b>Sin clasificar:</b> ' + g.unclassified.exercises.slice(0, 8).map(x => esc(x.name)).join(', ') + '. Puedes asignarles grupo editándolos en la biblioteca de ejercicios.</div>' : '')
-    + '<p class="muted small">' + esc(g.note) + ' <button type="button" class="linklike" data-action="tab" data-route="library">Abrir biblioteca</button></p></section>';
+    + (g.unclassified.exercises.length ? '<div class="ana-warn"><b>Sin clasificar:</b> ' + g.unclassified.exercises.slice(0, 8).map(x => esc(x.name)).join(', ') + '. El diccionario muscular no las identifica, así que no se reparten entre grupos.</div>' : '')
+    + '<p class="muted small">' + esc(g.note) + '</p></section>';
 }
 function anaBodyweightHTML(a){
   const b = a.bodyweight;
@@ -7181,7 +7446,13 @@ function offlinePendingTotal(){
 function renderOfflineBar(){
   const bar = $('#offline-bar');
   if(!bar) return;
-  if(!currentUser){ bar.className = 'offline-bar hidden'; bar.innerHTML = ''; return; }
+  const hide = () => {
+    if(bar.__lastHTML === '') return;
+    bar.__lastHTML = '';
+    bar.className = 'offline-bar hidden';
+    bar.innerHTML = '';
+  };
+  if(!currentUser){ hide(); return; }
   const stats = queueStatsSafe(currentUser);
   const st = cloudSync.state(currentUser) || {};
   const pending = offlinePendingTotal();
@@ -7215,10 +7486,14 @@ function renderOfflineBar(){
     tone = 'is-pending';
     action = '<button type="button" class="offline-btn" data-action="offline-retry">Sincronizar</button>';
   }
-  if(!text){ bar.className = 'offline-bar hidden'; bar.innerHTML = ''; return; }
-  bar.className = 'offline-bar ' + tone;
-  bar.innerHTML = '<span class="offline-text">' + esc(text) + '</span><span class="offline-actions">' + action
+  if(!text){ hide(); return; }
+  const html = '<span class="offline-text">' + esc(text) + '</span><span class="offline-actions">' + action
     + '<button type="button" class="offline-btn ghost" data-action="offline-details">Detalles</button></span>';
+  /* La barra es una región viva: no se reescribe si el estado no cambió. */
+  if(bar.__lastHTML === html && bar.className === 'offline-bar ' + tone) return;
+  bar.__lastHTML = html;
+  bar.className = 'offline-bar ' + tone;
+  bar.innerHTML = html;
 }
 function markStorageError(result){
   offlineState.storageError = true;
@@ -7486,3 +7761,11 @@ function setupOffline(){
 }
 
 setupOffline();
+
+/* El diccionario se carga después del primer render para no bloquear el acceso.
+   Cuando llega, solo se repinta si la vista actual muestra el mapa. */
+if(document.readyState === 'loading'){
+  document.addEventListener('DOMContentLoaded', () => { loadMuscleDictionary(); }, { once: true });
+} else {
+  setTimeout(loadMuscleDictionary, 0);
+}

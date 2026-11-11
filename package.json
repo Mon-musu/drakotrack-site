@@ -4,9 +4,11 @@
   "description": "DrakoTrack — workout tracking app",
   "main": "app.js",
   "scripts": {
-    "test": "node test-flows.js && node test-data.js && node test-sync.js && node test-ratelimit.js && node test-security.js && node test-session-fixes.js && node test-progress.js && node test-planner.js && node test-analytics.js && node test-workout-session.js && node test-offline.js && node scripts/build-cloudflare.mjs && node test-cloudflare.js",
+    "test": "node test-flows.js && node test-data.js && node test-sync.js && node test-ratelimit.js && node test-security.js && node test-session-fixes.js && node test-progress.js && node test-planner.js && node test-analytics.js && node test-workout-session.js && node test-offline.js && node test-muscles.js && node scripts/build-cloudflare.mjs && node test-cloudflare.js",
     "test:api": "node test-data.js && node test-sync.js && node test-ratelimit.js && node test-security.js",
     "test:cloudflare": "node scripts/build-cloudflare.mjs && node test-cloudflare.js",
+    "test:muscles": "node test-muscles.js",
+    "coverage:muscles": "node scripts/muscle-coverage.mjs",
     "build:cloudflare": "node scripts/build-cloudflare.mjs",
     "preview:cloudflare": "npm run build:cloudflare && npx --yes wrangler@latest pages dev dist",
     "deploy:cloudflare": "npm run build:cloudflare && npx --yes wrangler@latest pages deploy dist",

@@ -2,10 +2,11 @@
    Portada de DrakoTrack — carrusel de funciones (Swiper) y
    brillo de las tarjetas que sigue al puntero.
 
-   El carrusel se maneja con teclado (flechas, Inicio y Fin), con
-   sus flechas visibles, con los puntos y con el botón de pausa.
-   Cada cambio provocado por la persona se anuncia en una región
-   viva, así que un lector de pantalla lee la diapositiva nueva.
+   El carrusel ocupa un solo punto de tabulación: se maneja con
+   flechas, Inicio, Fin y P. Las flechas visibles, los puntos y el
+   botón de pausa siguen disponibles con ratón y con el cursor del
+   lector. Cada cambio provocado por la persona se anuncia en una
+   región viva, así que un lector de pantalla lee la diapositiva nueva.
 
    El avance automático lo lleva un temporizador propio (no el de
    Swiper) para que la pausa sea real: se detiene con el foco
@@ -69,10 +70,17 @@
       el: pagination,
       clickable: true,
       renderBullet: function (index, className) {
-        return '<button type="button" class="' + className + '" aria-label="Ir a la diapositiva ' +
+        return '<button type="button" tabindex="-1" class="' + className + '" aria-label="Ir a la diapositiva ' +
           (index + 1) + ' de ' + total + '"></button>';
       }
     } : undefined
+  });
+
+  /* El carrusel es un único punto de tabulación. Las flechas, puntos y
+     pausa siguen disponibles con ratón y con el cursor del lector, pero
+     no obligan a tabular por ocho controles antes del formulario. */
+  [prevBtn, nextBtn, toggleBtn].forEach(function (button) {
+    if (button) button.setAttribute('tabindex', '-1');
   });
 
   /* Swiper puede marcar el carrusel como región viva y repetir cada
@@ -183,6 +191,12 @@
   /* --- teclado: flechas, Inicio y Fin --- */
   element.addEventListener('keydown', function (event) {
     if (event.altKey || event.ctrlKey || event.metaKey) return;
+    if (event.key === 'p' || event.key === 'P') {
+      if (event.repeat) return;
+      event.preventDefault();
+      toggleAuto();
+      return;
+    }
     const before = swiper.activeIndex;
     if (event.key === 'ArrowRight') { takeControl(); userNavigated = true; swiper.slideNext(); }
     else if (event.key === 'ArrowLeft') { takeControl(); userNavigated = true; swiper.slidePrev(); }
@@ -214,17 +228,17 @@
   element.addEventListener('mouseleave', function () { hovering = false; scheduleAuto(); });
   document.addEventListener('visibilitychange', scheduleAuto);
 
-  if (toggleBtn) {
-    toggleBtn.addEventListener('click', function () {
-      if (autoAllowed()) {
-        userPaused = true;
-        explicitResume = false;
-      } else {
-        userPaused = false;
-        explicitResume = true;
-      }
-      scheduleAuto();
-      syncToggle();
-    });
+  function toggleAuto() {
+    if (autoAllowed()) {
+      userPaused = true;
+      explicitResume = false;
+    } else {
+      userPaused = false;
+      explicitResume = true;
+    }
+    scheduleAuto();
+    syncToggle();
   }
+
+  if (toggleBtn) toggleBtn.addEventListener('click', toggleAuto);
 })();

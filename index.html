@@ -14,7 +14,7 @@
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="vendor/swiper/swiper-bundle.min.css?v=12">
-<link rel="stylesheet" href="styles.css?v=33">
+<link rel="stylesheet" href="styles.css?v=36">
 </head>
 <body>
 <a class="skip-link" href="#main">Saltar al contenido</a>
@@ -26,10 +26,10 @@
   <div class="auth-wrap">
     <div class="auth-brand">
       <div class="brand-mark"><img src="logo.png?v=5" alt=""></div>
-      <h1>Drako<span class="accent">Track</span></h1>
+      <h1 id="auth-title" tabindex="-1">Drako<span class="accent">Track</span></h1>
       <p>Tu compañero de gimnasio. Entrenamientos, récords y peso corporal — en este dispositivo y, si quieres, en la nube para recuperarlos.</p>
       <div class="auth-features">
-        <div class="auth-swiper swiper" id="auth-swiper" tabindex="0" role="region" aria-roledescription="carrusel" aria-label="Qué puedes hacer con DrakoTrack">
+        <div class="auth-swiper swiper" id="auth-swiper" tabindex="0" role="region" aria-roledescription="carrusel" aria-label="Qué puedes hacer con DrakoTrack" aria-describedby="carousel-help" aria-keyshortcuts="ArrowLeft ArrowRight Home End P">
           <div class="swiper-wrapper">
             <div class="swiper-slide">
               <article class="glow-card">
@@ -76,6 +76,7 @@
             </button>
           </div>
           <p class="sr-only" id="carousel-status" role="status" aria-live="polite" aria-atomic="true"></p>
+          <p class="sr-only" id="carousel-help">Usa las flechas izquierda y derecha para cambiar de diapositiva, Inicio y Fin para ir a los extremos y P para pausar o reanudar. El cambio automático se pausa mientras el carrusel tiene el foco.</p>
         </div>
       </div>
     </div>
@@ -86,7 +87,7 @@
         <button type="button" class="auth-tab" data-auth="cloud" aria-pressed="false">Nube</button>
       </div>
       <form id="auth-form" novalidate>
-        <div id="auth-err" class="auth-err hidden" role="alert"></div>
+        <div id="auth-err" class="auth-err hidden" role="alert" tabindex="-1"></div>
         <label class="field">
           <span id="auth-user-label">Usuario o correo</span>
           <input id="auth-user" autocomplete="username" placeholder="tu@correo.com o entrenador_marco" spellcheck="false">
@@ -108,18 +109,18 @@
         <div id="consent-box" class="consent-box hidden">
           <label class="consent-row" for="consent-terms">
             <input type="checkbox" id="consent-terms">
-            <span>Acepto los <a href="legal.html#terminos" target="_blank" rel="noopener noreferrer">Términos del Servicio</a> y la <a href="legal.html#privacidad" target="_blank" rel="noopener noreferrer">Política de Privacidad</a>, incluido el tratamiento de mi peso y mi foto de progreso como datos de salud (opcionales).</span>
+            <span>Acepto los <a href="legal.html#terminos" target="_blank" rel="noopener noreferrer">Términos del Servicio<span class="sr-only"> (se abre en una pestaña nueva)</span></a> y la <a href="legal.html#privacidad" target="_blank" rel="noopener noreferrer">Política de Privacidad<span class="sr-only"> (se abre en una pestaña nueva)</span></a>, incluido el tratamiento de mi peso y mi foto de progreso como datos de salud (opcionales).</span>
           </label>
           <label class="consent-row" for="consent-age">
             <input type="checkbox" id="consent-age">
             <span>Confirmo que tengo <b>16 años o más</b>.</span>
           </label>
-          <p class="consent-note">Puedes borrar el peso, la foto o toda tu cuenta cuando quieras desde el menú de usuario. <a href="legal.html#derechos" target="_blank" rel="noopener noreferrer">Cómo se eliminan tus datos</a>.</p>
+          <p class="consent-note">Puedes borrar el peso, la foto o toda tu cuenta cuando quieras desde el menú de usuario. <a href="legal.html#derechos" target="_blank" rel="noopener noreferrer">Cómo se eliminan tus datos<span class="sr-only"> (se abre en una pestaña nueva)</span></a>.</p>
         </div>
         <button type="submit" class="btn btn-primary btn-block btn-lg" id="auth-submit">Iniciar sesión</button>
         <p class="auth-note" id="auth-note">Las cuentas locales viven solo en este dispositivo. Con <b>Nube</b> tus datos se guardan en Supabase y puedes restaurarlos desde cualquier dispositivo o si olvidas tu contraseña.</p>
       </form>
-      <a class="btn btn-ghost btn-block" href="https://github.com/Mon-musu/drakotrack-site/releases/latest" rel="noopener" data-apk-download style="margin-top:14px">Descargar app Android (APK)</a>
+      <a class="btn btn-ghost btn-block" href="https://github.com/Mon-musu/drakotrack-site/releases/latest" rel="noopener" data-apk-download style="margin-top:14px">Descargar app Android (APK)<span class="sr-only"> (se abre en una pestaña nueva)</span></a>
 
       <footer class="site-footer">
         <nav class="footer-links" aria-label="Información legal y privacidad">
@@ -146,10 +147,10 @@
     <div class="top-date" id="top-date"></div>
     <button class="theme-btn" id="theme-btn" type="button" data-action="toggle-theme" aria-label="Cambiar a tema claro" title="Cambiar a tema claro"></button>
     <div class="user-menu-wrap">
-      <button class="user-chip" id="user-chip" data-action="toggle-menu" type="button" aria-haspopup="true" aria-expanded="false" aria-controls="user-menu" aria-label="Tu cuenta"></button>
-      <div class="user-menu" id="user-menu" aria-label="Opciones de la cuenta">
+      <button class="user-chip" id="user-chip" data-action="toggle-menu" type="button" aria-expanded="false" aria-controls="user-menu" aria-label="Tu cuenta"></button>
+      <div class="user-menu" id="user-menu" role="group" aria-label="Opciones de la cuenta">
         <div class="user-menu-head" id="user-menu-head"></div>
-        <div class="sb-status hidden" id="sb-status" role="status"></div>
+        <div class="sb-status hidden" id="sb-status"></div>
         <button type="button" class="hidden" id="sb-push" data-action="sb-push">Subir copia a la nube</button>
         <button type="button" class="hidden" id="sb-restore" data-action="sb-pull">Restaurar copia de la nube</button>
         <button type="button" class="hidden" id="sb-conflicts" data-action="open-sync-conflicts">Revisar cambios en conflicto</button>
@@ -158,8 +159,8 @@
         <button type="button" class="hidden" id="sb-export" data-action="sb-export">Descargar mis datos (JSON)</button>
         <button type="button" data-action="open-change-pass">Cambiar contraseña</button>
         <button type="button" data-action="open-settings">Ajustes</button>
-        <a href="legal.html" target="_blank" rel="noopener noreferrer">Información legal y privacidad</a>
-        <a href="https://github.com/Mon-musu/drakotrack-site/releases/latest" rel="noopener" data-apk-download>Descargar la app (APK)</a>
+        <a href="legal.html" target="_blank" rel="noopener noreferrer">Información legal y privacidad<span class="sr-only"> (se abre en una pestaña nueva)</span></a>
+        <a href="https://github.com/Mon-musu/drakotrack-site/releases/latest" rel="noopener" data-apk-download>Descargar la app (APK)<span class="sr-only"> (se abre en una pestaña nueva)</span></a>
         <button type="button" data-action="reset-data">Borrar mis datos de entrenamiento</button>
         <button type="button" data-action="open-delete-account">Eliminar mi cuenta y todos mis datos</button>
         <button type="button" data-action="logout">Cerrar sesión</button>
@@ -167,7 +168,7 @@
     </div>
   </header>
 
-  <div id="offline-bar" class="offline-bar hidden" role="status" aria-live="polite"></div>
+  <div id="offline-bar" class="offline-bar hidden" role="status"></div>
 
   <nav class="sidebar" id="sidebar" aria-label="Secciones principales">
     <button class="nav-btn active" data-action="tab" data-route="workouts" aria-current="page"><span>Entrenamientos</span></button>
@@ -201,9 +202,9 @@
 <script src="planner.js?v=1"></script>
 <script src="offline.js?v=2"></script>
 <script src="analytics.js?v=1"></script>
-<script src="app.js?v=43"></script>
+<script src="app.js?v=47"></script>
 <script src="vendor/swiper/swiper-bundle.min.js?v=11" defer></script>
-<script src="landing.js?v=3" defer></script>
+<script src="landing.js?v=4" defer></script>
 <script src="update-check.js?v=2" defer></script>
 </body>
 </html>

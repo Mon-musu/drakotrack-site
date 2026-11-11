@@ -41,7 +41,7 @@ DEPLOY_FILES=(
   index.html app.js sync.js styles.css share.js supabase.js boostcamp.js
   legal.html legal.js logo.png update-check.js progress.js planner.js analytics.js offline.js offline.html
   manifest.webmanifest sw.js icons
-  vercel.json package.json package-lock.json api lib programs apk/version.json
+  vercel.json package.json package-lock.json api lib programs data apk/version.json
 )
 
 # ---------- 1. pruebas ------------------------------------------------------

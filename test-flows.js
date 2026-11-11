@@ -69,6 +69,13 @@ const tick = ms => new Promise(r => setTimeout(r, ms));
     try { return fs.existsSync(p) ? fs.readFileSync(p, 'utf8') : null; } catch (e) { return null; }
   };
 
+  const dictLoaded = await g('loadMuscleDictionary()');
+  check('the published muscle dictionary loads', dictLoaded === true && g('MUSCLE_DICT_STATE') === 'ready'
+    && g("Object.keys(MUSCLE_DICT.exercises).length") === 606);
+  check('muscle normalization matches the published keys', g("normalizeMuscleName('Bench Press (Barbell)')") === 'bench press');
+  check('dictionary groups and labels are available to the UI', g("groupLabel('cuadriceps')") === 'Cuádriceps'
+    && g("muscleBreakdownForKey('press-de-banca', null).length") === 3);
+
   window.render();
   check('auth screen shown when signed out', !window.document.querySelector('#auth-screen').classList.contains('hidden'));
 
@@ -95,10 +102,16 @@ const tick = ms => new Promise(r => setTimeout(r, ms));
   submit();
   await tick(200);
   check('signup blocked without accepting terms', /Términos/.test(errText()) && g('currentUser') === null);
+  check('missing terms focuses and marks the checkbox', window.document.activeElement === window.document.querySelector('#consent-terms')
+    && window.document.querySelector('#consent-terms').getAttribute('aria-invalid') === 'true'
+    && window.document.querySelector('#consent-terms').getAttribute('aria-describedby') === 'auth-err');
   window.document.querySelector('#consent-terms').checked = true;
   submit();
   await tick(200);
   check('signup blocked without age confirmation', /16 años/.test(errText()) && g('currentUser') === null);
+  check('missing age focuses and marks the checkbox', window.document.activeElement === window.document.querySelector('#consent-age')
+    && window.document.querySelector('#consent-age').getAttribute('aria-invalid') === 'true'
+    && window.document.querySelector('#consent-age').getAttribute('aria-describedby') === 'auth-err');
   window.document.querySelector('#consent-age').checked = true;
 
   // weak password via UI
@@ -106,6 +119,9 @@ const tick = ms => new Promise(r => setTimeout(r, ms));
   submit();
   await tick(400);
   check('short password rejected', /al menos|6/.test(errText()));
+  check('short password focuses and marks the password field', window.document.activeElement === window.document.querySelector('#auth-pass')
+    && window.document.querySelector('#auth-pass').getAttribute('aria-invalid') === 'true'
+    && window.document.querySelector('#auth-pass').getAttribute('aria-describedby') === 'auth-err');
 
   // el mensaje promete guiones: un usuario con guion debe poder crearse
   g("signup('tester-02-pruebas','local-pass-2026')");
@@ -196,6 +212,11 @@ const tick = ms => new Promise(r => setTimeout(r, ms));
   await tick(600);
   check('default login tab signs a device account in', g('currentUser') === 'tester_01');
   check('login tab does not demand picking a mode first', !/Elige iniciar sesión/.test(errText()));
+  check('logging in moves focus to the main content', window.document.activeElement === window.document.querySelector('#main'));
+  window.document.querySelector('[data-action="logout"]').click();
+  await tick(200);
+  check('logging out moves focus to the access heading', window.document.activeElement === window.document.querySelector('#auth-title')
+    && !window.document.querySelector('#auth-screen').classList.contains('hidden'));
 
   // un correo en esa misma pestaña se resuelve contra la nube
   g('currentUser = null; localStorage.removeItem(SESSION_KEY);');
@@ -541,6 +562,17 @@ const tick = ms => new Promise(r => setTimeout(r, ms));
   })());
   check('main is focusable for skip navigation', window.document.querySelector('#main').getAttribute('tabindex') === '-1');
   check('landing has a focusable skip target', window.document.querySelector('#auth-content').getAttribute('tabindex') === '-1');
+  check('new-tab links announce that a new tab opens', (() => {
+    const links = [...window.document.querySelectorAll('a[target="_blank"]')];
+    return links.length > 0 && links.every(a => /se abre en una pestaña nueva/i.test(a.textContent));
+  })());
+  check('carousel explains its keyboard model', (() => {
+    const swiper = window.document.querySelector('#auth-swiper');
+    const help = window.document.querySelector('#carousel-help');
+    return swiper.getAttribute('aria-describedby') === 'carousel-help'
+      && !!help && /flechas/i.test(help.textContent)
+      && /ArrowRight/.test(swiper.getAttribute('aria-keyshortcuts') || '');
+  })());
   g("$('#app').classList.add('hidden'); $('#auth-screen').classList.remove('hidden'); syncSkipLink();");
   check('skip link targets the landing form when the app is hidden', window.document.querySelector('.skip-link').getAttribute('href') === '#auth-content');
   g("document.querySelector('.skip-link').click()");
@@ -552,6 +584,19 @@ const tick = ms => new Promise(r => setTimeout(r, ms));
     g("toast('mal','error')");
     const nodes = [...window.document.querySelectorAll('#toast-root .toast')];
     return nodes.length === 2 && nodes[0].getAttribute('role') === 'status' && nodes[1].getAttribute('role') === 'alert';
+  })());
+  check('long notices stay on screen long enough to read', g('toastDuration("x".repeat(100), "success")') > 4500
+    && g('toastDuration("x".repeat(20), "success")') === 2800);
+  check('error notices remain longer than success notices', g('toastDuration("Error", "error")') > g('toastDuration("Hecho")'));
+  check('sync status does not compete with the live offline bar', !window.document.querySelector('#sb-status').hasAttribute('role'));
+  check('offline bar is a status region without a redundant aria-live', (() => {
+    const bar = window.document.querySelector('#offline-bar');
+    return bar.getAttribute('role') === 'status' && !bar.hasAttribute('aria-live');
+  })());
+  check('main has a visible keyboard focus indicator', (() => {
+    const css = fs.readFileSync(path.join(__dirname, 'styles.css'), 'utf8');
+    const rule = (css.match(/#main:focus-visible\{([^}]*)\}/) || [])[1] || '';
+    return /outline\s*:\s*3px solid var\(--focus\)/.test(rule);
   })());
   check('auth errors announced as alerts', window.document.querySelector('#auth-err').getAttribute('role') === 'alert');
   g("nav('#/history')");
@@ -565,11 +610,50 @@ const tick = ms => new Promise(r => setTimeout(r, ms));
     && (window.document.querySelector('#bottomnav').getAttribute('aria-label') || '').length > 3);
   check('user chip exposes menu state', window.document.querySelector('#user-chip').getAttribute('aria-expanded') === 'false'
     && window.document.querySelector('#user-chip').getAttribute('aria-controls') === 'user-menu');
+  check('account menu is a labelled group, not a fake menu', (() => {
+    const menu = window.document.querySelector('#user-menu');
+    const chip = window.document.querySelector('#user-chip');
+    return menu.getAttribute('role') === 'group'
+      && menu.getAttribute('aria-label') === 'Opciones de la cuenta'
+      && !chip.hasAttribute('aria-haspopup');
+  })());
+  g("nav('#/plan')");
+  await tick(80);
+  check('plan keeps a h1 -> h2 heading order', (() => {
+    const levels = [...window.document.querySelectorAll('#main h1,#main h2,#main h3,#main h4')]
+      .map(h => Number(h.tagName.slice(1)));
+    return levels[0] === 1 && levels.every((l, i) => i === 0 || l <= levels[i - 1] + 1);
+  })());
   g("nav('#/workouts')");
   await tick(100);
   check('icon-only buttons have accessible names', (() => {
     const icons = [...window.document.querySelectorAll('.icon-btn')];
     return icons.length > 0 && icons.every(b => (b.getAttribute('aria-label') || '').length > 5);
+  })());
+  check('repetition picker names its current value and exposes one tab stop', (() => {
+    const box = window.document.createElement('div');
+    box.innerHTML = g("repsPickerHtml(10, '', 'Repeticiones del ejercicio 1')");
+    const toggle = box.querySelector('.reps-toggle');
+    const options = [...box.querySelectorAll('.reps-opt')];
+    return toggle.getAttribute('aria-label') === 'Repeticiones del ejercicio 1: 10'
+      && box.querySelector('.reps-menu').getAttribute('role') === 'listbox'
+      && options.length === 16 && options.every(o => o.tabIndex === -1);
+  })());
+  check('repetition listbox supports arrows and Escape', (() => {
+    const box = window.document.createElement('div');
+    box.innerHTML = g("repsPickerHtml(10, '', 'Repeticiones del ejercicio 1')");
+    window.document.body.appendChild(box);
+    const toggle = box.querySelector('.reps-toggle');
+    toggle.click();
+    const first = window.document.activeElement;
+    first.dispatchEvent(new window.KeyboardEvent('keydown', { key: 'ArrowDown', bubbles: true, cancelable: true }));
+    const second = window.document.activeElement;
+    second.dispatchEvent(new window.KeyboardEvent('keydown', { key: 'Escape', bubbles: true, cancelable: true }));
+    const closed = box.querySelector('.reps-menu').classList.contains('hidden')
+      && window.document.activeElement === toggle;
+    box.remove();
+    return first && first.dataset.value === '10'
+      && second && second.dataset.value === '11' && closed;
   })());
   check('exercise checkboxes have accessible names', (() => {
     const s = [...window.document.querySelectorAll('.check input[type=checkbox]')];
@@ -1049,6 +1133,11 @@ const tick = ms => new Promise(r => setTimeout(r, ms));
   window.nav('#/session/' + tid);
   await tick(80);
   check('the session inherits the planned rest', g(`getSession('${tid}').exercises[0].rest`) === 120);
+  check('the current exercise chip is marked as a step', (() => {
+    const chip = window.document.querySelector('.ex-chip.is-current');
+    return !!chip && chip.getAttribute('aria-current') === 'step'
+      && ![...window.document.querySelectorAll('.ex-chip')].some(c => c.getAttribute('aria-current') === 'true');
+  })());
   check('no rest timer runs before the first set', !g(`getSession('${tid}').rest`) && !window.document.querySelector('#rest-time'));
 
   // completar una serie arranca el descanso planificado
@@ -1719,18 +1808,43 @@ const tick = ms => new Promise(r => setTimeout(r, ms));
   })()`);
   check('warmups and unfinished sets do not count', g('effectiveSets({ sets:[{weight:100,reps:5,completed:true,type:"working"},{weight:40,reps:10,completed:true,type:"warmup"},{weight:90,reps:8,completed:false,type:"working"}] }).sets') === 1);
   check('legacy exercises count as one set when done', g("effectiveSets({ done:true, weight:60, reps:5 })").volume === 300);
-  check('weekly volume is grouped by muscle group',
-    g("weekMuscleVolume(dataFor(currentUser), weekStartISO(todayISO())).map(r => r.id + ':' + r.sets + ':' + r.volume).join('|')")
-    === 'pecho:1:500|espalda:1:300|sin-grupo:1:200');
-  check('unknown exercises fall back to a named group', g("groupName('sin-grupo')") === 'Sin grupo');
+  check('weekly volume uses published muscle classifications', (() => {
+    const rows = g('weekMuscleVolume(dataFor(currentUser), weekStartISO(todayISO()))');
+    const by = new Map(rows.map(r => [r.id, r]));
+    return by.get('pecho').sets === 0.5 && by.get('pecho').volume === 250
+      && by.get('triceps').volume === 125 && by.get('hombros').volume === 125
+      && by.get('espalda').volume === 150 && by.get('biceps').volume === 75
+      && by.get('sin-clasificar').sets === 1 && by.get('sin-clasificar').volume === 200
+      && rows.meta.totalSets === 3 && rows.meta.classifiedSets === 2
+      && rows.reduce((sum, r) => sum + r.volume, 0) === rows.meta.totalVolume;
+  })());
+  check('unknown exercises stay unclassified', g("groupName('sin-clasificar')") === 'Sin clasificar');
 
   g("nav('#/progress')");
   await tick(120);
   const mvRows = window.document.querySelectorAll('.mv-row').length;
-  check('progress shows one bar per worked group', mvRows === 3);
+  check('progress shows one bar per worked muscle', mvRows === 7);
+  const pechoRow = [...window.document.querySelectorAll('.mv-row')].find(row => /Pecho/.test(row.textContent));
   check('bars compare against the previous week',
-    /-1/.test(window.document.querySelector('.mv-delta').textContent || ''));
-  check('weekly card adds up the week', /3 series efectivas/.test(mainHtml()));
+    !!pechoRow && pechoRow.querySelector('.mv-delta').textContent === '−0,5');
+  check('weekly card shows coverage and total series',
+    /2 de 3 series efectivas clasificadas/.test(mainHtml()) && /1000 kg de volumen total/.test(mainHtml()));
+
+  // Un fallo del diccionario no bloquea el mapa: muestra un reintento.
+  const realFetch = window.fetch;
+  window.fetch = async () => ({ ok: false, status: 503, json: async () => { throw new Error('offline'); } });
+  g("MUSCLE_DICT=null; MUSCLE_DICT_STATE='idle'; MUSCLE_DICT_PROMISE=null; loadMuscleDictionary();");
+  await tick(80);
+  check('the map explains a failed dictionary load and offers retry',
+    /No se pudo cargar el diccionario muscular/.test(mainHtml())
+    && !!window.document.querySelector('[data-action="muscle-retry"]'));
+  window.fetch = realFetch;
+  g("document.querySelector('[data-action=\"muscle-retry\"]').click()");
+  await tick(120);
+  check('the dictionary retry recovers the map',
+    g('MUSCLE_DICT_STATE') === 'ready'
+    && !window.document.querySelector('[data-action="muscle-retry"]')
+    && window.document.querySelectorAll('.mv-row').length === 7);
 
   // Comparación mes a mes
   check('months shift backwards across the year',

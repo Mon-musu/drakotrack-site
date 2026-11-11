@@ -165,7 +165,8 @@ async function appTests() {
   ok(!!s.rest.pausedAt && s.rest.remainingMs > 80000, 'T2. Pausar conserva el tiempo restante');
   ok(s.rest.endsAt === null || s.rest.endsAt === undefined, 'T2b. En pausa no queda una hora de fin activa');
   ok(/En pausa/.test(doc.querySelector('#rest-slot').textContent), 'T2c. El estado se muestra como «en pausa»');
-  ok(!g('_restClock'), 'T2d. Al pausar se detiene el intervalo de pintado');
+  ok(doc.activeElement === doc.querySelector('[data-action="rest-resume"]'), 'T2d. Pausar deja el foco en «Reanudar»');
+  ok(!g('_restClock'), 'T2e. Al pausar se detiene el intervalo de pintado');
 
   const frozenA = g(`restRemaining(getSession('${sid}'))`);
   await tick(300);
@@ -174,6 +175,7 @@ async function appTests() {
 
   click('[data-action="rest-resume"]');
   await tick(30);
+  ok(doc.activeElement === doc.querySelector('[data-action="rest-pause"]'), 'T3a. Reanudar deja el foco en «Pausar»');
   s = sess();
   const resumed = g(`restRemaining(getSession('${sid}'))`);
   ok(!s.rest.pausedAt && !!s.rest.endsAt, 'T3. Reanudar vuelve a poner el descanso en marcha');
