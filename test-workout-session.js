@@ -21,7 +21,7 @@ function run(){
   
   // Load scripts in order
   const scripts = ['sync.js', 'supabase.js', 'boostcamp.js', 'share.js', 'progress.js', 'planner.js',
-    'offline.js', 'analytics.js', 'app.js'];
+    'offline.js', 'analytics.js', 'activity.js', 'app.js'];
   for(const s of scripts){
     try {
       const code = fs.readFileSync(path.join(root, s), 'utf8');

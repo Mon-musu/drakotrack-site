@@ -126,7 +126,7 @@ check('dos dispositivos con la misma entrada no la duplican', DrakoSync.merge(nu
 
 const html = fs.readFileSync(path.join(__dirname, 'index.html'), 'utf8');
 const FILES = ['sync.js', 'supabase.js', 'boostcamp.js', 'share.js', 'progress.js', 'planner.js',
-    'offline.js', 'analytics.js', 'app.js'];
+    'offline.js', 'analytics.js', 'activity.js', 'app.js'];
 function bootDom(storedDB) {
   const dom = new JSDOM(html, {
     url: 'http://localhost:8765/index.html', runScripts: 'outside-only', pretendToBeVisual: true,

@@ -450,7 +450,7 @@ function setTheme(v){
 /* ---------------- Estado y almacenamiento ---------------- */
 let db = loadDB();
 let currentUser = localStorage.getItem(SESSION_KEY) || null;
-const state = { sessionId:null, editor:null, prExercise:null, onb:null, authMode:'login', sb:{ status:'idle', last:null, timer:null, retry:null, attempts:0, applying:false } };
+const state = { sessionId:null, editor:null, prExercise:null, onb:null, activity:null, authMode:'login', sb:{ status:'idle', last:null, timer:null, retry:null, attempts:0, applying:false } };
 
 function loadDB(){
   try{
@@ -1759,6 +1759,7 @@ const VIEW_TITLES = {
   history: 'Historial',
   progress: 'Progreso',
   analytics: 'Análisis',
+  activity: 'Actividad',
   weight: 'Peso',
   settings: 'Ajustes',
   profile: 'Perfil',
@@ -1808,6 +1809,7 @@ function render(){
   else if(route === 'start')   renderStart(main);
   else if(route === 'progress') renderProgress(main);
   else if(route === 'analytics') renderAnalytics(main);
+  else if(route === 'activity')  renderActivity(main);
   else if(route === 'settings') renderSettings(main);
   else if(route === 'profile')  renderProfile(main);
   else if(route === 'weight')  renderWeight(main);
@@ -1826,6 +1828,11 @@ function render(){
 }
 /* Al entrar o salir de la sesión el foco no debe quedarse en un control que
    acaba de desaparecer. El título del documento ya cambia en render(). */
+/* El anillo de foco del contenido solo aparece al navegar con teclado:
+   con ratón o dedo no debe dibujarse un marco alrededor de toda la página. */
+document.addEventListener('pointerdown', () => { delete document.documentElement.dataset.kbd; }, true);
+document.addEventListener('keydown', e => { if(e.key === 'Tab') document.documentElement.dataset.kbd = '1'; }, true);
+
 function focusMain(){
   const main = $('#main');
   if(!main || !document.contains(main) || main.closest('.hidden')) return;
@@ -3726,6 +3733,95 @@ function cmpResultHTML(res, unit){
     <span class="muted small">antes ${baseTxt}</span>
     <span class="trend-chip ${res.trend}">${trendLabel(res.trend)}${res.pct == null ? '' : ' ' + (res.pct > 0 ? '+' : '') + res.pct + ' %'}</span>`;
 }
+/* ---------------- F3 · calendario anual de actividad ---------------- */
+function activityLinkHTML(d){
+  const days = Activity.byDay(d.sessions);
+  const st = Activity.streak(days, Activity.restDays(d.planner), todayISO());
+  const racha = st.current ? (st.current === 1 ? '1 día de racha' : st.current + ' días de racha') : 'Sin racha activa';
+  return `<a class="act-cta" href="#/activity">
+    <span>
+      <span class="act-cta-title">Calendario de actividad</span>
+      <span class="act-cta-hint">${racha} · tu año entero, mes a mes.</span>
+    </span>
+    <span class="act-cta-arrow" aria-hidden="true">→</span>
+  </a>`;
+}
+function activityTimeLabel(minutes){
+  const m = Math.max(0, Math.round(Number(minutes) || 0));
+  if(!m) return '—';
+  const h = Math.floor(m / 60), r = m % 60;
+  if(!h) return m + ' min';
+  return h + ' h' + (r ? ' ' + r + ' min' : '');
+}
+function activityStatsHTML(stats){
+  const mins = activityTimeLabel(stats.minutes);
+  const vol = stats.volume ? Math.round(stats.volume).toLocaleString('es') + ' kg' : '—';
+  return `<section class="stats-grid small act-stats">
+    <div class="stat-card"><p class="stat-value">${stats.activeDays}</p><p class="stat-label">Días entrenados</p></div>
+    <div class="stat-card"><p class="stat-value">${stats.sessions}</p><p class="stat-label">Sesiones</p></div>
+    <div class="stat-card"><p class="stat-value">${mins}</p><p class="stat-label">Tiempo entrenado</p></div>
+    <div class="stat-card"><p class="stat-value">${vol}</p><p class="stat-label">Volumen</p></div>
+  </section>`;
+}
+function activityMonthHTML(m){
+  const cells = m.cells.map(c => {
+    const cls = 'act-day' + (c.inMonth ? '' : ' is-out') + (c.level ? ' is-l' + c.level : '') +
+      (c.rest ? ' is-rest' : '') + (c.isToday ? ' is-today' : '');
+    return `<span class="${cls}" title="${esc(c.label)}" aria-label="${esc(c.label)}"><span aria-hidden="true">${c.day}</span></span>`;
+  }).join('');
+  return `<section class="act-month" aria-labelledby="act-m-${m.month}">
+    <h2 id="act-m-${m.month}">${esc(m.label)}</h2>
+    <div class="act-weekdays" aria-hidden="true">${Activity.WEEKDAY_INITIALS.map(x => `<span>${x}</span>`).join('')}</div>
+    <div class="act-grid">${cells}</div>
+  </section>`;
+}
+function renderActivity(main){
+  const d = dataFor(currentUser);
+  if(!state.activity || typeof state.activity !== 'object') state.activity = { year: null, month: 'all' };
+  const view = Activity.build(d.sessions, {
+    now: todayISO(),
+    year: state.activity.year,
+    month: state.activity.month,
+    planner: d.planner
+  });
+  const st = view.stats.streak;
+  const racha = st.current ? (st.current === 1 ? '1 día' : st.current + ' días') : 'Sin racha';
+  const filters = `
+    <div class="act-filters">
+      <label class="field act-field"><span>Año</span>
+        <select id="act-year">${view.years.map(y => `<option value="${y}"${y === view.year ? ' selected' : ''}>${y}</option>`).join('')}</select>
+      </label>
+      <label class="field act-field"><span>Mes</span>
+        <select id="act-month">
+          <option value="all"${view.month === 'all' ? ' selected' : ''}>Todo el año</option>
+          ${Activity.MONTHS.map((name, i) => `<option value="${i + 1}"${view.month === i + 1 ? ' selected' : ''}>${name}</option>`).join('')}
+        </select>
+      </label>
+    </div>`;
+  const empty = `<section class="empty-state">Todavía no hay entrenamientos terminados. Cuando completes el primero, aquí verás tu año entero día a día.
+    <div style="margin-top:12px"><a class="btn btn-primary" href="#/start">Empezar entrenamiento</a></div></section>`;
+  const cuerpo = !view.hasData ? empty : `
+    ${filters}
+    ${activityStatsHTML(view.stats)}
+    <section class="act-streak">
+      <p class="act-streak-value">${racha}</p>
+      <p class="muted small">Mejor racha: ${st.best} ${st.best === 1 ? 'día' : 'días'}. Los días de descanso planificados no rompen la racha y el día de hoy no la corta mientras no haya terminado. Una sesión por día cuenta una vez.</p>
+    </section>
+    <div class="act-legend" aria-hidden="true"><span>Menos</span><i></i><i class="l1"></i><i class="l2"></i><i class="l3"></i><i class="l4"></i><span>Más</span><span class="act-legend-rest"><i class="rest"></i> Descanso planificado</span></div>
+    ${view.hasYearData ? '' : `<section class="alert">En ${view.year} no hay entrenamientos. Prueba otro año.</section>`}
+    <div class="act-year${view.months.length === 1 ? ' is-single' : ''}">${view.months.map(activityMonthHTML).join('')}</div>`;
+  main.innerHTML = `
+    <div class="page-head">
+      <h1>Calendario de actividad</h1>
+      <p class="muted">Cada día entrenado del año, con el tiempo y el volumen reales. El descanso planificado se muestra aparte y no rompe la racha.</p>
+    </div>
+    ${cuerpo}`;
+  const ys = $('#act-year');
+  if(ys) ys.onchange = () => { state.activity.year = Number(ys.value); state.activity.month = 'all'; render(); };
+  const ms = $('#act-month');
+  if(ms) ms.onchange = () => { state.activity.month = ms.value === 'all' ? 'all' : Number(ms.value); render(); };
+}
+
 function renderProgress(main){
   const d = dataFor(currentUser);
   const resolve = name => resolveExerciseId(name, d);
@@ -3774,6 +3870,8 @@ function renderProgress(main){
     </div>
 
     ${streakCardHTML(d)}
+
+    ${activityLinkHTML(d)}
 
     ${muscleVolumeCardHTML(d)}
 

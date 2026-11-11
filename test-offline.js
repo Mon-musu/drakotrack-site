@@ -170,7 +170,7 @@ console.log('\n=== Conectividad y almacenamiento ===');
 
   /* ---------------- Integración jsdom ---------------- */
   const html = fs.readFileSync(path.join(__dirname, 'index.html'), 'utf8');
-  const FILES = ['sync.js', 'supabase.js', 'boostcamp.js', 'share.js', 'progress.js', 'planner.js', 'offline.js', 'analytics.js', 'app.js'];
+  const FILES = ['sync.js', 'supabase.js', 'boostcamp.js', 'share.js', 'progress.js', 'planner.js', 'offline.js', 'analytics.js', 'activity.js', 'app.js'];
   function bootDom(storedDB, user, offline, storedQueue) {
     const dom = new JSDOM(html, {
       url: 'http://localhost:8765/index.html', runScripts: 'outside-only', pretendToBeVisual: true,

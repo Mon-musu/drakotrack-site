@@ -336,3 +336,59 @@ suelo de 12 px, los 5 destinos de navegación con `aria-current`, coherencia `th
   persistencia en `localStorage` tras guardar, visibilidad apagada por defecto y encendida tras el
   cambio, y comprobación de que el HTML del perfil no contiene ni el peso ni la foto de progreso.
 - `npm test` completo en verde (exit 0) y `scripts/medidas.mjs` sin desbordamiento en 320/375/768/1440 px.
+
+## F3 · Calendario anual de actividad
+
+**Estado**: implementado, con `npm test` en verde. Falta la revisión en producción y el despliegue
+(los cambios viven en la rama de trabajo hasta que se autoricen).
+
+### Qué se añadió
+
+- **Módulo puro `activity.js`**: agrupa las sesiones terminadas por día (una sesión por día cuenta
+  una vez), descarta canceladas y calentamientos, calcula minutos y volumen con la misma regla que
+  el resto de la app (peso externo > 0 y repeticiones > 0), asigna un nivel de intensidad de 0 a 4
+  y construye la cuadrícula mensual con semanas que empiezan en lunes.
+- **Vista `#/activity`** («Calendario de actividad») con:
+  - filtros de **año** y **mes** (solo lectura: no se guardan en el documento, así que no hay
+    migración ni campos nuevos en `lib/security.js`);
+  - resumen del período (días entrenados, sesiones, tiempo y volumen) que se recalcula con el filtro;
+  - los doce meses del año en tarjetas, o un único mes cuando se filtra;
+  - leyenda de intensidad y marcas distintas para el día de hoy y el descanso planificado;
+  - estado vacío honesto cuando todavía no hay sesiones terminadas.
+- **Racha que no penaliza el descanso**: se cuentan días consecutivos con sesión; los días de
+  descanso planificados en el calendario del plan se saltan (ni suman ni rompen) y los días
+  posteriores al último entrenamiento tampoco cortan la racha. Cualquier otro hueco sí la reinicia.
+  Es una racha en días; la tarjeta de Progreso mantiene la racha en semanas que ya existía.
+- **Entrada desde Progreso**: tarjeta «Calendario de actividad» con la racha actual, encima del
+  volumen por grupo muscular. La barra de navegación sigue con sus **5 destinos**.
+- Accesibilidad: cada día lleva `aria-label` con fecha, sesiones, minutos y volumen; las
+  cuadrículas no son interactivas (no se añaden 365 controles al tabulador); el anillo de foco de
+  `#main` aparece solo al navegar con teclado.
+
+### Correcciones de F1/F2 incluidas
+
+- Las tarjetas de «Panel de rendimiento» usaban `var(--card)` y `var(--line)`, que no existen, con
+  respaldos oscuros: en tema claro se veían negras con texto negro. Ahora usan `--surface`,
+  `--border`, `--ok`, `--danger` y `--accent-text`.
+- El `outline` de `#main` dibujaba un marco naranja alrededor de toda la página en cada navegación,
+  también con ratón o dedo. Ahora solo se muestra al navegar con teclado (`data-kbd`).
+
+### Pruebas
+
+`test-activity.js` (**45 aserciones**): agrupación por día, volumen sin calentamientos, niveles,
+cuadrícula de febrero de 2026, racha con y sin descanso planificado, racha con hueco real, filtros
+de año y mes, año vacío y vista completa en jsdom (doce meses, filtros, estado vacío y enlace desde
+Progreso). Se añadió a la cadena de `npm test`.
+
+Resultado: **82 / 75 / 74 / 123 / 13 / 101 / 11** + perfil **34** + actividad **45** + diseño **92**,
+build `dist ready (21 files, 5 directories)` y Cloudflare **116**.
+
+### Capturas
+
+`artifacts/f3/actividad-375-oscuro.png`, `actividad-375-claro.png`, `actividad-1440-oscuro.png`,
+`actividad-1440-claro.png`, `actividad-1440-mes.png` (filtro de noviembre), `inicio-1440-claro.png`
+(panel corregido) y `perfil-375-oscuro.png` (sin marco de foco).
+
+### Versiones
+
+`app.js?v=51`, `styles.css?v=40`, `activity.js?v=1`, service worker `drakotrack-v25`.

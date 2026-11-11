@@ -21,6 +21,7 @@ const FILES = [
   "progress.js",
   "planner.js",
   "analytics.js",
+  "activity.js",
   "offline.js",
   "offline.html",
   "manifest.webmanifest",
@@ -90,6 +91,9 @@ const headers = `/*
   Cache-Control: public, max-age=0, must-revalidate
 
 /analytics.js
+  Cache-Control: public, max-age=0, must-revalidate
+
+/activity.js
   Cache-Control: public, max-age=0, must-revalidate
 
 /offline.js

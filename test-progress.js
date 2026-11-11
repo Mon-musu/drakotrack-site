@@ -120,7 +120,7 @@ const dom = new JSDOM(html, {
 });
 const ctx = dom.getInternalVMContext();
 for (const f of ['sync.js', 'supabase.js', 'boostcamp.js', 'share.js', 'progress.js', 'planner.js',
-    'offline.js', 'analytics.js', 'app.js']) {
+    'offline.js', 'analytics.js', 'activity.js', 'app.js']) {
   vm.runInContext(fs.readFileSync(path.join(__dirname, f), 'utf8'), ctx, { filename: f });
 }
 const g = expr => vm.runInContext(expr, ctx, { filename: 'sup' });
