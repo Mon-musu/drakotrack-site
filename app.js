@@ -1886,8 +1886,11 @@ function renderHeader(){
   renderOfflineBar();
 }
 function setActiveTab(route){
-  $$('.nav-btn[data-route]').forEach(b => {
-    const on = b.dataset.route === route;
+  /* El calendario de actividad cuelga de Progreso: la barra mantiene la
+     orientación marcando esa sección en vez de no marcar ninguna. */
+  const active = route === 'activity' ? 'progress' : route;
+  $('.nav-btn[data-route]').forEach(b => {
+    const on = b.dataset.route === active;
     b.classList.toggle('active', on);
     if(on) b.setAttribute('aria-current', 'page');
     else b.removeAttribute('aria-current');
@@ -3817,9 +3820,9 @@ function renderActivity(main){
     </div>
     ${cuerpo}`;
   const ys = $('#act-year');
-  if(ys) ys.onchange = () => { state.activity.year = Number(ys.value); state.activity.month = 'all'; render(); };
+  if(ys) ys.onchange = () => { state.activity.year = Number(ys.value); state.activity.month = 'all'; render(); const next = $('#act-year'); if(next) next.focus(); };
   const ms = $('#act-month');
-  if(ms) ms.onchange = () => { state.activity.month = ms.value === 'all' ? 'all' : Number(ms.value); render(); };
+  if(ms) ms.onchange = () => { state.activity.month = ms.value === 'all' ? 'all' : Number(ms.value); render(); const next = $('#act-month'); if(next) next.focus(); };
 }
 
 function renderProgress(main){
