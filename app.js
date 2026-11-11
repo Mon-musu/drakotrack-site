@@ -1889,7 +1889,7 @@ function setActiveTab(route){
   /* El calendario de actividad cuelga de Progreso: la barra mantiene la
      orientación marcando esa sección en vez de no marcar ninguna. */
   const active = route === 'activity' ? 'progress' : route;
-  $('.nav-btn[data-route]').forEach(b => {
+  $$('.nav-btn[data-route]').forEach(b => {
     const on = b.dataset.route === active;
     b.classList.toggle('active', on);
     if(on) b.setAttribute('aria-current', 'page');
