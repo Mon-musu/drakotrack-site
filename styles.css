@@ -1607,3 +1607,18 @@ button.home-card:hover{transform:translateY(-2px);border-color:var(--accent)}
   .act-field{flex:1 1 130px;min-width:0}
   .act-legend-rest{margin-left:0}
 }
+
+/* ============================================================
+   F4 · músculos por ejercicio y cobertura del diccionario
+   ============================================================ */
+.ex-muscles{display:flex;flex-wrap:wrap;gap:4px;margin-top:5px}
+.ex-muscles .badge{font-size:12px;min-height:0;padding:1px 8px}
+.lib-coverage{margin-bottom:14px}
+.lib-coverage .section-head{margin-bottom:6px}
+.lib-coverage .section-head h2{font-size:17px}
+.lib-unclassified{margin-top:6px;font-size:13px}
+.lib-unclassified summary{cursor:pointer;color:var(--accent-text);font-weight:700;min-height:32px;display:flex;align-items:center}
+.lib-unclassified ul{margin:4px 0 0 18px;color:var(--muted);display:grid;gap:3px}
+.mv-unknown{margin-top:6px;font-size:13px}
+.mv-unknown summary{cursor:pointer;color:var(--accent-text);font-weight:700;min-height:32px;display:flex;align-items:center}
+.mv-unknown ul{margin:4px 0 0 18px;color:var(--muted);display:grid;gap:3px}

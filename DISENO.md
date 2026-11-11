@@ -419,3 +419,48 @@ build `dist ready (21 files, 5 directories)` y Cloudflare **116**.
   reales.
 - **Safari y móvil físico**: solo se ha verificado en Chrome headless.
 - **Rendimiento en gama baja y `prefers-reduced-motion`**: sin medición real.
+
+---
+
+# F4 — Diccionario muscular: cobertura y «sin clasificar»
+
+## Qué cambia
+
+- **Músculos por ejercicio en la biblioteca**: cada entrada de la lista (y del selector de
+  ejercicios) muestra los grupos que publica `data/muscles.json`, con el primario destacado y los
+  secundarios en insignia neutra. Si el diccionario no tiene el ejercicio, la fila dice **«Sin
+  clasificar»** con insignia de aviso: no se deduce del grupo antiguo de ocho categorías, que no
+  distingue cuádriceps de glúteo.
+- **Panel de cobertura en la biblioteca**: versión del diccionario, número de grupos y de
+  ejercicios, cuántos de los ejercicios del usuario (catálogo + propios) están clasificados, el
+  porcentaje y un desplegable con los que quedan sin clasificar. Con el diccionario cargando se
+  muestra un estado, y si falla la red hay un botón de reintento en vez de una lista vacía.
+- **Mapa semanal más honesto**: las series de un ejercicio sin clasificar ya no solo se cuentan,
+  también se pueden ver por nombre en un desplegable («Ver los ejercicios sin clasificar»). Siguen
+  sin repartirse entre músculos.
+- El reparto no cambia: primario 1, secundario 0,5, normalizado para que cada serie sume una vez.
+
+## Cobertura real (medida, no estimada)
+
+`node scripts/muscle-coverage.mjs` sobre el diccionario v2:
+
+| Ámbito | Cobertura |
+|---|---|
+| Catálogo de 256 programas, por uso | **89,4 %** (21 083 de 23 574 apariciones) |
+| Catálogo de programas, solo fuerza | **94,4 %** (20 647 de 21 878) |
+| Nombres distintos de programas | **35,1 %** (576 de 1642); el resto son cardio, movilidad, calentamientos o marcadores que no son ejercicios de fuerza |
+| Biblioteca local (`app.js`) | **100 %** por uso |
+
+La interfaz no promete más de lo que hay: enseña el porcentaje de la biblioteca del usuario y la
+lista de lo que falta.
+
+## Pruebas
+
+`test-muscle-ui.js` (nuevo, **20 aserciones**, dentro de `npm test`): chips de press de banca y
+sentadilla, «Sin clasificar» para un nombre desconocido, cobertura que suma clasificados + sin
+clasificar, panel de cobertura con versión y lista, insignia en la fila del ejercicio propio, y
+mapa semanal que cuenta las series sin clasificar sin repartirlas y muestra el nombre concreto.
+
+## Versiones
+
+`app.js?v=52`, `styles.css?v=41`, service worker `drakotrack-v26`.

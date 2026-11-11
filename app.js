@@ -2395,6 +2395,7 @@ function exerciseListHtml(list){
       <button class="ex-pick-main" data-action="pick-ex" data-id="${esc(x.id)}" type="button">
         <span class="ex-pick-name">${esc(x.name)}${x.custom ? ' <span class="tag-custom">propio</span>' : ''}</span>
         <span class="ex-pick-meta">${esc(groupLabel(x.group) || 'Sin grupo')}${equipLabel(x.equip) ? ' · ' + esc(equipLabel(x.equip)) : ''}${(x.aliases || []).length ? ' · alias: ' + esc((x.aliases || []).join(', ')) : ''}</span>
+        ${muscleChipsHTML(x)}
         ${mark ? `<span class="ex-pick-pr">${markText(mark)}<span class="ex-pick-recs">${recs ? recs + ' récord' + (recs === 1 ? '' : 's') + ' automático' + (recs === 1 ? '' : 's') : 'sin récords automáticos'}</span></span>`
           : (recs ? `<span class="ex-pick-pr"><span class="ex-pick-recs">${recs} récord${recs === 1 ? '' : 's'} automático${recs === 1 ? '' : 's'}</span></span>` : '')}
       </button>
@@ -2424,12 +2425,76 @@ function refreshExerciseList(kind){
   }
   box.innerHTML = exerciseListHtml(list);
 }
+/* ---------------- F4 · músculos por ejercicio y cobertura ---------------- */
+/* Músculos que publica el diccionario para una entrada de la biblioteca.
+   Si no hay entrada se dice «Sin clasificar»: no se adivina a partir del
+   grupo antiguo de ocho categorías, que no distingue cuádriceps de glúteo. */
+function muscleEntryForCatalogEntry(entry, d){
+  if(!entry) return null;
+  const data = d || dataFor(currentUser);
+  return muscleEntryForExercise({ name: entry.name, exId: entry.id }, data);
+}
+function muscleChipsHTML(entry, d){
+  if(!MUSCLE_DICT) return '';
+  const dict = muscleEntryForCatalogEntry(entry, d);
+  const shares = dict ? muscleShares(dict) : [];
+  if(!shares.length) return '<span class="ex-muscles"><span class="badge badge-warn">Sin clasificar</span></span>';
+  const chips = shares.map(sh => ({ id: sh.id, role: sh.role, label: groupLabel(sh.id) || sh.id }));
+  const primary = chips.filter(c => c.role === 'primary');
+  const secondary = chips.filter(c => c.role === 'secondary');
+  return '<span class="ex-muscles">'
+    + primary.map(c => `<span class="badge badge-accent">${esc(c.label)}</span>`).join('')
+    + secondary.map(c => `<span class="badge">${esc(c.label)}</span>`).join('')
+    + '</span>';
+}
+/* Cobertura real de la biblioteca del usuario (catálogo + ejercicios propios),
+   calculada con el mismo diccionario que reparte el volumen. */
+function libraryMuscleCoverage(d){
+  const data = d || dataFor(currentUser);
+  const list = allExerciseEntries(data);
+  const unclassified = [];
+  let classified = 0;
+  list.forEach(x => {
+    if(muscleEntryForCatalogEntry(x, data)) classified += 1;
+    else unclassified.push(x);
+  });
+  return { total: list.length, classified, unclassified };
+}
+function libraryCoverageHTML(d){
+  const cov = libraryMuscleCoverage(d || dataFor(currentUser));
+  const loading = MUSCLE_DICT_STATE === 'idle' || MUSCLE_DICT_STATE === 'loading';
+  const failed = MUSCLE_DICT_STATE === 'error';
+  const meta = MUSCLE_DICT
+    ? 'v' + esc(String(MUSCLE_DICT.version || '')) + ' · ' + Object.keys(MUSCLE_DICT.groups || {}).length + ' grupos · ' + Object.keys(MUSCLE_DICT.exercises || {}).length + ' ejercicios'
+    : '';
+  const pct = cov.total ? Math.round(cov.classified / cov.total * 100) : 0;
+  let body;
+  if(failed){
+    body = '<p class="muted small">No se pudo cargar el diccionario muscular: los ejercicios se muestran sin músculos y su volumen no se reparte.</p>'
+      + '<button class="btn btn-ghost btn-sm" type="button" data-action="muscle-retry">Reintentar</button>';
+  } else if(loading){
+    body = '<p class="muted small" role="status">Cargando las clasificaciones musculares publicadas…</p>';
+  } else {
+    body = '<p class="muted small">' + cov.classified + ' de ' + cov.total + ' ejercicios de tu biblioteca (' + pct + ' %) tienen músculos en el diccionario. Los que faltan se marcan como «Sin clasificar» y sus series no se reparten entre músculos.</p>'
+      + (cov.unclassified.length
+        ? '<details class="lib-unclassified"><summary>Sin clasificar (' + cov.unclassified.length + ')</summary><ul>'
+          + cov.unclassified.map(x => '<li>' + esc(x.name) + (x.custom ? ' <span class="tag-custom">propio</span>' : '') + '</li>').join('')
+          + '</ul></details>'
+        : '<p class="muted small">Todos los ejercicios de tu biblioteca están clasificados.</p>');
+  }
+  return '<section class="card lib-coverage">'
+    + '<div class="section-head"><h2>Cobertura del diccionario muscular</h2><span class="muted">' + meta + '</span></div>'
+    + body
+    + '</section>';
+}
+
 function renderLibrary(main){
   main.innerHTML = `
     <div class="page-head">
       <h1>Biblioteca de ejercicios</h1>
       <p class="muted">${EXERCISE_CATALOG.length} ejercicios con identificador estable y alias. Busca por nombre o alias y filtra por grupo muscular y material.</p>
     </div>
+    ${libraryCoverageHTML()}
     <div class="editor-card lib-card">
       <div class="field"><input id="lib-search" placeholder="Buscar por nombre o alias… p. ej. banca, RDL, dominadas" autocomplete="off" aria-label="Buscar ejercicio"></div>
       <div class="picker-filters">
@@ -4437,6 +4502,7 @@ function weekMuscleVolume(d, weekISO){
   const to = shiftISO(weekISO, 6);
   const map = new Map();
   let totalSets = 0, classifiedSets = 0, totalVolume = 0;
+  const unclassified = [];
   const add = (id, sets, volume) => {
     const cur = map.get(id) || { id, sets: 0, volume: 0 };
     cur.sets += sets;
@@ -4453,8 +4519,10 @@ function weekMuscleVolume(d, weekISO){
       totalVolume += t.volume;
       const shares = muscleBreakdownForExercise(ex, d);
       if(!shares.length){
-        /* El diccionario no lo clasifica: no se reparte a ciegas. */
+        /* El diccionario no lo clasifica: no se reparte a ciegas, pero sí se
+           guarda el nombre para poder decirlo en la interfaz. */
         add('sin-clasificar', t.sets, t.volume);
+        if(!unclassified.some(u => u.name === ex.name)) unclassified.push({ name: ex.name, sets: t.sets });
       } else {
         classifiedSets += t.sets;
         shares.forEach(sh => add(sh.id, t.sets * sh.weight, t.volume * sh.weight));
@@ -4468,6 +4536,7 @@ function weekMuscleVolume(d, weekISO){
     totalSets: Math.round(totalSets * 10) / 10,
     classifiedSets: Math.round(classifiedSets * 10) / 10,
     totalVolume: Math.round(totalVolume),
+    unclassified: unclassified.sort((a, b) => b.sets - a.sets),
   };
   return rows;
 }
@@ -4514,7 +4583,10 @@ function muscleVolumeCardHTML(d){
               </li>`;
               }).join('')}</ul>
               <p class="muted small">${fmtMuscleSets(meta.classifiedSets)} de ${fmtMuscleSets(meta.totalSets)} series efectivas clasificadas (${pct} %). ${meta.totalVolume ? esc(fmtKg(meta.totalVolume)) + ' kg de volumen total.' : ''} El reparto pondera primario 1 y secundario 0,5, y se ajusta para que cada serie sume una sola vez.</p>`
-              + (unclassified ? `<p class="muted small">${setCountLabel(unclassified.sets)} sin clasificar no se ${unclassified.sets === 1 ? 'reparte' : 'reparten'} entre músculos: el diccionario no las identifica.</p>` : '')
+              + (unclassified ? `<p class="muted small">${setCountLabel(unclassified.sets)} sin clasificar no se ${unclassified.sets === 1 ? 'reparte' : 'reparten'} entre músculos: el diccionario no las identifica.</p>`
+                + (meta.unclassified && meta.unclassified.length
+                  ? `<details class="mv-unknown"><summary>Ver los ejercicios sin clasificar</summary><ul>${meta.unclassified.map(u => `<li>${esc(u.name)} · ${setCountLabel(u.sets)}</li>`).join('')}</ul></details>`
+                  : '') : '')
             : '<p class="muted small">Esta semana todavía no hay series registradas. Completa una sesión y aquí verás el reparto por grupo muscular.</p>'}
     </section>`;
 }
