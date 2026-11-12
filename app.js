@@ -558,11 +558,11 @@ function syncErrorText(err){
       : '';
     return 'Otro dispositivo guardó antes (conflicto 409). Se combinará en el próximo intento; si tienes la app abierta en dos sitios, deja solo una.' + detalle;
   }
-  if(status === 413) return 'El servidor rechaza la copia porque supera el tamaño máximo (error 413). Exporta tus datos desde Ajustes y avísame para reducirla.';
+  if(status === 413) return 'El servidor rechaza la copia porque supera el tamaño máximo (error 413). Exporta tus datos desde Ajustes → Conexión y quita fotos o sesiones antiguas; después pulsa Sincronizar.';
   if(status === 429) return 'El servidor está limitando las peticiones (error 429). Espera un minuto y pulsa Sincronizar otra vez.';
-  if(status === 400) return 'El servidor rechazó los datos (error 400): ' + ((err && err.message) || 'formato no válido') + '. Tus cambios siguen en este dispositivo.';
-  if(status >= 500) return 'El servidor devolvió un error ' + status + '. Tus cambios siguen aquí; se reintentará automáticamente.';
-  if(status) return 'No se pudo sincronizar (error ' + status + '). Tus cambios siguen guardados en este dispositivo.';
+  if(status === 400) return 'El servidor rechazó los datos (error 400): ' + ((err && err.message) || 'formato no válido') + '. Tus cambios siguen en este dispositivo; pulsa Sincronizar para reintentar y, si se repite, exporta tus datos desde Ajustes → Conexión.';
+  if(status >= 500) return 'El servidor devolvió un error ' + status + '. Tus cambios siguen aquí y se reintentará solo; si continúa, pulsa Sincronizar en Ajustes → Conexión.';
+  if(status) return 'No se pudo sincronizar (error ' + status + '). Tus cambios siguen guardados en este dispositivo; pulsa Sincronizar en Ajustes → Conexión para reintentar.';
   return 'No se pudo sincronizar ahora. Tus cambios están guardados en este dispositivo y se enviarán solos al volver la conexión.';
 }
 function syncFailed(notify, jobId, err){
@@ -599,11 +599,11 @@ function notifySyncResult(result){
   else if(result.status === 'kept-local') toast('El servidor no devolvió la copia; tus datos locales siguen intactos. Se reintentará.', 'info');
   else if(result.status === 'pushed' || result.status === 'replayed') toast('Copia guardada en la nube.');
   else if(result.status === 'offline') toast('Sin conexión: tus cambios quedan guardados aquí.', 'info');
-  else if(syncPending()) toast('Quedan cambios pendientes de sincronizar.', 'info');
+  else if(syncPending()) toast('Quedan cambios pendientes de sincronizar: pulsa Sincronizar en Ajustes → Conexión.', 'info');
   else toast('Todo sincronizado.');
 }
 async function runSync(notify){
-  if(!isCloud()){ if(notify) toast('No hay sesión de nube activa.', 'error'); return false; }
+  if(!isCloud()){ if(notify) toast('No hay sesión de nube activa. Inicia sesión desde Ajustes → Conexión.', 'error'); return false; }
   if(state.sb.timer){ clearTimeout(state.sb.timer); state.sb.timer = null; }
   if(state.sb.retry){ clearTimeout(state.sb.retry); state.sb.retry = null; }
   const account = currentUser;
@@ -872,7 +872,7 @@ function formatSyncStamp(iso){
   catch(e){ return 'fecha desconocida'; }
 }
 async function openVersionHistory(){
-  if(!isCloud()){ toast('Necesitas una cuenta en la nube para ver versiones anteriores.', 'info'); return; }
+  if(!isCloud()){ toast('Necesitas una cuenta en la nube para ver versiones anteriores. Inicia sesión en Ajustes → Conexión.', 'info'); return; }
   toast('Buscando versiones anteriores…');
   let items = [];
   try{ items = await DrakoSB.dataHistory(); }
@@ -7917,9 +7917,15 @@ function renderOfflineBar(){
   } else if(offlineState.authExpired){
     text = 'Tu sesión de la nube caducó: vuelve a iniciar sesión para sincronizar.';
     tone = 'is-error';
-    action = '<button type="button" class="offline-btn" data-action="offline-details">Revisar</button>';
+    action = '<button type="button" class="offline-btn" data-action="offline-details">Iniciar sesión</button>';
   } else if(state.sb.status === 'syncing'){
     text = 'Sincronizando cambios…'; tone = 'is-syncing';
+  } else if(state.sb.status === 'conflict'){
+    /* Un 409 no es una caída: hay otro cliente escribiendo. Se ve el estado y
+       se ofrece reintentar sin esperar al temporizador. */
+    text = 'Otro dispositivo guardó antes: combinando los cambios…';
+    tone = 'is-pending';
+    action = '<button type="button" class="offline-btn" data-action="offline-retry">Reintentar</button>';
   } else if(conflicts){
     text = conflicts + ' cambio(s) en conflicto entre dispositivos.';
     tone = 'is-error';

@@ -64,6 +64,11 @@ const check = (name, cond, detail) => { if(cond){ pass++; console.log('  ok  ' +
 
   check('un 409 se explica como conflicto de dos dispositivos', /^Otro dispositivo/.test(g('syncErrorText({ status: 409 })')) && /409/.test(g('syncErrorText({ status: 409 })')));
 
+  check('los 4xx genéricos dicen qué hacer a continuación', /Sincronizar en Ajustes/.test(g("syncErrorText({ status: 418 })")));
+  check('el 400 incluye el motivo y una salida', /motivo del servidor/.test(g("syncErrorText({ status: 400, message: 'motivo del servidor' })")) && /Sincronizar/.test(g("syncErrorText({ status: 400, message: 'x' })")));
+  check('el 413 explica cómo reducir la copia', /Exporta tus datos/.test(g('syncErrorText({ status: 413 })')));
+  check('el 5xx tranquiliza y ofrece reintentar a mano', /se reintentará solo/.test(g('syncErrorText({ status: 503 })')) && /Sincronizar/.test(g('syncErrorText({ status: 503 })')));
+
   console.log(`\n${pass} ok, ${fail} fallo(s)`);
   process.exit(fail ? 1 : 0);
 })();
