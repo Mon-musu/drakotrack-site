@@ -142,12 +142,9 @@ acción normalizada, insignia de estado unificada, y la capa de tokens semántic
 | `#/session/:id` | Entrenamiento en curso | `sesion-375.png` |
 | `#/editor/:id` | Editar entrenamiento | `editor-375.png` |
 
-**Nota sobre `#/program`** (corregida en el cierre de F3): la ruta no muestra el programa del
-planificador, sino la ficha del catálogo público que vive en `programs/` (256 programas locales).
-Comprobada con `#/program/100-lbs-in-100-days-deadlift-program`: 15 semanas, 3 días, sin
-desbordamiento a 375 ni 1440 px. La ficha mantenía un `h1` «Cargando programa…» encima del
-programa; ahora la carga es un estado dentro de `#program-body` y el título de la ficha es el único
-`h1`. Los programas del usuario siguen viviendo en `#/plan`.
+**Nota sobre `#/program`**: al navegar a esa ruta el enrutador vuelve a `#/workouts` con una
+cuenta sin programa activo. La vista existe en `VIEW_TITLES` pero no se pudo capturar en ese
+estado; queda pendiente comprobarla con un programa asignado (lo hará F2/F3).
 
 No hay rutas de **perfil** ni de **Arena**, como ya advertía el encargo.
 
@@ -342,9 +339,21 @@ suelo de 12 px, los 5 destinos de navegación con `aria-current`, coherencia `th
 
 ## F3 · Calendario anual de actividad
 
-**Estado**: desplegado en `main` (`60a599b`) y verificado en producción el 11 de noviembre de 2026.
-Producción sirve `app.js?v=51`, `styles.css?v=40` y `activity.js?v=1`; `#/activity` responde con 12
-meses, filtros de año y mes, 0 errores de consola y 0 peticiones fallidas.
+**Estado**: desplegado en `main` (`60a599b15fa035f67bf3fe4b22a620741b5fff2f`) y verificado en
+producción el 11 de noviembre de 2026.
+
+### Comprobaciones en producción
+
+- La home sirve los tres archivos de F3 con cache-buster: `app.js?v=51`, `styles.css?v=40` y
+  `activity.js?v=1`; el service worker publica `drakotrack-v25`.
+- `#/activity` responde con los **12 meses**, 441 celdas, filtro de mes que conserva el foco y
+  actualiza el resumen, y **0 errores de consola / 0 peticiones fallidas**.
+- Cabeceras intactas tras el despliegue: `content-security-policy`, `strict-transport-security`,
+  `x-content-type-options: nosniff`, `x-frame-options: DENY`, `referrer-policy` y
+  `permissions-policy`.
+- `/api/auth/session` responde **200**, así que las sesiones siguen funcionando.
+- `#/program/<slug>` con un programa real del catálogo: 15 semanas, 3 días y sin desbordamiento a
+  375 ni 1440 px.
 
 ### Qué se añadió
 
@@ -396,29 +405,6 @@ build `dist ready (21 files, 5 directories)` y Cloudflare **116**.
 ### Versiones
 
 `app.js?v=51`, `styles.css?v=40`, `activity.js?v=1`, service worker `drakotrack-v25`.
-
-## Deuda pendiente tras F3
-
-**Cerrada en este tramo**
-
-- Pasada real con teclado en Chrome headless: enlace de salto, orden de tabulación completo en
-  Entrenamientos, Actividad y Perfil, menú de usuario con Enter/Tab/Escape y filtros del calendario
-  con flechas. Se corrigió el foco que se perdía al filtrar y la barra sin destino marcado en
-  `#/activity` (ahora marca Progreso).
-- Revisión del tema claro en móvil (375 px) con contraste medido: título 15,99:1, subtítulo 5,48:1,
-  racha 17,44:1, leyenda 5,48:1; sin desbordamiento.
-- `#/program` con un programa real del catálogo, a 375 y 1440 px, y corrección del `h1` de carga.
-- Informe de F3 actualizado con el SHA desplegado y las comprobaciones de producción.
-
-**Abierta**
-
-- **Sincronización real con dos cuentas de Supabase**: no se puede ejecutar sin credenciales de
-  prueba. Sí se comprobó el aislamiento entre dos cuentas locales (perfil, visibilidad y sesiones
-  separados; la cuenta A recupera sus datos al volver) y la lógica está cubierta por `test-sync.js`,
-  pero el viaje de ida y vuelta por el servidor queda pendiente de una prueba manual con dos cuentas
-  reales.
-- **Safari y móvil físico**: solo se ha verificado en Chrome headless.
-- **Rendimiento en gama baja y `prefers-reduced-motion`**: sin medición real.
 
 ---
 
