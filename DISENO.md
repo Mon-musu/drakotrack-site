@@ -410,6 +410,22 @@ build `dist ready (21 files, 5 directories)` y Cloudflare **116**.
 
 # F4 — Diccionario muscular: cobertura y «sin clasificar»
 
+**Estado**: desplegado en `main` (`cc68915`) y verificado en producción el 12 de noviembre de 2026.
+
+### Comprobaciones en producción
+
+- El índice sirve `app.js?v=52`, `styles.css?v=41` y `activity.js?v=1`, y el service worker publica
+  `drakotrack-v26`. El `app.js` publicado incluye el panel de cobertura y el CSS publicado incluye
+  `.lib-coverage`, así que no cambió solo el cache-buster.
+- `#/library` (375 px, cuenta local de usar y tirar): panel «Cobertura del diccionario muscular» con
+  **43 de 48 ejercicios (90 %)**, 48 filas con sus 48 insignias de músculos y **5 marcadas «Sin
+  clasificar»**.
+- `#/activity`: **12 meses** y **441 días** con el día de hoy marcado, sin regresión respecto a F3.
+- `#/progress`: mapa muscular con las series sin clasificar y el desplegable con el nombre del
+  ejercicio que las produjo.
+- **0 desbordamiento horizontal**, **0 errores de consola** y **0 respuestas HTTP ≥ 400**; las seis
+  cabeceras siguen intactas y `/api/auth/session` responde **200**.
+
 ## Qué cambia
 
 - **Músculos por ejercicio en la biblioteca**: cada entrada de la lista (y del selector de
