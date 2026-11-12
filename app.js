@@ -146,7 +146,7 @@ const CUSTOM_PREFIX = 'custom:';
 
 /* Diccionario muscular publicado. Es la fuente única para el mapa: no se
    deduce el músculo desde el grupo antiguo de la biblioteca. */
-const MUSCLE_DICT_URL = 'data/muscles.json?v=2';
+const MUSCLE_DICT_URL = 'data/muscles.json?v=3';
 const MUSCLE_PRIMARY_WEIGHT = 1;
 const MUSCLE_SECONDARY_WEIGHT = 0.5;
 let MUSCLE_DICT = null;

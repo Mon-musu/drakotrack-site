@@ -177,7 +177,7 @@ hoy la portada interna es prácticamente una lista infinita.
 
 ## 7. Activos que ya están en el repositorio
 
-- `data/muscles.json` — **v2, 606 ejercicios, 16 grupos, 10 patrones**, con `primary`,
+- `data/muscles.json` — **v3, 612 ejercicios, 16 grupos, 10 patrones**, con `primary`,
   `secondary` y `pattern` por ejercicio, más normalización. F4 no parte de cero: hay que
   comprobar cobertura y honestidad del «sin clasificar», no inventar el diccionario.
 - `vendor/swiper/` — Swiper 11 servido desde el propio sitio (sin CDN), usado en la portada.
@@ -458,7 +458,7 @@ lista de lo que falta.
 
 ## Pruebas
 
-`test-muscle-ui.js` (nuevo, **20 aserciones**, dentro de `npm test`): chips de press de banca y
+`test-muscle-ui.js` (nuevo, **21 aserciones**, dentro de `npm test`): chips de press de banca y
 sentadilla, «Sin clasificar» para un nombre desconocido, cobertura que suma clasificados + sin
 clasificar, panel de cobertura con versión y lista, insignia en la fila del ejercicio propio, y
 mapa semanal que cuenta las series sin clasificar sin repartirlas y muestra el nombre concreto.
@@ -466,3 +466,12 @@ mapa semanal que cuenta las series sin clasificar sin repartirlas y muestra el n
 ## Versiones
 
 `app.js?v=52`, `styles.css?v=41`, service worker `drakotrack-v26`.
+
+## Cierre de cobertura (12 de noviembre de 2026)
+
+- El diccionario pasa a **v3, 612 entradas** (antes 606): se añadieron `press declinado`,
+  `aperturas` / `aperturas con`, `fondos en banco`, `thruster` y `burpee`, que eran los cinco
+  ejercicios del catálogo local que la interfaz marcaba como «Sin clasificar».
+- La biblioteca del catálogo queda al **100 % (48 de 48)**. `test-muscles.js` fija esas cinco
+  clasificaciones y `test-muscle-ui.js` comprueba que no queda ninguna sin clasificar.
+- `app.js?v=53`, `styles.css?v=41`, service worker `drakotrack-v27`, `data/muscles.json?v=3`.

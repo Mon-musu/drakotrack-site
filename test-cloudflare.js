@@ -44,8 +44,8 @@ ok(fs.existsSync(path.join(dist, 'apk/version.json')), 'dist APK feed exists');
 ok(fs.existsSync(path.join(dist, 'programs/index.json')), 'dist program catalogue exists');
 ok(fs.existsSync(path.join(dist, 'data/muscles.json')), 'dist muscle dictionary exists');
 const distMuscles = JSON.parse(read('dist/data/muscles.json'));
-ok(Object.keys(distMuscles.exercises || {}).length === 606,
-  'dist muscle dictionary keeps 606 entries');
+ok(Object.keys(distMuscles.exercises || {}).length === 612,
+  'dist muscle dictionary keeps 612 entries');
 ok(fs.existsSync(path.join(dist, 'icons/icon-192.png')), 'dist icon exists');
 ok(fs.existsSync(path.join(dist, 'sounds/rest-alarm.mp3')), 'dist sound exists');
 

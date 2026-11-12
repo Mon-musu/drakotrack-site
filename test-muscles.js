@@ -1,7 +1,7 @@
 'use strict';
 /* Prueba de contrato del diccionario muscular publicado.
    Sirve el mismo archivo que consume la app, lo pide con ?v=2 y comprueba
-   que la respuesta conserva las 606 entradas y que todas sus referencias
+   que la respuesta conserva las 612 entradas y que todas sus referencias
    (grupos y patrones) son válidas. */
 const fs = require('fs');
 const http = require('http');
@@ -9,7 +9,7 @@ const path = require('path');
 
 const ROOT = __dirname;
 const FILE = path.join(ROOT, 'data', 'muscles.json');
-const EXPECTED_EXERCISES = 606;
+const EXPECTED_EXERCISES = 612;
 const EXPECTED_GROUPS = 16;
 const EXPECTED_PATTERNS = 10;
 
@@ -77,13 +77,13 @@ async function main() {
   const exercises = data && typeof data.exercises === 'object' ? data.exercises : {};
   const entries = Object.entries(exercises);
 
-  check('conserva exactamente 606 entradas', entries.length === EXPECTED_EXERCISES,
+  check('conserva exactamente 612 entradas', entries.length === EXPECTED_EXERCISES,
     entries.length + ' entradas');
   check('conserva los 16 grupos musculares', Object.keys(groups).length === EXPECTED_GROUPS,
     Object.keys(groups).length + ' grupos');
   check('conserva los 10 patrones de movimiento', Object.keys(patterns).length === EXPECTED_PATTERNS,
     Object.keys(patterns).length + ' patrones');
-  check('la versión publicada es la 2', data.version === 2, 'versión ' + data.version);
+  check('la versión publicada es la 3', data.version === 3, 'versión ' + data.version);
 
   const errors = [];
   for (const [key, entry] of entries) {
@@ -112,6 +112,17 @@ async function main() {
   check('la clasificación de sentadilla trasera responde como se publicó',
     !!squat && squat.primary.join(',') === 'cuadriceps'
     && (squat.secondary || []).includes('gluteos'));
+
+  const nuevos = {
+    'press declinado': 'pecho',
+    'aperturas con': 'pecho',
+    'fondos en banco': 'triceps',
+    'thruster': 'cuadriceps',
+    'burpee': 'cuadriceps',
+  };
+  const faltan = Object.keys(nuevos).filter(k => !exercises[k] || exercises[k].primary[0] !== nuevos[k]);
+  check('los ejercicios que antes quedaban sin clasificar ya tienen primario', faltan.length === 0,
+    faltan.join(', '));
 
   console.log('\npassed: ' + pass + ' failed: ' + fail);
   process.exit(fail ? 1 : 0);

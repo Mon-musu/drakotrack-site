@@ -45,6 +45,7 @@ check('la cobertura suma clasificados y sin clasificar', cov.classified + cov.un
 check('el catálogo tiene ejercicios', cov.total > 20);
 check('la cobertura no inventa clasificaciones', cov.classified > 0 && cov.classified <= cov.total);
 check('cada sin clasificar tiene nombre', cov.unclassified.every(x => x && typeof x.name === 'string' && x.name));
+check('la biblioteca del catálogo queda entera clasificada', cov.unclassified.length === 0, cov.unclassified.map(x => x.name).join(', '));
 
 (async () => {
   const user = 'mus_' + Date.now().toString(36).slice(-5);
@@ -58,7 +59,7 @@ check('cada sin clasificar tiene nombre', cov.unclassified.every(x => x && typeo
   g("nav('#/library')"); await tick(90);
   check('la biblioteca muestra el panel de cobertura', !!$('#main .lib-coverage'));
   check('la cobertura dice cuántos ejercicios están clasificados', /ejercicios de tu biblioteca/.test($('#main .lib-coverage').textContent));
-  check('el diccionario cargado indica versión y grupos', /v2/.test($('#main .lib-coverage').textContent));
+  check('el diccionario cargado indica versión y grupos', /v3/.test($('#main .lib-coverage').textContent));
   check('hay una lista de sin clasificar', !!$('#main .lib-unclassified'));
   check('el ejercicio propio sin clasificar aparece en la lista', /Ejercicio rarísimo XYZ/.test($('#main .lib-coverage').textContent));
   check('la fila del ejercicio propio lleva su insignia', /Sin clasificar/.test($('#main #lib-list').textContent));

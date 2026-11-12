@@ -71,7 +71,7 @@ const tick = ms => new Promise(r => setTimeout(r, ms));
 
   const dictLoaded = await g('loadMuscleDictionary()');
   check('the published muscle dictionary loads', dictLoaded === true && g('MUSCLE_DICT_STATE') === 'ready'
-    && g("Object.keys(MUSCLE_DICT.exercises).length") === 606);
+    && g("Object.keys(MUSCLE_DICT.exercises).length") === 612);
   check('muscle normalization matches the published keys', g("normalizeMuscleName('Bench Press (Barbell)')") === 'bench press');
   check('dictionary groups and labels are available to the UI', g("groupLabel('cuadriceps')") === 'Cuádriceps'
     && g("muscleBreakdownForKey('press-de-banca', null).length") === 3);
