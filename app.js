@@ -547,14 +547,27 @@ function syncAuthExpired(notify){
   renderOfflineBar();
   return false;
 }
-function syncFailed(notify, jobId){
+/* Traduce el fallo real a un mensaje que diga qué está pasando: el aviso
+   genérico de «sin conexión» ocultaba 400/413/429/5xx y dejaba al usuario sin
+   ninguna pista para arreglarlo. */
+function syncErrorText(err){
+  const status = err && err.status;
+  if(status === 413) return 'El servidor rechaza la copia porque supera el tamaño máximo (error 413). Exporta tus datos desde Ajustes y avísame para reducirla.';
+  if(status === 429) return 'El servidor está limitando las peticiones (error 429). Espera un minuto y pulsa Sincronizar otra vez.';
+  if(status === 400) return 'El servidor rechazó los datos (error 400): ' + ((err && err.message) || 'formato no válido') + '. Tus cambios siguen en este dispositivo.';
+  if(status >= 500) return 'El servidor devolvió un error ' + status + '. Tus cambios siguen aquí; se reintentará automáticamente.';
+  if(status) return 'No se pudo sincronizar (error ' + status + '). Tus cambios siguen guardados en este dispositivo.';
+  return 'No se pudo sincronizar ahora. Tus cambios están guardados en este dispositivo y se enviarán solos al volver la conexión.';
+}
+function syncFailed(notify, jobId, err){
   state.sb.status = 'offline';
+  state.sb.lastError = { status: (err && err.status) || 0, at: Date.now() };
   state.sb.attempts = (state.sb.attempts || 0) + 1;
   let delay = Math.min(30000, Math.pow(2, state.sb.attempts) * 2000);
   try{ if(jobId){ const queued = opQueue.retry(jobId, 'network'); if(queued && queued.nextAt) delay = Math.max(1000, queued.nextAt - Date.now()); } }catch(e){}
   if(state.sb.retry) clearTimeout(state.sb.retry);
   state.sb.retry = setTimeout(() => { state.sb.retry = null; if(isCloud()) runSync(false); }, delay);
-  if(notify) toast('No se pudo sincronizar ahora. Tus cambios están guardados en este dispositivo y se enviarán solos al volver la conexión.', 'error');
+  if(notify) toast(syncErrorText(err), 'error');
   renderHeader();
   renderOfflineBar();
   return false;
@@ -583,7 +596,7 @@ async function runSync(notify){
     result = await cloudSync.sync(account, dataFor(account));
   }catch(err){
     if(err && err.status === 401) return syncAuthExpired(notify);
-    return syncFailed(notify, job ? job.id : null);
+    return syncFailed(notify, job ? job.id : null, err);
   }
   if(currentUser !== account){
     /* La cuenta cambió mientras la petición estaba en vuelo: cerrar su trabajo
@@ -599,7 +612,7 @@ async function runSync(notify){
       result = await cloudSync.sync(account, dataFor(account));
     }catch(err){
       if(err && err.status === 401) return syncAuthExpired(notify);
-      return syncFailed(notify, job ? job.id : null);
+      return syncFailed(notify, job ? job.id : null, err);
     }
     if(currentUser !== account){
       try{ finishSyncJob(job, cloudSync.state(account) || {}); }catch(e){}
@@ -610,7 +623,7 @@ async function runSync(notify){
   const st = cloudSync.state(account) || {};
   finishSyncJob(job, st);
   if((st.conflicts || []).length) state.sb.status = 'conflict';
-  else { state.sb.status = 'ok'; state.sb.last = Date.now(); state.sb.attempts = 0; offlineState.authExpired = false; }
+  else { state.sb.status = 'ok'; state.sb.last = Date.now(); state.sb.attempts = 0; offlineState.authExpired = false; state.sb.lastError = null; }
   /* Si se guardó algo mientras la petición estaba en vuelo, el estado no puede
      decir «todo sincronizado»: se marca pendiente y se envía en el próximo tick. */
   if(!st.dirty && st.digest && currentUser === account){
@@ -7966,6 +7979,7 @@ function offlineSettingsHTML(){
     + '<div><span class="muted">Modo</span><b>' + (isStandaloneApp() ? 'Instalada' : 'Navegador') + '</b></div>'
     + '</div>'
     + (stats.lastError ? '<p class="muted small">Último aviso: ' + esc(stats.lastError) + '</p>' : '')
+    + (st.lastError ? '<p class="muted small">Último error de sincronización: HTTP ' + esc(String(st.lastError.status || 'sin respuesta')) + ' · ' + esc(offlineTime(st.lastError.at)) + '</p>' : '')
     + '<div class="offline-actions">'
     + '<button type="button" class="btn btn-ghost btn-sm" data-action="offline-check">Comprobar conexión</button>'
     + (cloud ? '<button type="button" class="btn btn-ghost btn-sm" data-action="offline-retry">Sincronizar ahora</button>' : '')

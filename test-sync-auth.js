@@ -55,6 +55,13 @@ const check = (name, cond, detail) => { if(cond){ pass++; console.log('  ok  ' +
   check('la actualización avisa de la sesión y no del genérico', /sesión de la nube caducó/i.test(
     g("(function(){ const s = currentUser ? (cloudSync.state(currentUser) || {}) : {}; const d = Offline.updateDecision({ hasActiveSession:false, pending: offlinePendingTotal(), conflicts: 0 }); return d.defer ? (offlineState.authExpired ? 'sesión de la nube caducó' : 'pendientes') : 'permite'; })()")));
 
+  /* Los fallos que no son de red se explican con su código. */
+  check('un 413 avisa del tamaño máximo', /413/.test(g('syncErrorText({ status: 413 })')));
+  check('un 429 pide esperar', /429/.test(g('syncErrorText({ status: 429 })')));
+  check('un 500 muestra el código y no «sin conexión»', /500/.test(g('syncErrorText({ status: 500 })')) && !/volver la conexión/.test(g('syncErrorText({ status: 500 })')));
+  check('un 400 incluye el motivo del servidor', /invalid_data/.test(g("syncErrorText({ status: 400, message: 'invalid_data' })")));
+  check('el error queda registrado para Ajustes', (() => { g('state.sb.lastError = { status: 500, at: Date.now() }'); return g('state.sb.lastError.status') === 500; })());
+
   console.log(`\n${pass} ok, ${fail} fallo(s)`);
   process.exit(fail ? 1 : 0);
 })();

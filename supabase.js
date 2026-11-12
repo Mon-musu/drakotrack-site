@@ -113,7 +113,7 @@ window.DrakoSB = (function () {
       throw conflict;
     }
     if (!response.ok) {
-      const error = new Error((result && result.message) || 'No se pudo guardar la copia.');
+      const error = new Error((result && (result.message || result.error)) || 'No se pudo guardar la copia.');
       error.status = response.status;
       throw error;
     }
