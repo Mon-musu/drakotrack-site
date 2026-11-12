@@ -488,3 +488,13 @@ mapa semanal que cuenta las series sin clasificar sin repartirlas y muestra el n
   pestaña propia del dominio para que el acceso y la sincronización funcionen.
 - `test-sync-auth.js` (8 aserciones, dentro de `npm test`) cubre el 401: estado `auth`, aviso
   correcto, sin reintento programado, cambios pendientes intactos y mensaje de actualización.
+
+## Conflictos de sincronización (409)
+
+- Un **409** ya no se muestra como «no se pudo sincronizar»: significa que otro dispositivo guardó
+  entre la lectura y la escritura. El motor combina, y si tras combinar no queda nada distinto de lo
+  que ya tiene el servidor, **no vuelve a subir** (antes reenviaba lo mismo y el conflicto se
+  repetía indefinidamente entre dos pestañas abiertas).
+- El aviso explica el conflicto, se reintenta en dos segundos y no se marca como error permanente.
+- Recomendación operativa: usar **una sola pestaña** de la app a la vez; el panel de vista previa y
+  una pestaña normal compiten por la misma revisión.

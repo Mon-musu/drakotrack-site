@@ -693,6 +693,20 @@
             const merged = merge(st.digest, doc, remoteData);
             st.rev = Number.isInteger(current.rev) ? current.rev : st.rev;
             st.digest = digest(remoteData);
+            /* Si al combinar no queda nada distinto de lo que ya tiene el
+               servidor, no se vuelve a subir: empujar lo mismo otra vez solo
+               produce otro 409 (dos pestañas guardando a la vez se turnaban el
+               conflicto indefinidamente). */
+            if (same(merged.data, remoteData)) {
+              st.dirty = false;
+              st.opId = null;
+              st.lastSync = now();
+              persist(account, Object.assign(st, {
+                conflicts: mergeConflicts(st.conflicts, merged.conflicts),
+                lastError: null,
+              }));
+              return { status: 'pulled', rev: st.rev, data: merged.data, conflicts: merged.conflicts, needsPush: false };
+            }
             persist(account, Object.assign(st, {
               conflicts: mergeConflicts(st.conflicts, merged.conflicts),
               dirty: true, lastError: null,

@@ -552,6 +552,7 @@ function syncAuthExpired(notify){
    ninguna pista para arreglarlo. */
 function syncErrorText(err){
   const status = err && err.status;
+  if(status === 409) return 'Otro dispositivo guardó antes (conflicto 409). Se combinará en el próximo intento; si tienes la app abierta en dos sitios, deja solo una.';
   if(status === 413) return 'El servidor rechaza la copia porque supera el tamaño máximo (error 413). Exporta tus datos desde Ajustes y avísame para reducirla.';
   if(status === 429) return 'El servidor está limitando las peticiones (error 429). Espera un minuto y pulsa Sincronizar otra vez.';
   if(status === 400) return 'El servidor rechazó los datos (error 400): ' + ((err && err.message) || 'formato no válido') + '. Tus cambios siguen en este dispositivo.';
@@ -560,6 +561,18 @@ function syncErrorText(err){
   return 'No se pudo sincronizar ahora. Tus cambios están guardados en este dispositivo y se enviarán solos al volver la conexión.';
 }
 function syncFailed(notify, jobId, err){
+  /* Un conflicto no es un fallo: es otro dispositivo guardando a la vez. Se
+     reintenta, se combina y se avisa sin marcarlo como error permanente. */
+  if(err && err.status === 409){
+    state.sb.attempts = 0;
+    state.sb.status = 'conflict';
+    if(state.sb.retry) clearTimeout(state.sb.retry);
+    state.sb.retry = setTimeout(() => { state.sb.retry = null; if(isCloud()) runSync(false); }, 2000);
+    if(notify) toast(syncErrorText(err), 'info');
+    renderHeader();
+    renderOfflineBar();
+    return false;
+  }
   state.sb.status = 'offline';
   state.sb.lastError = { status: (err && err.status) || 0, at: Date.now() };
   state.sb.attempts = (state.sb.attempts || 0) + 1;

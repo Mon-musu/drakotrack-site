@@ -62,6 +62,8 @@ const check = (name, cond, detail) => { if(cond){ pass++; console.log('  ok  ' +
   check('un 400 incluye el motivo del servidor', /invalid_data/.test(g("syncErrorText({ status: 400, message: 'invalid_data' })")));
   check('el error queda registrado para Ajustes', (() => { g('state.sb.lastError = { status: 500, at: Date.now() }'); return g('state.sb.lastError.status') === 500; })());
 
+  check('un 409 se explica como conflicto de dos dispositivos', /^Otro dispositivo/.test(g('syncErrorText({ status: 409 })')) && /409/.test(g('syncErrorText({ status: 409 })')));
+
   console.log(`\n${pass} ok, ${fail} fallo(s)`);
   process.exit(fail ? 1 : 0);
 })();
