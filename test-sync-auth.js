@@ -69,6 +69,8 @@ const check = (name, cond, detail) => { if(cond){ pass++; console.log('  ok  ' +
   check('el 413 explica cómo reducir la copia', /Exporta tus datos/.test(g('syncErrorText({ status: 413 })')));
   check('el 5xx tranquiliza y ofrece reintentar a mano', /se reintentará solo/.test(g('syncErrorText({ status: 503 })')) && /Sincronizar/.test(g('syncErrorText({ status: 503 })')));
 
+  check('un 409 con rev 0 y base nula no culpa a otro dispositivo', /ficha vacía/.test(g('syncErrorText({ status: 409, rev: 0, baseRev: null })')));
+
   console.log(`\n${pass} ok, ${fail} fallo(s)`);
   process.exit(fail ? 1 : 0);
 })();

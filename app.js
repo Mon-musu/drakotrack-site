@@ -552,6 +552,11 @@ function syncAuthExpired(notify){
    ninguna pista para arreglarlo. */
 function syncErrorText(err){
   const status = err && err.status;
+  if(status === 409 && err && err.rev === 0 && err.baseRev === null) {
+    /* No es otro dispositivo: es una ficha vacía de una versión anterior que
+       impide el primer envío. Decirlo así evita buscar culpables donde no hay. */
+    return 'La nube guarda una ficha vacía de una versión anterior de la app (revisión 0), así que el primer envío aún no ha entrado. Se está preparando el envío completo con los datos de este dispositivo.';
+  }
   if(status === 409) {
     const detalle = (Number.isInteger(err && err.rev) || Number.isInteger(err && err.baseRev))
       ? ' Servidor: rev ' + ((err && Number.isInteger(err.rev)) ? err.rev : '?') + ' · enviado sobre: rev ' + ((err && Number.isInteger(err.baseRev)) ? err.baseRev : '?') + '.'
