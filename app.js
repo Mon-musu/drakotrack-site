@@ -7996,6 +7996,41 @@ async function retryOfflineNow(){
   renderOfflineBar();
   return true;
 }
+/* Qué versión tiene cargada de verdad el navegador: los scripts llevan ?v= en
+   la URL justo para forzar la descarga, así que el <script> dice qué se está
+   ejecutando. El service worker guarda su propia caché con nombre versionado. */
+function loadedVersion(prefix){
+  const el = document.querySelector('script[src^="' + prefix + '"]');
+  const src = el ? (el.getAttribute('src') || '') : '';
+  const m = /[?&]v=([0-9]+)/.exec(src);
+  return m ? m[1] : '—';
+}
+async function checkVersions(){
+  const line = $('#ver-check');
+  const app = loadedVersion('app.js');
+  const engine = loadedVersion('sync.js');
+  let cache = 'sin caché';
+  try{
+    const keys = await caches.keys();
+    const mine = keys.filter(k => k.indexOf('drakotrack-') === 0).sort();
+    if(mine.length) cache = mine[mine.length - 1].replace('drakotrack-', '');
+  }catch(e){}
+  let published = '';
+  try{
+    const res = await fetch('sw.js?check=' + Date.now(), { cache: 'no-store' });
+    if(res.ok){
+      const text = await res.text();
+      const m = /drakotrack-v([0-9]+)/.exec(text);
+      if(m) published = 'v' + m[1];
+    }
+  }catch(e){}
+  const alDia = Boolean(published) && published === cache;
+  const texto = 'Versión cargada: app ' + app + ' · motor de sincronización ' + engine + ' · caché ' + cache
+    + (published ? ' · publicada ' + published + (alDia ? ' (al día).' : ' (hay una versión nueva: recarga con Ctrl+F5).') : ' · no se pudo consultar la publicada.');
+  if(line) line.textContent = texto;
+  toast(published ? (alDia ? 'La app está al día (' + published + ').' : 'Hay una versión nueva: recarga con Ctrl+F5.') : 'No se pudo consultar la versión publicada.', published && alDia ? 'info' : 'error');
+  return texto;
+}
 function offlineSettingsHTML(){
   if(!currentUser) return '';
   const stats = queueStatsSafe(currentUser);
@@ -8016,6 +8051,8 @@ function offlineSettingsHTML(){
     + '<div><span class="muted">Última sincronización</span><b>' + esc(offlineTime(last)) + '</b></div>'
     + '<div><span class="muted">Cola persistente</span><b>' + (stats.total ? stats.total + ' operación(es)' : 'Vacía') + '</b></div>'
     + '<div><span class="muted">Modo</span><b>' + (isStandaloneApp() ? 'Instalada' : 'Navegador') + '</b></div>'
+    + '<div><span class="muted">App</span><b>' + esc(loadedVersion('app.js')) + '</b></div>'
+    + '<div><span class="muted">Motor de sincronización</span><b>' + esc(loadedVersion('sync.js')) + '</b></div>'
     + '</div>'
     + (stats.lastError ? '<p class="muted small">Último aviso: ' + esc(stats.lastError) + '</p>' : '')
     + (st.lastError ? '<p class="muted small">Último error de sincronización: HTTP ' + esc(String(st.lastError.status || 'sin respuesta'))
@@ -8023,7 +8060,9 @@ function offlineSettingsHTML(){
         ? ' · revisión del servidor ' + esc(String(st.lastError.rev === null ? '?' : st.lastError.rev))
           + ' · revisión enviada ' + esc(String(st.lastError.baseRev === null ? '?' : st.lastError.baseRev)) : '')
       + ' · ' + esc(offlineTime(st.lastError.at)) + '</p>' : '')
+    + '<p class="muted small" id="ver-check"></p>'
     + '<div class="offline-actions">'
+    + '<button type="button" class="btn btn-ghost btn-sm" data-action="version-check">Comprobar versión</button>'
     + '<button type="button" class="btn btn-ghost btn-sm" data-action="offline-check">Comprobar conexión</button>'
     + (cloud ? '<button type="button" class="btn btn-ghost btn-sm" data-action="offline-retry">Sincronizar ahora</button>' : '')
     + (stats.confirmed ? '<button type="button" class="btn btn-ghost btn-sm" data-action="offline-clear-confirmed">Limpiar confirmadas</button>' : '')
@@ -8039,6 +8078,7 @@ function offlineSettingsHTML(){
 function offlineAction(action, el){
   if(action === 'offline-retry'){ retryOfflineNow(); return true; }
   if(action === 'offline-details'){ nav('#/settings'); return true; }
+  if(action === 'version-check'){ checkVersions(); return true; }
   if(action === 'offline-check'){
     handleConnectivity('manual').then(ok => toast(ok ? 'Conexión con el servidor confirmada.' : 'Sin conexión con el servidor. Los datos siguen guardados aquí.', ok ? 'info' : 'error'));
     return true;
