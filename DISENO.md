@@ -475,3 +475,16 @@ mapa semanal que cuenta las series sin clasificar sin repartirlas y muestra el n
 - La biblioteca del catálogo queda al **100 % (48 de 48)**. `test-muscles.js` fija esas cinco
   clasificaciones y `test-muscle-ui.js` comprueba que no queda ninguna sin clasificar.
 - `app.js?v=53`, `styles.css?v=41`, service worker `drakotrack-v27`, `data/muscles.json?v=3`.
+
+## Sesión de nube caducada y actualizaciones
+
+- Un **401** del servidor durante la sincronización ya no se confunde con una caída de red: la app
+  deja de reintentar en bucle, muestra «Tu sesión de la nube caducó…» en el aviso y en la barra de
+  estado, y mantiene los cambios guardados en el dispositivo.
+- El bloqueo de «Actualizar» ahora distingue ese caso del simple retraso de sincronización, así que
+  el mensaje dice qué hacer en vez de pedir una sincronización que no puede funcionar.
+- Motivo frecuente: la cookie de sesión es `SameSite=Strict`, así que **no se envía dentro de un
+  iframe de otro origen** (por ejemplo, un panel de vista previa). La app debe abrirse en una
+  pestaña propia del dominio para que el acceso y la sincronización funcionen.
+- `test-sync-auth.js` (8 aserciones, dentro de `npm test`) cubre el 401: estado `auth`, aviso
+  correcto, sin reintento programado, cambios pendientes intactos y mensaje de actualización.

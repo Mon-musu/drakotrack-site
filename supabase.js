@@ -84,7 +84,12 @@ window.DrakoSB = (function () {
   async function loadData() {
     if (!hasSession()) return null;
     const { response, data } = await request('/data/profile', { method: 'GET' });
-    if (!response.ok) throw new Error((data && data.message) || 'No se pudo leer la copia guardada.');
+    if (!response.ok) {
+      /* .status permite distinguir una sesión caducada (401) de un fallo de red. */
+      const error = new Error((data && data.message) || 'No se pudo leer la copia guardada.');
+      error.status = response.status;
+      throw error;
+    }
     if (!data || data.data === null || data.data === undefined) return null;
     return {
       data: data.data,

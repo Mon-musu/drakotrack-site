@@ -492,7 +492,7 @@ const opQueue = Offline.createQueue({ storage: syncStore });
 const offlineState = {
   online: typeof navigator === 'undefined' || navigator.onLine !== false,
   checking: null, lastCheck: 0, installPrompt: null, updateReady: false,
-  deferredUpdate: false, storageError: false, sw: null, refreshing: false,
+  deferredUpdate: false, storageError: false, authExpired: false, sw: null, refreshing: false,
 };
 const SW_ROLLBACK_KEY = 'draktrack_sw_rollback_done_v1';
 const SW_CACHE_PREFIX = 'drakotrack-';
@@ -535,6 +535,18 @@ function scheduleCloudSync(){
   queueSync();
   renderHeader();
 }
+/* 401 del servidor: la cookie de sesión no llegó o caducó (por ejemplo, dentro
+   de un iframe de otro origen, donde SameSite=Strict no se envía). No es un
+   fallo de red: reintentar en bucle no arregla nada y el usuario debe saberlo. */
+function syncAuthExpired(notify){
+  state.sb.status = 'auth';
+  state.sb.attempts = 0;
+  offlineState.authExpired = true;
+  if(notify) toast('Tu sesión de la nube caducó. Vuelve a iniciar sesión para sincronizar; tus cambios siguen guardados en este dispositivo.', 'error');
+  renderHeader();
+  renderOfflineBar();
+  return false;
+}
 function syncFailed(notify, jobId){
   state.sb.status = 'offline';
   state.sb.attempts = (state.sb.attempts || 0) + 1;
@@ -570,6 +582,7 @@ async function runSync(notify){
   try{
     result = await cloudSync.sync(account, dataFor(account));
   }catch(err){
+    if(err && err.status === 401) return syncAuthExpired(notify);
     return syncFailed(notify, job ? job.id : null);
   }
   if(currentUser !== account){
@@ -585,6 +598,7 @@ async function runSync(notify){
     try{
       result = await cloudSync.sync(account, dataFor(account));
     }catch(err){
+      if(err && err.status === 401) return syncAuthExpired(notify);
       return syncFailed(notify, job ? job.id : null);
     }
     if(currentUser !== account){
@@ -596,7 +610,7 @@ async function runSync(notify){
   const st = cloudSync.state(account) || {};
   finishSyncJob(job, st);
   if((st.conflicts || []).length) state.sb.status = 'conflict';
-  else { state.sb.status = 'ok'; state.sb.last = Date.now(); state.sb.attempts = 0; }
+  else { state.sb.status = 'ok'; state.sb.last = Date.now(); state.sb.attempts = 0; offlineState.authExpired = false; }
   /* Si se guardó algo mientras la petición estaba en vuelo, el estado no puede
      decir «todo sincronizado»: se marca pendiente y se envía en el próximo tick. */
   if(!st.dirty && st.digest && currentUser === account){
@@ -7859,6 +7873,10 @@ function renderOfflineBar(){
     text = 'Sin conexión · tus cambios se guardan en este dispositivo' + (pending ? ' (' + pending + ')' : '') + '.';
     tone = 'is-offline';
     action = '<button type="button" class="offline-btn" data-action="offline-retry">Reintentar</button>';
+  } else if(offlineState.authExpired){
+    text = 'Tu sesión de la nube caducó: vuelve a iniciar sesión para sincronizar.';
+    tone = 'is-error';
+    action = '<button type="button" class="offline-btn" data-action="offline-details">Revisar</button>';
   } else if(state.sb.status === 'syncing'){
     text = 'Sincronizando cambios…'; tone = 'is-syncing';
   } else if(conflicts){
@@ -8017,7 +8035,9 @@ function applyServiceWorkerUpdate(){
     offlineState.deferredUpdate = true;
     toast(decision.reason === 'active-session'
       ? 'Termina o cierra el entrenamiento activo antes de actualizar. No se perderá nada: se aplicará cuando quieras.'
-      : 'Hay cambios pendientes de sincronizar. Sincronízalos antes de actualizar para no arriesgar datos.', 'info');
+      : offlineState.authExpired
+        ? 'Tu sesión de la nube caducó: vuelve a iniciar sesión y sincroniza antes de actualizar. Tus datos siguen aquí.'
+        : 'Hay cambios pendientes de sincronizar. Sincronízalos antes de actualizar para no arriesgar datos.', 'info');
     return;
   }
   const reg = offlineState.sw;
