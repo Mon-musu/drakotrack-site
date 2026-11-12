@@ -507,6 +507,20 @@ const engineFor = (server, account, extra = {}) => {
     ok(photoMerge.data.photo === withPhoto.photo, 'la foto no se pierde al combinar');
   }
 
+  /* Fila heredada con revisión 0 y sin contenido legible -------------------- */
+  {
+    const server = fakeServer();
+    server.rows.set(ACCOUNT, { rev: 0, data: null, lastOp: null });
+    const a = engineFor(server, ACCOUNT);
+    const doc = docBase();
+    const result = await a.sync(ACCOUNT, doc);
+    ok(result.status === 'pushed', 'una fila heredada con rev 0 no bloquea el primer guardado');
+    eq(server.rows.get(ACCOUNT).rev, 1, 'la escritura sobre la fila heredada sube su revisión');
+    ok(server.rows.get(ACCOUNT).data.sessions[0].id === 's-1', 'la copia local sustituye a la fila vacía');
+    const after = await a.sync(ACCOUNT, doc);
+    ok(!after.needsPush, 'la siguiente sincronización ya no empuja de más');
+  }
+
   console.log('sync: ' + passed + ' assertions passed');
 })().catch(error => { console.error(error); process.exitCode = 1; });
 

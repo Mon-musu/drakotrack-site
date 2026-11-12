@@ -498,3 +498,13 @@ mapa semanal que cuenta las series sin clasificar sin repartirlas y muestra el n
 - El aviso explica el conflicto, se reintenta en dos segundos y no se marca como error permanente.
 - Recomendación operativa: usar **una sola pestaña** de la app a la vez; el panel de vista previa y
   una pestaña normal compiten por la misma revisión.
+
+### Bloqueo por fila heredada (rev 0)
+
+- Una fila de `app_data` creada antes de la migración de revisiones puede quedar con `rev 0` y sin
+  contenido legible. El servidor ya existía, así que rechaza **toda** escritura con `base_rev` nulo:
+  el primer guardado del dispositivo devolvía 409 para siempre («Servidor: rev 0 · enviado: rev ?»).
+- Ahora, cuando el servidor responde 409 con revisión 0, el motor adopta esa revisión (con copia
+  local de seguridad), relee por si hay contenido que combinar y escribe: la fila vacía deja de
+  bloquear la sincronización. Con cualquier otra revisión no se toca nada.
+- Cubierto por `test-sync.js` («una fila heredada con rev 0 no bloquea el primer guardado»).

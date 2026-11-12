@@ -629,8 +629,33 @@
           const first = await remote.load();
           const remoteData = first && isObj(first.data) ? first.data : null;
           if (!remoteData || !hasContent(remoteData)) {
-            await push(account, st, doc, null, startRevision);
-            return { status: 'pushed', rev: st.rev, data: null, conflicts: [], needsPush: st.dirty };
+            try {
+              await push(account, st, doc, null, startRevision);
+              return { status: 'pushed', rev: st.rev, data: null, conflicts: [], needsPush: st.dirty };
+            } catch (error) {
+              /* Fila heredada con rev 0 y sin contenido legible: la fila ya
+                 existe, así que el servidor rechaza cualquier base nula y el
+                 envío no puede entrar jamás. Se adopta su revisión y se escribe
+                 sobre ella; si al releer sí hay contenido, se combina. */
+              if (!isConflictError(error) || error.rev !== 0) throw error;
+              const again = await remote.load().catch(() => null);
+              const readable = again && isObj(again.data) && hasContent(again.data) ? again.data : null;
+              st.rev = 0;
+              if (readable && !same(readable, doc)) {
+                const merged = merge(null, doc, readable);
+                st.digest = digest(readable);
+                persist(account, Object.assign(st, {
+                  conflicts: mergeConflicts(st.conflicts, merged.conflicts),
+                  dirty: true, opId: st.opId || newId(), lastError: null,
+                }));
+                return { status: 'merged', rev: st.rev, data: merged.data, conflicts: merged.conflicts, needsPush: true };
+              }
+              backup(account, doc);
+              st.digest = readable ? digest(readable) : null;
+              persist(account, Object.assign(st, { dirty: true, opId: st.opId || newId(), lastError: null }));
+              const retry = await push(account, st, doc, undefined, startRevision);
+              return { status: retry && retry.replay ? 'replayed' : 'pushed', rev: st.rev, data: null, conflicts: [], needsPush: st.dirty };
+            }
           }
           /* La respuesta de un primer guardado se perdió pero el servidor sí
              lo aplicó: el contenido coincide, así que no se repite. */
@@ -678,7 +703,16 @@
             const current = await remote.load();
             const remoteData = current && isObj(current.data) ? current.data : null;
             if (!remoteData) {
-              /* Respuesta vacía inesperada: no se borra nada local. */
+              /* Copia vacía o ilegible. Con rev 0 la fila nunca llegó a
+                 escribirse, así que adoptar esa revisión es seguro y evita el
+                 bucle de 409. Con cualquier otra revisión no se toca nada. */
+              if (Number.isInteger(current && current.rev) && current.rev === 0) {
+                backup(account, doc);
+                st.rev = 0;
+                st.lastError = null;
+                persist(account, Object.assign(st, { dirty: true, opId: st.opId || newId() }));
+                return { status: 'kept-local', rev: st.rev, data: null, conflicts: [], needsPush: true };
+              }
               st.lastError = 'empty_remote';
               persist(account, Object.assign(st, { dirty: true, opId: st.opId || newId() }));
               return { status: 'kept-local', rev: st.rev, data: null, conflicts: [], needsPush: true };
