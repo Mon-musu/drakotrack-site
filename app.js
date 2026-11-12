@@ -682,8 +682,15 @@ async function pullRemote(notify){
     if(currentUser !== account) return false;
     if(result.status === 'empty'){
       state.sb.status = 'ok';
-      if(notify) toast('Todavía no hay copia en la nube de esta cuenta.', 'info');
       renderHeader();
+      /* La nube no tiene nada que restaurar: se ofrece el camino que sí
+         desbloquea, subir la copia de este dispositivo, en el mismo aviso. */
+      if(notify) confirmModal('La nube no tiene copia de esta cuenta',
+        'El servidor no devolvió ningún dato guardado, así que no hay nada que restaurar y este dispositivo sigue como está. Si quieres, se puede subir la copia de este dispositivo como primera copia en la nube; no se borra nada de aquí.',
+        'Subir este dispositivo', () => {
+          closeModal();
+          pushNow(true);
+        });
       return false;
     }
     applyRemoteDoc(result.data);
@@ -5762,7 +5769,9 @@ document.addEventListener('click', e => {
   if(a === 'restore-version'){ restoreServerVersion(Number(el.dataset.rev)); return; }
   if(a === 'sb-export'){ exportCloudJSON(); return; }
   if(a === 'sb-pull'){
-    confirmModal('¿Restaurar copia de la nube?', 'Se reemplazarán los datos actuales de este dispositivo por la última copia guardada en la nube. Antes se guarda una copia local por si quieres volver atrás.', 'Restaurar', () => {
+    confirmModal('¿Restaurar copia de la nube?',
+      'Si la nube tiene copia, reemplazará los datos de este dispositivo; antes se guarda aquí una copia por si quieres volver atrás. Si la nube está vacía, no se toca nada y se ofrecerá subir la copia de este dispositivo.',
+      'Restaurar', () => {
       closeModal();
       pullRemote(true);
     });
