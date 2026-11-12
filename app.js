@@ -552,7 +552,12 @@ function syncAuthExpired(notify){
    ninguna pista para arreglarlo. */
 function syncErrorText(err){
   const status = err && err.status;
-  if(status === 409) return 'Otro dispositivo guardó antes (conflicto 409). Se combinará en el próximo intento; si tienes la app abierta en dos sitios, deja solo una.';
+  if(status === 409) {
+    const detalle = (Number.isInteger(err && err.rev) || Number.isInteger(err && err.baseRev))
+      ? ' Servidor: rev ' + ((err && Number.isInteger(err.rev)) ? err.rev : '?') + ' · enviado sobre: rev ' + ((err && Number.isInteger(err.baseRev)) ? err.baseRev : '?') + '.'
+      : '';
+    return 'Otro dispositivo guardó antes (conflicto 409). Se combinará en el próximo intento; si tienes la app abierta en dos sitios, deja solo una.' + detalle;
+  }
   if(status === 413) return 'El servidor rechaza la copia porque supera el tamaño máximo (error 413). Exporta tus datos desde Ajustes y avísame para reducirla.';
   if(status === 429) return 'El servidor está limitando las peticiones (error 429). Espera un minuto y pulsa Sincronizar otra vez.';
   if(status === 400) return 'El servidor rechazó los datos (error 400): ' + ((err && err.message) || 'formato no válido') + '. Tus cambios siguen en este dispositivo.';
@@ -566,6 +571,7 @@ function syncFailed(notify, jobId, err){
   if(err && err.status === 409){
     state.sb.attempts = 0;
     state.sb.status = 'conflict';
+    state.sb.lastError = { status: 409, rev: Number.isInteger(err.rev) ? err.rev : null, baseRev: Number.isInteger(err.baseRev) ? err.baseRev : null, at: Date.now() };
     if(state.sb.retry) clearTimeout(state.sb.retry);
     state.sb.retry = setTimeout(() => { state.sb.retry = null; if(isCloud()) runSync(false); }, 2000);
     if(notify) toast(syncErrorText(err), 'info');
@@ -7992,7 +7998,11 @@ function offlineSettingsHTML(){
     + '<div><span class="muted">Modo</span><b>' + (isStandaloneApp() ? 'Instalada' : 'Navegador') + '</b></div>'
     + '</div>'
     + (stats.lastError ? '<p class="muted small">Último aviso: ' + esc(stats.lastError) + '</p>' : '')
-    + (st.lastError ? '<p class="muted small">Último error de sincronización: HTTP ' + esc(String(st.lastError.status || 'sin respuesta')) + ' · ' + esc(offlineTime(st.lastError.at)) + '</p>' : '')
+    + (st.lastError ? '<p class="muted small">Último error de sincronización: HTTP ' + esc(String(st.lastError.status || 'sin respuesta'))
+      + (Number.isInteger(st.lastError.rev) || Number.isInteger(st.lastError.baseRev)
+        ? ' · revisión del servidor ' + esc(String(st.lastError.rev === null ? '?' : st.lastError.rev))
+          + ' · revisión enviada ' + esc(String(st.lastError.baseRev === null ? '?' : st.lastError.baseRev)) : '')
+      + ' · ' + esc(offlineTime(st.lastError.at)) + '</p>' : '')
     + '<div class="offline-actions">'
     + '<button type="button" class="btn btn-ghost btn-sm" data-action="offline-check">Comprobar conexión</button>'
     + (cloud ? '<button type="button" class="btn btn-ghost btn-sm" data-action="offline-retry">Sincronizar ahora</button>' : '')

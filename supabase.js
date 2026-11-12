@@ -107,9 +107,12 @@ window.DrakoSB = (function () {
     if (opId) body.op_id = opId;
     const { response, data: result } = await request('/data/profile', { method: 'PUT', body });
     if (response.status === 409) {
-      const conflict = new Error('conflict');
+      const conflict = new Error((result && result.message) || 'conflict');
       conflict.status = 409;
       conflict.rev = result && Number.isInteger(result.rev) ? result.rev : null;
+      /* Revisión sobre la que se construyó el envío: comparar ambas dice si la
+         base local está atrasada o si otra sesión escribe sin parar. */
+      conflict.baseRev = Number.isInteger(baseRev) ? baseRev : null;
       throw conflict;
     }
     if (!response.ok) {
