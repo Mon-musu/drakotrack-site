@@ -339,8 +339,21 @@ suelo de 12 px, los 5 destinos de navegación con `aria-current`, coherencia `th
 
 ## F3 · Calendario anual de actividad
 
-**Estado**: implementado, con `npm test` en verde. Falta la revisión en producción y el despliegue
-(los cambios viven en la rama de trabajo hasta que se autoricen).
+**Estado**: desplegado en `main` (`60a599b15fa035f67bf3fe4b22a620741b5fff2f`) y verificado en
+producción el 11 de noviembre de 2026.
+
+### Comprobaciones en producción
+
+- La home sirve los tres archivos de F3 con cache-buster: `app.js?v=51`, `styles.css?v=40` y
+  `activity.js?v=1`; el service worker publica `drakotrack-v25`.
+- `#/activity` responde con los **12 meses**, 441 celdas, filtro de mes que conserva el foco y
+  actualiza el resumen, y **0 errores de consola / 0 peticiones fallidas**.
+- Cabeceras intactas tras el despliegue: `content-security-policy`, `strict-transport-security`,
+  `x-content-type-options: nosniff`, `x-frame-options: DENY`, `referrer-policy` y
+  `permissions-policy`.
+- `/api/auth/session` responde **200**, así que las sesiones siguen funcionando.
+- `#/program/<slug>` con un programa real del catálogo: 15 semanas, 3 días y sin desbordamiento a
+  375 ni 1440 px.
 
 ### Qué se añadió
 
