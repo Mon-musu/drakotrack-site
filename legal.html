@@ -155,8 +155,7 @@
   <section id="terceros" class="legal-sec">
     <h2>4. Terceros: auditoría de servicios y SDK</h2>
     <p class="legal-body">
-      Auditoría del 27 de octubre de 2026 sobre el código desplegado. La app es JavaScript propio con una única librería de interfaz, Swiper (carrusel de la portada, licencia MIT, servida desde este mismo sitio y sin peticiones a servidores externos): no hay SDK de analítica,
-      publicidad, errores, mapas, redes sociales ni pagos. El registro no usa captcha ni cookies. Estos son todos los terceros que intervienen:
+      Auditoría de terceros y recursos de interfaz. La app no incorpora SDK de analítica, publicidad ni seguimiento. Algunos recursos externos se cargan solo cuando el usuario los solicita, como el visor anatómico 3D de Sketchfab. Estos son los proveedores y recursos relevantes:
     </p>
     <div class="legal-table-wrap">
       <table class="legal-table">
@@ -171,8 +170,8 @@
             <td>Solo si creas o usas una cuenta en la nube</td>
           </tr>
           <tr>
-            <td>Vercel</td>
-            <td>Alojamiento del HTML, CSS y JS</td>
+            <td>Proveedor de alojamiento (Cloudflare o Vercel, según el dominio activo)</td>
+            <td>Alojamiento del HTML, CSS, JavaScript y API</td>
             <td>IP y datos técnicos de la petición (logs del proveedor)</td>
             <td>Siempre, al cargar la app</td>
           </tr>
@@ -181,6 +180,12 @@
             <td>Tipografía «Outfit»</td>
             <td>IP y datos técnicos de la petición de la fuente; sin cookies</td>
             <td>Siempre, al cargar la app (si el navegador la solicita)</td>
+          </tr>
+          <tr>
+            <td>Sketchfab</td>
+            <td>Visor 3D de anatomía muscular, cargado bajo demanda</td>
+            <td>IP y datos técnicos de conexión que recibe el proveedor al abrir el visor</td>
+            <td>Solo si pulsas «Cargar modelo 3D» en Análisis</td>
           </tr>
           <tr>
             <td>Boostcamp y Muscle &amp; Strength</td>
@@ -202,7 +207,7 @@
       <li>Sin Google Analytics, Meta Pixel, TikTok, Hotjar, Sentry ni ningún SDK de seguimiento o errores.</li>
       <li>Sin cookies publicitarias, sin fingerprinting, sin SDKs de compra dentro de la app.</li>
       <li>Sin permisos de cámara, micrófono, ubicación ni contactos. La foto de progreso la eliges tú desde el selector de archivos.</li>
-      <li>Sin conexiones salientes a servidores propios más allá de Supabase, Vercel y Google Fonts (declaradas arriba y limitadas por la Política de Seguridad de Contenidos).</li>
+      <li>Sin conexiones salientes a servidores propios más allá de Supabase, el proveedor de alojamiento y Google Fonts. El visor de Sketchfab solo se conecta tras una acción explícita del usuario.</li>
     </ul>
     <h3>4.2. Recomendación abierta</h3>
     <p class="legal-body">
@@ -348,9 +353,29 @@
             <td>Obra propia. Todos los derechos reservados; no se autoriza su reutilización ni modificación.</td>
           </tr>
           <tr>
-            <td>Iconos (mancuerna, sol, luna) y gráficas</td>
+            <td>Iconos y gráficas propias</td>
             <td>© DrakoTrack</td>
-            <td>SVG dibujados en el propio proyecto con el API Canvas/SVG nativo. Sin librerías de iconos.</td>
+            <td>SVG y gráficas implementados con APIs nativas; los iconos derivados de Lucide se identifican por separado.</td>
+          </tr>
+          <tr>
+            <td>Iconos de navegación inspirados en Lucide</td>
+            <td>Lucide Icons y colaboradores</td>
+            <td>Licencia ISC (y MIT para los iconos derivados de Feather, según el aviso de licencia). SVG incluidos localmente.</td>
+          </tr>
+          <tr>
+            <td>Microinteracciones CSS</td>
+            <td>Uiverse (componentes de MR mrhyddenn, PR Praashoo7 y MO mobinkakei) y FreeFrontend</td>
+            <td>Adaptaciones de componentes publicados bajo MIT; modificados para la identidad visual de DrakoTrack.</td>
+          </tr>
+          <tr>
+            <td>Iconos animados</td>
+            <td>Lucide Animated</td>
+            <td>Inspiración de animación; adaptación SVG/CSS propia para la app vanilla, basada en el proyecto MIT. No se incorpora su runtime React/Motion.</td>
+          </tr>
+          <tr>
+            <td>Modelo anatómico 3D</td>
+            <td>«Male Body Muscular System — Anatomy Study», Ruslan Gadzhiev, vía Sketchfab</td>
+            <td>Creative Commons Attribution (CC BY 4.0). Atribución y enlace al modelo disponibles junto al visor.</td>
           </tr>
           <tr>
             <td>Programas de entrenamiento</td>

@@ -3,57 +3,62 @@
 Estado: **auditoría del proyecto actual completada**; la integración de los archivos de F5 está
 pendiente de recibir la referencia completa (`drakotrack-visual-refresh-f5.zip`).
 
-## 1. Referencia F5
+## 1. Referencia F5 recibida
 
-El archivo adjunto `drakotrack-visual-refresh-f5-comprimido.json` llegó truncado: 1 000 000 de
-caracteres de un payload Base64 de 2 187 372 (JSON interno de 5 564 508 bytes). Con ese fragmento el
-gzip no se puede descomprimir, y en el proyecto no hay ninguna copia del ZIP. No se ha reconstruido
-ningún archivo de F5 a partir de datos parciales.
+- Cuatro partes de texto Base64 (`drakotrack-f5-parte-0N-de-04.txt`, 800 000 + 800 000 + 800 000 + 679 900
+  caracteres) alojadas en el repositorio privado `Mon-musu/DrakoF5`.
+- Reconstrucción con `scripts/f5-fetch.sh` + `scripts/f5-unpack.mjs`: 3 079 900 caracteres Base64 →
+  **2 309 924 bytes**, **355 archivos**, `unzip -t`: *No errors detected*.
+- F5 resultó ser **este mismo proyecto con una capa visual encima**: 343 archivos idénticos, 9 modificados
+  y 3 nuevos. No hubo que elegir entre versiones: F5 ya contenía el trabajo de sincronización
+  (fila heredada rev 0, 409, avisos con acción, comprobación de versión).
 
-## 2. Qué hay hoy en el proyecto (auditoría)
+## 2. Comparación archivo por archivo
 
-| Elemento | Estado actual | Cambio F5 | Acción |
+| Archivo | Actual | F5 | Acción |
 |---|---|---|---|
-| Sistema de diseño | `styles.css` (98 KB, 859 selectores). Capa semántica con `--bg:#111318`, `--surface:#1c222b`, `--surface-2:#242c38`, `--text:#f2f4f7`, `--muted:#9ba4b4`, `--accent:#f28c28`, `--accent-strong`, `--accent-deep`, `--accent-rgb`, estados `--ok/--warn/--danger`, escalas de espacio, radio y tipografía, alias heredados (`--panel`, `--orange`…) | Renovado | La paleta F5 **ya está integrada**; falta comparar contra el CSS de F5 |
-| Acento turquesa `#19D3C5` | 0 apariciones en `styles.css`, `index.html`, `app.js` y `manifest.webmanifest`; solo existe como patrón prohibido en `test-design.js` | Eliminado | Ya resuelto y protegido por prueba |
-| Tema claro | `:root[data-theme="light"]` define colores propios y hereda escalas | Mantener | Comparar con F5 |
-| Componentes | `.btn`, `.btn-primary`, `.btn-secondary`, `.btn-ghost`, `.btn-danger`, `.btn-sm/lg/block/group`, tarjetas, modales, inputs, barra offline | Renovados | Comparar clase por clase; no reemplazar bloques con lógica asociada |
-| Iconografía | 9 SVG inline en `index.html`, 6 en `app.js`; sin Lucide ni librería de iconos | Lucide + Lucide Animated | Pendiente; requiere el código F5 |
-| Anatomía 3D | No existe visor; el mapa muscular actual es 2D | Visor interactivo (Sketchfab) | Pendiente; requiere CSP y licencia (ver §3) |
-| Navegación | Barra inferior + cabecera ya maquetadas y probadas en `test-design.js` | Mejorada | Comparar |
-| PWA / Service Worker | `sw.js` en `drakotrack-v36`; precachea `app.js?v=62` y `sync.js?v=3`; estrategia `staleWhileRevalidate` para estáticos y `networkFirstNavigation` para navegación | Ajustes | Revisar el lista de precache al integrar |
-| Cloudflare | `scripts/build-cloudflare.mjs` genera `dist/` con `_headers` y `_routes.json`; Workers Builds despliega desde `main` | Mantener | No tocar el despliegue |
-| Supabase | Auth, RLS y RPC de datos intactos (`dt_save_app_data`, historial, restauración) | Sin cambios | No modificar |
-| Pruebas | `test-design.js` (tokens, turquesa, foco, objetivos táctiles, navegación), `test-sync.js` (104 aserciones), `test-sync-auth.js` (19), `test-flows.js`, API, Cloudflare (116) | Añadir pruebas F5 | Extender, nunca debilitar |
+| `styles.css` | 98 885 B, 836 selectores | 112 131 B, 866 selectores | **Integrado**: 0 selectores perdidos, 30 nuevos (iconos de navegación, botones con icono, tarjeta y visor anatómico) |
+| `app.js` | 445 698 B | 447 812 B | **Integrado**: sprite de iconos, botones con icono, sección «Anatomía muscular en 3D» y acción `anatomy-load` (iframe bajo demanda) |
+| `index.html` | 15 576 B | 17 694 B | **Integrado**: sprite SVG local (10 símbolos), iconos en navegación lateral e inferior, `frame-src` en la CSP del meta |
+| `legal.html` | 28 399 B | 29 811 B | **Integrado**: avisos de terceros y licencias |
+| `sw.js` | v36 | v37 | **Integrado**: precache de `app.js?v=63` y `styles.css?v=42` |
+| `scripts/build-cloudflare.mjs` | CSP sin `frame-src` | `frame-src https://sketchfab.com` | **Integrado**: cambio mínimo y acotado, como se acordó |
+| `test-design.js` | 92 aserciones | 100 | **Integrado**: nuevas comprobaciones del sistema visual |
+| `test-cloudflare.js` | 116 | 117 | **Integrado**: la CSP publicada debe incluir `frame-src` |
+| `DISENO.md` | 30 371 B | 33 815 B | **Integrado**: conserva nuestras secciones del 409 y del rev 0 |
+| `THIRD_PARTY_NOTICES.md` | — | 1 886 B | **Nuevo**, integrado |
+| `_headers`, `_routes.json` | generados en `dist/` | incluidos en el ZIP | **No copiados**: son salida de `build-cloudflare.mjs` y no deben vivir en el código fuente |
+| 61 archivos solo del proyecto | capturas de `artifacts/`, `apk-build/` | no están en F5 | **Conservados** |
 
-## 3. Decisiones tomadas
+## 3. Licencias y terceros
 
-1. **CSP y visor 3D.** La política actual no declara `frame-src` y `default-src` es `'self'`, así que
-   un iframe de Sketchfab queda bloqueado. Decisión del usuario: **abrir `frame-src` únicamente a
-   Sketchfab**, sin tocar el resto de la política (ni `script-src`, ni `img-src`, ni `object-src`).
-   La CSP está definida en tres sitios que deben cambiar a la vez:
-   - `scripts/build-cloudflare.mjs` línea 50 (`const csp = ...`, la que se publica en `dist/_headers`).
-   - `vercel.json` (bloque de cabeceras de `/(.*)`).
-   - `index.js` (servidor Node).
-   Además `test-flows.js` comprueba la CSP de `vercel.json` y `test-cloudflare.js` la de
-   `dist/_headers`: ambas pruebas deben seguir en verde y ampliarse para fijar el nuevo `frame-src`.
-2. **Nada se sobrescribe sin comparar.** Los archivos con lógica más reciente (sincronización,
-   seguridad, PWA, datos) se combinan a mano; nunca se sustituye el proyecto entero por el ZIP.
+- Iconos: sprite SVG propio inspirado en Lucide (línea), sin dependencia ni petición externa.
+- Modelo 3D: «Male Body Muscular System — Anatomy Study» de Ruslan Gadzhiev, **CC BY 4.0**, con autor,
+  enlace y licencia visibles junto al visor y en `THIRD_PARTY_NOTICES.md`.
+- El visor **no se descarga al abrir la app**: solo se crea el iframe al pulsar «Cargar modelo 3D».
 
-## 4. Plan por fases
+## 4. Seguridad
 
-| Fase | Contenido | Criterio de cierre |
-|---|---|---|
-| F5.0 | Auditoría archivo por archivo contra el ZIP real | Tabla de nuevos/modificados/conflictos |
-| F5.1 | Tokens y componentes base (botones, tarjetas, formularios, modales) | `test-design.js` ampliado y verde; build |
-| F5.2 | Iconografía Lucide y animaciones de feedback | Iconos accesibles y sin animaciones permanentes |
-| F5.3 | Pantallas: dashboard, entrenamiento, rutinas, historial, progreso, perfil, ajustes | Sin regresiones funcionales; `npm test` verde |
-| F5.4 | Visor anatómico + `frame-src https://sketchfab.com` + licencia y atribución | Carga bajo demanda, alternativa si falla el servicio |
-| F5.5 | Responsive y PWA | Sin desbordes; `sw` versionado; offline intacto |
-| F5.6 | Informe, ZIP e instrucciones de despliegue | Entregable revisado |
+- CSP: se añade únicamente `frame-src https://sketchfab.com`. `script-src`, `object-src`,
+  `frame-ancestors 'none'` y `form-action` quedan igual; el resto de la política no se relaja.
+- Sin secretos nuevos: el único recurso externo es el iframe del modelo.
+- La CSP vive en tres sitios y los tres están alineados: `scripts/build-cloudflare.mjs`, `index.html`
+  (meta) y `vercel.json` (pendiente de equiparar; ver §6).
 
-## 5. Pendiente
+## 5. Pruebas ejecutadas
 
-- Recibir `drakotrack-visual-refresh-f5.zip` completo (o el payload Base64 en fragmentos).
-- Confirmar autor y licencia del modelo 3D de F5 antes de publicarlo.
-- Revisar si F5 trae su propia CSP y qué orígenes añade, para contrastar con la decisión de §3.
+| Suite | Resultado |
+|---|---|
+| `test-design.js` | 100 ok, 0 fallos |
+| `test-cloudflare.js` | 117 aserciones |
+| `test-sync.js` | 104 aserciones |
+| `test-sync-auth.js` | 19 ok |
+| `test-flows.js` y API | 82 / 75 / 74 / 123 / 13 / 101 / 12, 0 fallos |
+| `build:cloudflare` | `dist ready (21 files, 5 directories)` |
+| `npm test` (completo) | **exit 0** |
+
+## 6. Pendiente
+
+- Equiparar `vercel.json` con la misma CSP si ese despliegue sigue en uso.
+- Revisión visual real en navegador (no se ha abierto la app para mirar las pantallas).
+- Publicar: el commit está en la rama local `fase/rediseno-arena`, sin push.

@@ -2329,8 +2329,8 @@ function homeHeroHTML(greet){
         <p class="hero-sub">Empieza una sesión y registra tus series; el progreso se calcula solo con tus datos reales.</p>
       </div>
       <div class="home-actions">
-        <button class="btn btn-primary btn-lg" data-action="tab" data-route="start" type="button">Empezar entrenamiento</button>
-        <button class="btn btn-secondary" data-action="open-profile" type="button">Mi perfil</button>
+        <button class="btn btn-primary btn-lg" data-action="tab" data-route="start" type="button"><span class="btn-icon" aria-hidden="true">${DUMBBELL}</span>Empezar entrenamiento</button>
+        <button class="btn btn-secondary" data-action="open-profile" type="button"><svg class="btn-svg-icon" aria-hidden="true"><use href="#dt-icon-user"/></svg>Mi perfil</button>
       </div>
     </section>`;
 }
@@ -5511,6 +5511,23 @@ document.addEventListener('click', e => {
   const el = e.target.closest('[data-action]');
   if(!el) return;
   const a = el.dataset.action;
+  if(a === 'anatomy-load'){
+    const host = document.getElementById('anatomy-viewer');
+    if(!host || host.dataset.loaded === 'true') return;
+    const frame = document.createElement('iframe');
+    frame.src = 'https://sketchfab.com/models/991eb96938be4d0d8fadee241a1063d3/embed?autostart=0&preload=1&ui_infos=0&ui_controls=1&ui_hint=0';
+    frame.title = 'Modelo 3D de anatomía muscular humana';
+    frame.loading = 'lazy';
+    frame.allow = 'autoplay; fullscreen; xr-spatial-tracking';
+    frame.referrerPolicy = 'strict-origin-when-cross-origin';
+    frame.allowFullscreen = true;
+    host.replaceChildren(frame);
+    host.dataset.loaded = 'true';
+    el.disabled = true;
+    el.setAttribute('aria-expanded', 'true');
+    el.textContent = 'Visor solicitado';
+    return;
+  }
   if(a === 'muscle-retry'){ retryMuscleDictionary(); return; }
   if(a.indexOf('ana-') === 0 && analyticsAction(a, el)) return;
   if(a.indexOf('offline-') === 0 || a.indexOf('pwa-') === 0 || a.indexOf('sw-') === 0){ if(offlineAction(a, el)) return; }
@@ -7603,7 +7620,13 @@ function anaMusclesHTML(a, ana){
     + (bars || '<div class="empty-state">Los ejercicios de este período no tienen grupo muscular asignado.</div>')
     + (detail || '')
     + (g.unclassified.exercises.length ? '<div class="ana-warn"><b>Sin clasificar:</b> ' + g.unclassified.exercises.slice(0, 8).map(x => esc(x.name)).join(', ') + '. El diccionario muscular no las identifica, así que no se reparten entre grupos.</div>' : '')
-    + '<p class="muted small">' + esc(g.note) + '</p></section>';
+    + '<p class="muted small">' + esc(g.note) + '</p>'
+    + '<section class="anatomy-3d-card" aria-labelledby="anatomy-3d-title">'
+    + '<div class="anatomy-3d-head"><div><span class="eyebrow">EXPLORACIÓN ANATÓMICA</span><h3 id="anatomy-3d-title">Anatomía muscular en 3D</h3><p class="muted small">Rota y acerca el modelo para explorar la musculatura. Se carga solo cuando lo solicitas.</p></div>'
+    + '<button class="btn btn-secondary btn-sm" type="button" data-action="anatomy-load" aria-controls="anatomy-viewer" aria-expanded="false">Cargar modelo 3D</button></div>'
+    + '<div class="anatomy-viewer" id="anatomy-viewer" aria-live="polite"><div class="anatomy-viewer-placeholder"><span class="anatomy-viewer-mark">3D</span><span>El visor se abrirá aquí cuando pulses «Cargar modelo 3D».</span></div></div>'
+    + '<p class="anatomy-credit">Modelo «Male Body Muscular System — Anatomy Study» de <a href="https://sketchfab.com/3d-models/male-body-muscular-system-anatomy-study-991eb96938be4d0d8fadee241a1063d3" target="_blank" rel="noopener noreferrer">Ruslan Gadzhiev en Sketchfab</a>, licencia <a href="https://creativecommons.org/licenses/by/4.0/" target="_blank" rel="noopener noreferrer">CC BY 4.0</a>.</p>'
+    + '</section></section>';
 }
 function anaBodyweightHTML(a){
   const b = a.bodyweight;

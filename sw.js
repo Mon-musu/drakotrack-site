@@ -15,23 +15,23 @@
    ============================================================ */
 'use strict';
 
-const VERSION = 'drakotrack-v36';
+const VERSION = 'drakotrack-v37';
 const CACHE_PREFIX = 'drakotrack-';
 const OFFLINE_URL = './offline.html';
 
-const ESSENTIAL = ['./index.html', './app.js?v=62', './styles.css?v=41', './offline.html'];
+const ESSENTIAL = ['./index.html', './app.js?v=63', './styles.css?v=42', './offline.html'];
 
 const SHELL = [
   './',
   './index.html',
   './offline.html',
-  './styles.css?v=41',
+  './styles.css?v=42',
   './landing.js?v=4',
   './vendor/swiper/swiper-bundle.min.css?v=12',
   './vendor/swiper/swiper-bundle.min.js?v=11',
   './sync.js?v=3',
   './offline.js?v=2',
-  './app.js?v=62',
+  './app.js?v=63',
   './data/muscles.json?v=3',
   './progress.js?v=1',
   './planner.js?v=1',

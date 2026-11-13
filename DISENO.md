@@ -508,3 +508,59 @@ mapa semanal que cuenta las series sin clasificar sin repartirlas y muestra el n
   local de seguridad), relee por si hay contenido que combinar y escribe: la fila vacía deja de
   bloquear la sincronización. Con cualquier otra revisión no se toca nada.
 - Cubierto por `test-sync.js` («una fila heredada con rev 0 no bloquea el primer guardado»).
+
+
+---
+
+# F5 — Pulido visual, microinteracciones e integración anatómica 3D
+
+**Alcance:** elevar la presentación del frontend existente sin reescribir el modelo de datos ni
+introducir un framework nuevo. Se mantiene JavaScript vanilla, la navegación hash, la PWA y el
+sistema de tokens F1 (`#F28C28`).
+
+## Recursos y criterios de uso
+
+- **Uiverse:** patrones CSS de botones, tarjetas y controles adaptados a los tokens de DrakoTrack.
+  Referencias concretas: MR mrhyddenn (botón), PR Praashoo7 (tarjeta) y MO mobinkakei (switch).
+  Los componentes consultados publican licencia MIT.
+- **FreeFrontend:** referencia para controles, estados y transiciones ligeras; el sitio declara sus
+  snippets MIT. No se cargan scripts remotos ni dependencias adicionales en runtime.
+- **Lucide / Lucide Animated:** sprite SVG local para navegación y acciones, con feedback de
+  animación CSS inspirado en la colección animada. No se añade React ni Motion al proyecto vanilla.
+- **Sketchfab:** visor anatómico opcional, cargado únicamente tras pulsar «Cargar modelo 3D».
+  Modelo: «Male Body Muscular System — Anatomy Study», Ruslan Gadzhiev, CC BY 4.0. Se muestra
+  atribución visible junto al visor. El iframe añade `frame-src https://sketchfab.com` a la CSP.
+- **CTA Gallery:** referencia de jerarquía, composición y tratamiento de CTAs; no se copian sus
+  capturas, imágenes ni marcas porque pertenecen a sus respectivos titulares.
+
+## Cambios implementados
+
+- Sprite SVG local para Entrenamientos, Plan, Historial, Progreso y Peso en ambas barras de navegación.
+- Refinamiento de topbar, navegación activa, botones, tarjetas, hero, campos, gráficas, estados,
+  modales y responsive móvil, manteniendo la paleta oscura/clara y el acento naranja.
+- Brillo CSS breve en el botón principal y microanimación de iconos activos; ambas respetan
+  `prefers-reduced-motion`.
+- CTA de inicio con iconografía local.
+- Visor Sketchfab en el bloque de grupos musculares de Análisis; no realiza peticiones hasta que
+  el usuario pulsa el botón. El modelo es externo y requiere conexión.
+- Actualización de CSP, avisos de terceros/licencias, cache-busters y versión del Service Worker
+  (`drakotrack-v37`).
+
+## Límites y verificaciones pendientes
+
+- El visor 3D es una mejora visual/educativa; no enlaza todavía las superficies del modelo con
+  los grupos del diccionario muscular ni colorea músculos según volumen. No se debe presentar como
+  mapa muscular interactivo sincronizado con datos.
+- No se añaden imágenes decorativas externas ni se copian capturas de CTA Gallery.
+- Pendiente de prueba visual manual en Chrome Android, Safari iOS y escritorio, especialmente el
+  visor 3D, tema claro y navegación inferior.
+- `node --check` sobre `app.js`, `sw.js`, `scripts/build-cloudflare.mjs`, `test-design.js` y
+  `test-cloudflare.js`: correcto.
+- `test-design.js`: **100 ok, 0 fallos**.
+- `test-muscles.js`: **12 ok, 0 fallos**.
+- `scripts/build-cloudflare.mjs`: `dist ready (21 files, 5 directories)`.
+- `test-cloudflare.js`: **117 aserciones correctas**.
+- `npm ci` no terminó antes del límite de ejecución; por eso `npm test` completo no pudo correr
+  (el entorno no llegó a instalar `jsdom`). Chromium headless tampoco arrancó, así que no se
+  declaran capturas ni una auditoría visual real de navegador. Queda pendiente ejecutar la suite
+  completa y revisar visualmente en Chrome Android, Safari iOS y escritorio.

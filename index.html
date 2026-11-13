@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <meta name="theme-color" id="theme-color" content="#111318">
 <meta name="description" content="DrakoTrack — tu compañero de gimnasio. Entrenamientos, récords y control de peso, guardados en tu dispositivo.">
-<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; img-src 'self' data:; connect-src 'self' https://rxamdcgcpjzfeygxeukj.supabase.co; object-src 'none'; base-uri 'self'; form-action 'self'">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; img-src 'self' data:; frame-src https://sketchfab.com; connect-src 'self' https://rxamdcgcpjzfeygxeukj.supabase.co; object-src 'none'; base-uri 'self'; form-action 'self'">
 <title>DrakoTrack — Seguimiento de entrenamiento</title>
 <link rel="icon" href="logo.png?v=5">
 <link rel="apple-touch-icon" href="icons/apple-touch-icon-180.png">
@@ -14,10 +14,22 @@
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="vendor/swiper/swiper-bundle.min.css?v=12">
-<link rel="stylesheet" href="styles.css?v=41">
+<link rel="stylesheet" href="styles.css?v=42">
 </head>
 <body>
 <a class="skip-link" href="#main">Saltar al contenido</a>
+<!-- Sprite SVG local de iconos lineales, inspirado en Lucide. No requiere JS ni peticiones externas. -->
+<svg class="dt-icon-sprite" xmlns="http://www.w3.org/2000/svg" aria-hidden="true" focusable="false">
+  <symbol id="dt-icon-dumbbell" viewBox="0 0 24 24"><path d="M6.5 7v10M17.5 7v10M3.5 9v6M20.5 9v6M6.5 12h11M3.5 12h3M17.5 12h3"/></symbol>
+  <symbol id="dt-icon-calendar" viewBox="0 0 24 24"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M16 3v4M8 3v4M3 10h18M8 14h.01M12 14h.01M16 14h.01M8 17h.01M12 17h.01"/></symbol>
+  <symbol id="dt-icon-history" viewBox="0 0 24 24"><path d="M3 12a9 9 0 1 0 3-6.7L3 8"/><path d="M3 3v5h5M12 7v5l3 2"/></symbol>
+  <symbol id="dt-icon-chart" viewBox="0 0 24 24"><path d="M3 3v18h18M7 14l4-4 4 3 6-7"/><path d="M17 6h4v4"/></symbol>
+  <symbol id="dt-icon-scale" viewBox="0 0 24 24"><path d="M12 3v18M5 6h14M7 6l-3 6h6L7 6ZM17 6l-3 6h6l-3-6ZM8 21h8"/></symbol>
+  <symbol id="dt-icon-user" viewBox="0 0 24 24"><circle cx="12" cy="8" r="4"/><path d="M4 21a8 8 0 0 1 16 0"/></symbol>
+  <symbol id="dt-icon-play" viewBox="0 0 24 24"><path d="m8 5 12 7-12 7z"/></symbol>
+  <symbol id="dt-icon-activity" viewBox="0 0 24 24"><path d="M3 12h4l3-8 4 16 3-8h4"/></symbol>
+  <symbol id="dt-icon-arrow-right" viewBox="0 0 24 24"><path d="M5 12h14M13 6l6 6-6 6"/></symbol>
+</svg>
 <div class="bg-glow" aria-hidden="true"></div>
 
 <!-- ============ PANTALLA DE ACCESO ============ -->
@@ -172,20 +184,20 @@
   <div id="offline-bar" class="offline-bar hidden" role="status"></div>
 
   <nav class="sidebar" id="sidebar" aria-label="Secciones principales">
-    <button class="nav-btn active" data-action="tab" data-route="workouts" aria-current="page"><span>Entrenamientos</span></button>
-    <button class="nav-btn" data-action="tab" data-route="plan"><span>Plan</span></button>
-    <button class="nav-btn" data-action="tab" data-route="history"><span>Historial</span></button>
-    <button class="nav-btn" data-action="tab" data-route="progress"><span>Progreso</span></button>
-    <button class="nav-btn" data-action="tab" data-route="weight"><span>Peso</span></button>
+    <button class="nav-btn active" data-action="tab" data-route="workouts" aria-current="page"><svg class="nav-icon" aria-hidden="true"><use href="#dt-icon-dumbbell"/></svg><span>Entrenamientos</span></button>
+    <button class="nav-btn" data-action="tab" data-route="plan"><svg class="nav-icon" aria-hidden="true"><use href="#dt-icon-calendar"/></svg><span>Plan</span></button>
+    <button class="nav-btn" data-action="tab" data-route="history"><svg class="nav-icon" aria-hidden="true"><use href="#dt-icon-history"/></svg><span>Historial</span></button>
+    <button class="nav-btn" data-action="tab" data-route="progress"><svg class="nav-icon" aria-hidden="true"><use href="#dt-icon-chart"/></svg><span>Progreso</span></button>
+    <button class="nav-btn" data-action="tab" data-route="weight"><svg class="nav-icon" aria-hidden="true"><use href="#dt-icon-scale"/></svg><span>Peso</span></button>
     <div class="sidebar-foot">Entrena como un dragón.</div>
   </nav>
 
   <nav class="bottomnav" id="bottomnav" aria-label="Secciones principales (móvil)">
-    <button class="nav-btn active" data-action="tab" data-route="workouts" aria-current="page"><span>Entrenamientos</span></button>
-    <button class="nav-btn" data-action="tab" data-route="plan"><span>Plan</span></button>
-    <button class="nav-btn" data-action="tab" data-route="history"><span>Historial</span></button>
-    <button class="nav-btn" data-action="tab" data-route="progress"><span>Progreso</span></button>
-    <button class="nav-btn" data-action="tab" data-route="weight"><span>Peso</span></button>
+    <button class="nav-btn active" data-action="tab" data-route="workouts" aria-current="page"><svg class="nav-icon" aria-hidden="true"><use href="#dt-icon-dumbbell"/></svg><span>Entrenamientos</span></button>
+    <button class="nav-btn" data-action="tab" data-route="plan"><svg class="nav-icon" aria-hidden="true"><use href="#dt-icon-calendar"/></svg><span>Plan</span></button>
+    <button class="nav-btn" data-action="tab" data-route="history"><svg class="nav-icon" aria-hidden="true"><use href="#dt-icon-history"/></svg><span>Historial</span></button>
+    <button class="nav-btn" data-action="tab" data-route="progress"><svg class="nav-icon" aria-hidden="true"><use href="#dt-icon-chart"/></svg><span>Progreso</span></button>
+    <button class="nav-btn" data-action="tab" data-route="weight"><svg class="nav-icon" aria-hidden="true"><use href="#dt-icon-scale"/></svg><span>Peso</span></button>
   </nav>
 
   <main id="main" class="main" tabindex="-1"></main>
@@ -204,7 +216,7 @@
 <script src="offline.js?v=2"></script>
 <script src="analytics.js?v=1"></script>
 <script src="activity.js?v=1"></script>
-<script src="app.js?v=62"></script>
+<script src="app.js?v=63"></script>
 <script src="vendor/swiper/swiper-bundle.min.js?v=11" defer></script>
 <script src="landing.js?v=4" defer></script>
 <script src="update-check.js?v=2" defer></script>

@@ -74,6 +74,7 @@ for (const ref of [...new Set(precache)]) {
 
 const headers = read('dist/_headers');
 ok(/Content-Security-Policy:/.test(headers), 'Pages headers include CSP');
+ok(/frame-src https:\/\/sketchfab\.com/.test(headers), 'CSP allows the lazy Sketchfab anatomy viewer');
 ok(/Strict-Transport-Security:/.test(headers), 'Pages headers include HSTS');
 ok(/X-Frame-Options: DENY/.test(headers), 'Pages headers deny framing');
 ok(/\/sw\.js[\s\S]*Service-Worker-Allowed: \//.test(headers), 'Pages allows the root service worker');

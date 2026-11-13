@@ -122,5 +122,15 @@ for(const primitive of ['.btn-secondary', '.card-head', '.badge{', '.alert{', '.
 check('las primitivas usan tokens, no colores sueltos',
   /\.btn-secondary\{background:var\(--surface-2\)/.test(css) && /\.badge\{[^}]*var\(--radius-pill\)/.test(css));
 
+/* ---------- 10. F5: iconografía y anatomía bajo demanda ---------- */
+check('el sprite SVG local existe sin librería externa', html.includes('dt-icon-sprite') && html.includes('dt-icon-dumbbell'));
+check('las dos barras de navegación incluyen iconos SVG', (html.match(/class=\"nav-icon\"/g) || []).length === 10);
+check('la acción principal usa un icono local', app.includes('class=\"btn-icon\"'));
+check('el visor de Sketchfab no tiene iframe precargado en HTML', !/<iframe[^>]+src=\"https:\/\/sketchfab\.com/.test(app));
+check('el visor se monta solo tras una acción explícita', app.includes("a === 'anatomy-load'") && app.includes("frame.src = 'https://sketchfab.com/models/"));
+check('la atribución del modelo 3D está visible en el HTML generado', app.includes('Ruslan Gadzhiev en Sketchfab') && app.includes('CC BY 4.0'));
+check('CSP de la página permite únicamente el host de Sketchfab para frames', /frame-src https:\/\/sketchfab\.com/.test(html));
+check('las microanimaciones respetan movimiento reducido', /@media\s*\(prefers-reduced-motion:reduce\)[\s\S]*?\.nav-icon/.test(css));
+
 console.log(`\n${pass} ok, ${fail} fallos`);
 process.exit(fail ? 1 : 0);
