@@ -152,5 +152,15 @@ check('las microanimaciones respetan movimiento reducido', /@media\s*\(prefers-r
   }
 }
 
+/* ---------- 12. los estados semánticos usan tokens en ambos temas ---------- */
+check('los estados del historial y del plan usan tokens de color', 
+  /\.hist-status\.is-done\{[^}]*var\(--ok\)/.test(css)
+  && /\.plan-chip\.is-pending\{[^}]*var\(--warn\)/.test(css)
+  && /\.plan-chip\.is-progress\{[^}]*var\(--info\)/.test(css));
+check('no quedan verdes y rojos literales en los estados', 
+  !/#8ef0c4|#4ade80|#fca5a5|#bfdbfe|#ffc38a/.test(css.replace(/:root[^{]*\{[^}]*\}/g, '')));
+check('ambos temas definen los tokens semánticos', 
+  (css.match(/--info:/g) || []).length === 2 && (css.match(/--ok:/g) || []).length === 2);
+
 console.log(`\n${pass} ok, ${fail} fallos`);
 process.exit(fail ? 1 : 0);
