@@ -162,5 +162,9 @@ check('no quedan verdes y rojos literales en los estados',
 check('ambos temas definen los tokens semánticos', 
   (css.match(/--info:/g) || []).length === 2 && (css.match(/--ok:/g) || []).length === 2);
 
+check('los puntos del calendario usan los tokens de estado', 
+  /\.cal-dot\.done\{background:var\(--ok\)\}/.test(css) && /\.cal-dot\.pending\{background:var\(--warn\)\}/.test(css)
+  && /\.cal-dot\.missed\{background:var\(--danger-text\)\}/.test(css) && /\.cal-dot\.rest\{background:var\(--muted-2\)\}/.test(css));
+
 console.log(`\n${pass} ok, ${fail} fallos`);
 process.exit(fail ? 1 : 0);

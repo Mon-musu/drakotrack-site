@@ -10,7 +10,7 @@
   --surface:#1c222b;               /* tarjetas y paneles */
   --surface-2:#242c38;             /* panel elevado y controles */
   --text:#f2f4f7;
-  --muted:#9ba4b4;                 /* 6.3:1 sobre panel — AA */
+  --muted:#a9b2c0;                 /* 7.5:1 sobre panel — AA */
   --muted-2:#8b94a3;               /* 5.2:1 sobre panel — AA */
   --accent:#f28c28;                /* acento naranja de la marca */
   --accent-strong:#ffa94d;         /* acento claro (bordes, iconos) */
@@ -1275,7 +1275,7 @@ input[type=number]{-moz-appearance:textfield;appearance:textfield}
 .cal-dot.done{background:var(--ok)}
 .cal-dot.pending{background:var(--warn)}
 .cal-dot.missed{background:var(--danger-text)}
-.cal-dot.rest{background:var(--border-strong)}
+.cal-dot.rest{background:var(--muted-2)}
 .cal-legend{display:flex;flex-wrap:wrap;gap:12px;font-size:12.5px;color:var(--muted);margin-bottom:18px}
 .cal-legend span{display:inline-flex;align-items:center;gap:5px}
 .plan-day-detail{margin-bottom:22px}
