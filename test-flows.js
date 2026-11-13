@@ -977,6 +977,16 @@ const tick = ms => new Promise(r => setTimeout(r, ms));
   await tick(60);
   check('interrupted session offers a resume card', /Continuar/.test(mainHtml()) && /sin terminar|pausada/i.test(mainHtml()));
 
+  // historial sin sesiones: un solo mensaje, sin el aviso de filtros
+  g(`(function(){ closeModal(); currentUser = 'hist_vacio'; dataFor(currentUser); localStorage.setItem(SESSION_KEY, currentUser); saveDB(); })()`);
+  window.render();
+  await tick(60);
+  window.nav('#/history');
+  await tick(60);
+  const histVacio = mainHtml();
+  check('empty history shows a single empty state', (histVacio.match(/class="empty-state"/g) || []).length === 1);
+  check('empty history does not blame filters', !/Ninguna sesión coincide/.test(histVacio));
+
   // ===== PROMPT 2: biblioteca de ejercicios =====
   g(`(function(){ closeModal(); currentUser = 'lib_tester'; dataFor(currentUser); localStorage.setItem(SESSION_KEY, currentUser); saveDB(); })()`);
   window.render();

@@ -5039,7 +5039,9 @@ function renderHistory(main){
     </section>`}
 
     ${!rows.length
-      ? `<section class="empty-state">Ninguna sesión coincide con esos filtros. <button class="btn btn-ghost btn-sm" type="button" id="hist-clear">Ver todo el historial</button></section>`
+      ? (!all.length
+        ? ''
+        : `<section class="empty-state">Ninguna sesión coincide con esos filtros. <button class="btn btn-ghost btn-sm" type="button" id="hist-clear">Ver todo el historial</button></section>`)
       : `<section class="section">${shown.map(lite => {
           const s = byId.get(lite.id);
           return s ? histCard(s, lite) : '';
