@@ -132,5 +132,21 @@ check('la atribución del modelo 3D está visible en el HTML generado', app.incl
 check('CSP de la página permite únicamente el host de Sketchfab para frames', /frame-src https:\/\/sketchfab\.com/.test(html));
 check('las microanimaciones respetan movimiento reducido', /@media\s*\(prefers-reduced-motion:reduce\)[\s\S]*?\.nav-icon/.test(css));
 
+/* ---------- 11. la CSP es la misma en los cuatro sitios ---------- */
+{
+  const vercelCsp = JSON.parse(read('vercel.json')).headers
+    .find(h => h.source === '/(.*)').headers
+    .find(h => h.key === 'Content-Security-Policy').value;
+  const nodeCsp = (/"content-security-policy":\s*"([^"]+)"/.exec(read('index.js')) || [])[1] || '';
+  const buildCsp = (/const csp = "([^"]+)"/.exec(read('scripts/build-cloudflare.mjs')) || [])[1] || '';
+  const metaCsp = (/http-equiv="Content-Security-Policy" content="([^"]+)"/.exec(html) || [])[1] || '';
+  const frameOf = csp => (/(?:^|;)\s*frame-src ([^;]+)/.exec(csp) || [])[1] || '';
+  const places = { 'vercel.json': vercelCsp, 'index.js': nodeCsp, 'build-cloudflare.mjs': buildCsp, 'index.html': metaCsp };
+  for(const [name, csp] of Object.entries(places)){
+    check(`${name} permite solo el host de Sketchfab en frame-src`, frameOf(csp) === 'https://sketchfab.com');
+    check(`${name} mantiene los scripts en el propio dominio`, /script-src 'self'/.test(csp));
+  }
+}
+
 console.log(`\n${pass} ok, ${fail} fallos`);
 process.exit(fail ? 1 : 0);

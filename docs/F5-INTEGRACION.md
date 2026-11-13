@@ -23,7 +23,7 @@ pendiente de recibir la referencia completa (`drakotrack-visual-refresh-f5.zip`)
 | `legal.html` | 28 399 B | 29 811 B | **Integrado**: avisos de terceros y licencias |
 | `sw.js` | v36 | v37 | **Integrado**: precache de `app.js?v=63` y `styles.css?v=42` |
 | `scripts/build-cloudflare.mjs` | CSP sin `frame-src` | `frame-src https://sketchfab.com` | **Integrado**: cambio mínimo y acotado, como se acordó |
-| `test-design.js` | 92 aserciones | 100 | **Integrado**: nuevas comprobaciones del sistema visual |
+| `test-design.js` | 92 aserciones | 108 | **Integrado**: comprobaciones del sistema visual y paridad de CSP en los cuatro archivos |
 | `test-cloudflare.js` | 116 | 117 | **Integrado**: la CSP publicada debe incluir `frame-src` |
 | `DISENO.md` | 30 371 B | 33 815 B | **Integrado**: conserva nuestras secciones del 409 y del rev 0 |
 | `THIRD_PARTY_NOTICES.md` | — | 1 886 B | **Nuevo**, integrado |
@@ -42,14 +42,15 @@ pendiente de recibir la referencia completa (`drakotrack-visual-refresh-f5.zip`)
 - CSP: se añade únicamente `frame-src https://sketchfab.com`. `script-src`, `object-src`,
   `frame-ancestors 'none'` y `form-action` quedan igual; el resto de la política no se relaja.
 - Sin secretos nuevos: el único recurso externo es el iframe del modelo.
-- La CSP vive en tres sitios y los tres están alineados: `scripts/build-cloudflare.mjs`, `index.html`
-  (meta) y `vercel.json` (pendiente de equiparar; ver §6).
+- La CSP vive en cuatro sitios y los cuatro están alineados: `scripts/build-cloudflare.mjs`,
+  `index.html` (meta), `vercel.json` e `index.js`. `test-design.js` compara los cuatro y exige que
+  `frame-src` sea exactamente `https://sketchfab.com` en todos.
 
 ## 5. Pruebas ejecutadas
 
 | Suite | Resultado |
 |---|---|
-| `test-design.js` | 100 ok, 0 fallos |
+| `test-design.js` | 108 ok, 0 fallos |
 | `test-cloudflare.js` | 117 aserciones |
 | `test-sync.js` | 104 aserciones |
 | `test-sync-auth.js` | 19 ok |
@@ -59,6 +60,5 @@ pendiente de recibir la referencia completa (`drakotrack-visual-refresh-f5.zip`)
 
 ## 6. Pendiente
 
-- Equiparar `vercel.json` con la misma CSP si ese despliegue sigue en uso.
 - Revisión visual real en navegador (no se ha abierto la app para mirar las pantallas).
 - Publicar: el commit está en la rama local `fase/rediseno-arena`, sin push.

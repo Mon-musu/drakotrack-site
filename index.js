@@ -1,5 +1,5 @@
 const SECURITY_HEADERS = {
-  "content-security-policy": "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; img-src 'self' data:; connect-src 'self' data: https://rxamdcgcpjzfeygxeukj.supabase.co; object-src 'none'; frame-ancestors 'none'; base-uri 'self'; form-action 'self'",
+  "content-security-policy": "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; img-src 'self' data:; frame-src https://sketchfab.com; connect-src 'self' data: https://rxamdcgcpjzfeygxeukj.supabase.co; object-src 'none'; frame-ancestors 'none'; base-uri 'self'; form-action 'self'",
   "x-content-type-options": "nosniff",
   "strict-transport-security": "max-age=63072000; includeSubDomains; preload",
   "x-frame-options": "DENY",
