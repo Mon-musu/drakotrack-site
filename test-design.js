@@ -132,6 +132,8 @@ check('la atribución del modelo 3D está visible en el HTML generado', app.incl
 check('CSP de la página permite únicamente el host de Sketchfab para frames', /frame-src https:\/\/sketchfab\.com/.test(html));
 check('el visor anatómico usa un fondo del tema, no un negro fijo',
   /:root\[data-theme="light"\] \.anatomy-viewer\{background:[^}]*var\(--surface-2\)/.test(css));
+check('el botón deshabilitado se lee con tokens, no con opacidad sobre el gradiente',
+  /\.btn:disabled\{opacity:1[^}]*var\(--surface-2\)[^}]*var\(--muted\)/.test(css));
 check('las microanimaciones respetan movimiento reducido', /@media\s*\(prefers-reduced-motion:reduce\)[\s\S]*?\.nav-icon/.test(css));
 
 /* ---------- 11. la CSP es la misma en los cuatro sitios ---------- */
