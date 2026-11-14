@@ -1,0 +1,46 @@
+name: deploy-vercel
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+concurrency:
+  group: deploy-vercel-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    env:
+      VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
+      VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
+      VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+
+      - name: Comprobar credenciales de Vercel
+        run: |
+          missing=""
+          [ -n "$VERCEL_TOKEN" ] || missing="$missing VERCEL_TOKEN"
+          [ -n "$VERCEL_ORG_ID" ] || missing="$missing VERCEL_ORG_ID"
+          [ -n "$VERCEL_PROJECT_ID" ] || missing="$missing VERCEL_PROJECT_ID"
+          if [ -n "$missing" ]; then
+            echo "::error::Faltan secretos del repositorio:$missing. Añádelos en Settings → Secrets and variables → Actions → New repository secret."
+            exit 1
+          fi
+
+      - name: Instalar Vercel CLI
+        run: npm install --global vercel@latest
+
+      - name: Desplegar a producción
+        run: vercel deploy --prod --yes --token "$VERCEL_TOKEN"
+
+      - name: Resumen
+        run: echo "Desplegado el commit ${GITHUB_SHA} en producción (https://drakotrack.vercel.app)."
