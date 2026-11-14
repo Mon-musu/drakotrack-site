@@ -65,13 +65,15 @@ for(const name of scaleTokens){
 }
 
 /* ---------- 3. acento y alias heredados ---------- */
-check('el acento oscuro es el naranja de la marca (#f28c28)', token(dark, 'accent') === '#f28c28');
+check('el acento oscuro es el naranja de la marca (#ff5f15)', token(dark, 'accent') === '#ff5f15');
+check('el fondo oscuro es negro puro (#000000)', token(dark, 'bg') === '#000000');
 check('el tema claro redefine el acento', /^#[0-9a-f]{6}$/i.test(token(light, 'accent') || '') && token(light, 'accent') !== token(dark, 'accent'));
 for(const alias of ['panel', 'panel-2', 'orange', 'orange-grad', 'green', 'red']){
   check(`alias --${alias} conservado en oscuro`, !!token(dark, alias));
   check(`alias --${alias} conservado en claro`, !!token(light, alias));
 }
 check('no quedan literales del naranja anterior en styles.css', !/#ff7a00|#ffa040|#f05100/i.test(css));
+check('no queda el naranja ámbar anterior en styles.css', !/#f28c28|#ffa94d|#d9690f/i.test(css));
 check('no quedan literales del naranja anterior en app.js', !/#ff7a00|#ffa040|#f05100/i.test(app));
 
 /* ---------- 4. foco visible ---------- */

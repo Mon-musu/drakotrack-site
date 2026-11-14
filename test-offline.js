@@ -125,7 +125,7 @@ console.log('\n=== Conectividad y almacenamiento ===');
   const manifest = JSON.parse(fs.readFileSync(path.join(__dirname, 'manifest.webmanifest'), 'utf8'));
   check('el manifest declara DrakoTrack', manifest.name === 'DrakoTrack' && manifest.short_name === 'DrakoTrack');
   check('el manifest es instalable en standalone', manifest.display === 'standalone' && manifest.start_url === './' && manifest.scope === './');
-  check('el manifest define colores, orientación e idioma', manifest.theme_color === '#111318' && manifest.background_color === '#111318' && manifest.orientation === 'portrait' && manifest.lang === 'es');
+  check('el manifest define colores, orientación e idioma', manifest.theme_color === '#000000' && manifest.background_color === '#000000' && manifest.orientation === 'portrait' && manifest.lang === 'es');
   check('hay iconos 192, 512 y maskable', ['icons/icon-192.png', 'icons/icon-512.png', 'icons/icon-maskable-512.png'].every(src => fs.existsSync(path.join(__dirname, src))));
   check('el icono maskable está declarado como tal', manifest.icons.some(i => i.purpose === 'maskable' && i.sizes === '512x512'));
   check('el icono de Apple existe', fs.existsSync(path.join(__dirname, 'icons/apple-touch-icon-180.png')));

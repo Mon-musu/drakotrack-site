@@ -421,7 +421,7 @@ function applyTheme(){
     btn.setAttribute('title', light ? 'Cambiar a tema oscuro' : 'Cambiar a tema claro');
   }
   const meta = $('#theme-color');
-  if(meta) meta.setAttribute('content', light ? '#f4f5f7' : '#0a0a0c');
+  if(meta) meta.setAttribute('content', light ? '#f4f5f7' : '#000000');
 }
 
 /* El tema vive en localStorage para pintar antes de iniciar sesión y en

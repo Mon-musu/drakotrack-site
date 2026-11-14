@@ -5,19 +5,19 @@
 
 :root{
   /* ===== capa semántica (F1) ===== */
-  --bg:#111318;                    /* fondo de la página */
-  --bg-2:#0d0f14;                  /* fondo de campos y huecos */
-  --surface:#1c222b;               /* tarjetas y paneles */
-  --surface-2:#242c38;             /* panel elevado y controles */
+  --bg:#000000;                    /* fondo de la página */
+  --bg-2:#060606;                  /* fondo de campos y huecos */
+  --surface:#0d0d0e;               /* tarjetas y paneles */
+  --surface-2:#161617;             /* panel elevado y controles */
   --text:#f2f4f7;
   --muted:#a9b2c0;                 /* 7.5:1 sobre panel — AA */
   --muted-2:#8b94a3;               /* 5.2:1 sobre panel — AA */
-  --accent:#f28c28;                /* acento naranja de la marca */
-  --accent-strong:#ffa94d;         /* acento claro (bordes, iconos) */
-  --accent-deep:#d9690f;           /* extremo del degradado */
-  --accent-ink:#1a1206;            /* texto sobre relleno de acento */
-  --accent-text:#ffb067;           /* 8.9:1 sobre panel — AA */
-  --accent-rgb:242,140,40;         /* tintes rgba(var(--accent-rgb),α) */
+  --accent:#ff5f15;                /* acento naranja de la marca */
+  --accent-strong:#ff8a45;         /* acento claro (bordes, iconos) */
+  --accent-deep:#d24a0c;           /* extremo del degradado */
+  --accent-ink:#140700;            /* texto sobre relleno de acento */
+  --accent-text:#ff9a5c;           /* 9.1:1 sobre panel — AA */
+  --accent-rgb:255,95,21;         /* tintes rgba(var(--accent-rgb),α) */
   --ok:#34d399;
   --info:#8ab4ff;
   --warn:#f5b547;
@@ -35,8 +35,8 @@
   --font-size-md:16px; --font-size-lg:19px; --font-size-xl:24px; --font-size-2xl:30px;
 
   /* ===== alias heredados (mantienen los estilos existentes) ===== */
-  --panel:#1c222b;
-  --panel-2:#242c38;
+  --panel:#0d0d0e;
+  --panel-2:#161617;
   --border:rgba(255,255,255,.08);
   --border-strong:rgba(255,255,255,.14);
   --orange:var(--accent);
@@ -47,11 +47,11 @@
   --shadow:0 10px 30px rgba(0,0,0,.45);
   --font:'Outfit',system-ui,-apple-system,'Segoe UI',Roboto,sans-serif;
   --color-scheme:dark;
-  --topbar-bg:rgba(17,19,24,.82);
-  --sidebar-bg:rgba(17,19,24,.5);
-  --bottomnav-bg:rgba(17,19,24,.92);
-  --hero-grad:linear-gradient(135deg,#1c222b 0%,#141920 60%,#1a1512 100%);
-  --modal-grad:linear-gradient(180deg,#1c222b,#141920);
+  --topbar-bg:rgba(0,0,0,.82);
+  --sidebar-bg:rgba(0,0,0,.5);
+  --bottomnav-bg:rgba(0,0,0,.92);
+  --hero-grad:linear-gradient(135deg,#141415 0%,#0a0a0b 60%,#1a0f07 100%);
+  --modal-grad:linear-gradient(180deg,#141415,#0a0a0b);
   --ghost-hover:#2a3340;
   --thumb:#2a3340;
   --thumb-hover:#3a4553;
@@ -70,12 +70,12 @@
   --text:#171a1f;
   --muted:#5b6472;                 /* 6.0:1 sobre panel — AA */
   --muted-2:#5b6472;               /* 5.3:1 sobre panel — AA */
-  --accent:#c25e00;                /* relleno y bordes sobre fondo claro */
-  --accent-strong:#a8490a;
-  --accent-deep:#8f3d06;
+  --accent:#c2410c;                /* relleno y bordes sobre fondo claro */
+  --accent-strong:#9a3412;
+  --accent-deep:#7c2d12;
   --accent-ink:#ffffff;
-  --accent-text:#9c4400;           /* 6.5:1 sobre blanco — AA */
-  --accent-rgb:194,94,0;
+  --accent-text:#9a3412;           /* 6.9:1 sobre blanco — AA */
+  --accent-rgb:194,65,12;
   --ok:#0d6f4b;
   --info:#1d4ed8;
   --warn:#8a5a00;
@@ -89,7 +89,7 @@
   --border-strong:rgba(15,15,25,.14);
   --orange:var(--accent);
   --orange-hi:var(--accent-strong);
-  --orange-grad:linear-gradient(135deg,#f7a24a 0%,#f28c28 60%,#de7412 100%);
+  --orange-grad:linear-gradient(135deg,#ff8a45 0%,#ff5f15 60%,#d9480f 100%);
   --green:var(--ok);
   --red:var(--danger);
   --shadow:0 10px 30px rgba(20,20,35,.12);
@@ -1668,7 +1668,7 @@ body{background-image:linear-gradient(rgba(255,255,255,.012) 1px,transparent 1px
 
 /* Botón principal con brillo breve inspirado en los elementos CSS de Uiverse. */
 .btn{border-radius:13px;font-weight:750;letter-spacing:-.01em;transition:transform .18s ease,box-shadow .18s ease,border-color .18s ease,background .18s ease,color .18s ease}
-.btn-primary{position:relative;isolation:isolate;overflow:hidden;border:1px solid rgba(255,255,255,.16);background:linear-gradient(128deg,#ffb35c 0%,#f28c28 48%,#d9690f 100%);box-shadow:0 7px 20px rgba(var(--accent-rgb),.2),inset 0 1px 0 rgba(255,255,255,.38)}
+.btn-primary{position:relative;isolation:isolate;overflow:hidden;border:1px solid rgba(255,255,255,.16);background:linear-gradient(128deg,#ff8a45 0%,#ff5f15 48%,#d24a0c 100%);box-shadow:0 7px 20px rgba(var(--accent-rgb),.2),inset 0 1px 0 rgba(255,255,255,.38)}
 .btn-primary::after{content:"";position:absolute;z-index:-1;top:-80%;left:-45%;width:34%;height:260%;transform:rotate(24deg);background:linear-gradient(90deg,transparent,rgba(255,255,255,.34),transparent);transition:left .55s cubic-bezier(.2,.7,.2,1)}
 .btn-primary:hover:not(:disabled)::after{left:125%}
 .btn-primary:hover:not(:disabled){box-shadow:0 10px 28px rgba(var(--accent-rgb),.32),inset 0 1px 0 rgba(255,255,255,.42);transform:translateY(-2px)}

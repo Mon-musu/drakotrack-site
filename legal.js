@@ -10,5 +10,5 @@
   if (theme !== 'light') theme = 'dark';
   document.documentElement.setAttribute('data-theme', theme);
   var meta = document.querySelector('meta[name="theme-color"]');
-  if (meta) meta.setAttribute('content', theme === 'light' ? '#f4f5f7' : '#0a0a0c');
+  if (meta) meta.setAttribute('content', theme === 'light' ? '#f4f5f7' : '#000000');
 })();
