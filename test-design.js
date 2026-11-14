@@ -91,7 +91,7 @@ check('ningún tamaño de fuente declarado baja de 12 px', tiny.length === 0);
 /* ---------- 6. navegación ---------- */
 const routes = [...html.matchAll(/data-action="tab" data-route="([a-z]+)"/g)].map(m => m[1]);
 const unique = [...new Set(routes)];
-check('la navegación declara exactamente 5 destinos', unique.length === 5);
+check('la navegación declara exactamente 6 destinos', unique.length === 6);
 check('cada destino aparece en barra lateral y barra inferior', unique.every(r => routes.filter(x => x === r).length === 2));
 const navBlock = (id) => {
   const start = html.indexOf('id="' + id + '"');
@@ -126,7 +126,7 @@ check('las primitivas usan tokens, no colores sueltos',
 
 /* ---------- 10. F5: iconografía y anatomía bajo demanda ---------- */
 check('el sprite SVG local existe sin librería externa', html.includes('dt-icon-sprite') && html.includes('dt-icon-dumbbell'));
-check('las dos barras de navegación incluyen iconos SVG', (html.match(/class=\"nav-icon\"/g) || []).length === 10);
+check('las dos barras de navegación incluyen iconos SVG', (html.match(/class=\"nav-icon\"/g) || []).length === 12);
 check('la acción principal usa un icono local', app.includes('class=\"btn-icon\"'));
 check('el visor de Sketchfab no tiene iframe precargado en HTML', !/<iframe[^>]+src=\"https:\/\/sketchfab\.com/.test(app));
 check('el visor se monta solo tras una acción explícita', app.includes("a === 'anatomy-load'") && app.includes("frame.src = 'https://sketchfab.com/models/"));

@@ -1808,10 +1808,11 @@ function confirmModal(title, body, confirmLabel, cb){
 function parseHash(){
   const h = location.hash.replace(/^#\/?/, '');
   const parts = h.split('/');
-  return { route: parts[0] || 'workouts', rest: parts.slice(1) };
+  return { route: parts[0] || 'home', rest: parts.slice(1) };
 }
 /* Nombre de cada vista para el título del documento y para el `main`. */
 const VIEW_TITLES = {
+  home: 'Inicio',
   workouts: 'Entrenamientos',
   plan: 'Plan',
   history: 'Historial',
@@ -1830,6 +1831,351 @@ const VIEW_TITLES = {
 function nav(hash){
   if(location.hash === '#' + hash || location.hash === hash) render();
   else location.hash = hash;
+}
+
+/* ============================================================
+   Inicio — resumen del entrenamiento
+   Constancia, volumen, balance muscular, últimas sesiones y
+   récords. Todo se reconstruye desde los datos del usuario.
+   ============================================================ */
+const DASH_RANGES = [4, 12, 26];
+const DASH_PALETTE = ['#ff5f15', '#ff8a45', '#f5b13d', '#a78bfa', '#6db8ff', '#f472b6', '#38bdf8', '#facc15'];
+let dashHeatWeeks = 12;
+
+function dashIcon(name, size){
+  return `<svg class="ico" width="${size || 16}" height="${size || 16}" aria-hidden="true"><use href="#dt-icon-${name}"/></svg>`;
+}
+function dashNum(v){ return Math.round(Number(v) || 0).toLocaleString('es-ES'); }
+function dashKg(v){
+  return (Math.round((Number(v) || 0) * 10) / 10).toLocaleString('es-ES', { maximumFractionDigits: 1 });
+}
+function dashCompact(v){
+  const n = Math.abs(Number(v) || 0);
+  if(n >= 1000000) return (n / 1000000).toFixed(1).replace('.', ',') + 'M';
+  if(n >= 1000) return (n / 1000).toFixed(1).replace('.', ',') + 'k';
+  return dashNum(n);
+}
+function dashSetVolume(st){
+  const w = Number(st && st.weight), r = Number(st && st.reps);
+  return w > 0 && r > 0 ? w * r : 0;
+}
+function dashSessionVolume(s){
+  return ((s && s.exercises) || []).reduce((a, e) =>
+    a + (((e && e.sets) || []).reduce((b, st) => b + dashSetVolume(st), 0)), 0);
+}
+function dashSessionSets(s){
+  return ((s && s.exercises) || []).reduce((a, e) =>
+    a + (((e && e.sets) || []).filter(st => dashSetVolume(st) > 0).length), 0);
+}
+function dashRelative(iso){
+  if(!iso) return '—';
+  const diff = Math.round((new Date(todayISO() + 'T00:00:00') - new Date(String(iso).slice(0, 10) + 'T00:00:00')) / 86400000);
+  if(diff === 0) return 'Hoy';
+  if(diff === 1) return 'Ayer';
+  if(diff > 1 && diff < 7) return 'Hace ' + diff + ' días';
+  return fmtDate(iso);
+}
+function dashWeekLabel(iso){
+  return new Date(iso + 'T00:00:00').toLocaleDateString('es', { day: 'numeric', month: 'short' }).replace('.', '');
+}
+function dashDayStreak(d){
+  const days = new Set(finishedSessions(d).map(s => String(s.date).slice(0, 10)));
+  let cursor = todayISO();
+  if(!days.has(cursor)) cursor = shiftISO(cursor, -1);
+  let count = 0;
+  while(days.has(cursor)){ count++; cursor = shiftISO(cursor, -1); }
+  return count;
+}
+function dashPRs(d){
+  const best = new Map();
+  ((d && d.prs) || []).concat((d && d.records) || []).forEach(p => {
+    if(!p || !p.exercise) return;
+    const w = Number(p.weight) || 0;
+    const cur = best.get(p.exercise);
+    if(!cur || w > Number(cur.weight) || (w === Number(cur.weight) && String(p.date || '') > String(cur.date || ''))) best.set(p.exercise, p);
+  });
+  return [...best.values()].sort((a, b) => (Number(b.weight) || 0) - (Number(a.weight) || 0));
+}
+function dashWeekSeries(d, count){
+  const thisWeek = weekStartISO(todayISO());
+  const out = [];
+  for(let i = count - 1; i >= 0; i--){
+    const start = shiftISO(thisWeek, -7 * i);
+    const end = shiftISO(start, 6);
+    const list = finishedSessions(d).filter(s => String(s.date) >= start && String(s.date) <= end);
+    out.push({
+      week: start, label: dashWeekLabel(start),
+      volume: list.reduce((a, s) => a + dashSessionVolume(s), 0),
+      sessions: list.length,
+    });
+  }
+  return out;
+}
+function dashActivityDays(d, weeks){
+  const today = todayISO();
+  const dow = (new Date(today + 'T00:00:00').getDay() + 6) % 7;
+  const end = shiftISO(today, 6 - dow);
+  const start = shiftISO(end, -(weeks * 7 - 1));
+  const byDay = new Map();
+  finishedSessions(d).forEach(s => {
+    const key = String(s.date).slice(0, 10);
+    const cur = byDay.get(key) || { sessions: 0, volume: 0 };
+    cur.sessions += 1;
+    cur.volume += dashSessionVolume(s);
+    byDay.set(key, cur);
+  });
+  const out = [];
+  for(let i = 0; i < weeks * 7; i++){
+    const date = shiftISO(start, i);
+    const hit = byDay.get(date) || { sessions: 0, volume: 0 };
+    out.push({
+      date, sessions: hit.sessions, volume: hit.volume,
+      level: hit.sessions >= 4 ? 4 : hit.sessions >= 3 ? 3 : hit.sessions === 2 ? 2 : hit.sessions === 1 ? 1 : 0,
+    });
+  }
+  return out;
+}
+function dashMuscleRows(d, days){
+  const since = shiftISO(todayISO(), -days);
+  const map = new Map();
+  finishedSessions(d).forEach(s => {
+    if(String(s.date) < since) return;
+    ((s.exercises) || []).forEach(e => {
+      const sets = ((e.sets) || []).filter(st => dashSetVolume(st) > 0).length;
+      if(!sets) return;
+      const entry = findExercise(resolveExerciseId(e.name, d), d) || findExercise(e.exId, d);
+      const id = (entry && entry.group) || 'otro';
+      map.set(id, (map.get(id) || 0) + sets);
+    });
+  });
+  const rows = [...map.entries()].map(([id, sets]) => ({ id, sets, label: groupLabel(id) || 'Otro grupo' }))
+    .sort((a, b) => b.sets - a.sets).slice(0, 7);
+  const max = rows.length ? rows[0].sets : 0;
+  return rows.map((r, i) => ({
+    ...r, pct: max ? Math.round(r.sets / max * 100) : 0,
+    color: DASH_PALETTE[i % DASH_PALETTE.length],
+  }));
+}
+function dashTopExercises(d, limit){
+  const since = shiftISO(todayISO(), -90);
+  const map = new Map();
+  finishedSessions(d).forEach(s => {
+    if(String(s.date) < since) return;
+    ((s.exercises) || []).forEach(e => {
+      const vol = ((e.sets) || []).reduce((a, st) => a + dashSetVolume(st), 0);
+      if(!vol || !e.name) return;
+      map.set(e.name, (map.get(e.name) || 0) + vol);
+    });
+  });
+  return [...map.entries()].map(([name, volume]) => ({ name, volume }))
+    .sort((a, b) => b.volume - a.volume).slice(0, limit);
+}
+function dashHeatmapHTML(days){
+  const cols = [];
+  for(let i = 0; i < days.length; i += 7) cols.push(days.slice(i, i + 7));
+  const months = cols.map((col, i) => {
+    const dt = new Date(col[0].date + 'T00:00:00');
+    const prev = i > 0 ? new Date(cols[i - 1][0].date + 'T00:00:00') : null;
+    if(prev && prev.getMonth() === dt.getMonth()) return '<span></span>';
+    return `<span>${esc(dt.toLocaleDateString('es', { month: 'short' }).replace('.', ''))}</span>`;
+  }).join('');
+  const cells = cols.map(col => `
+    <div class="heat-col">
+      ${col.map(day => `<i class="heat-cell lv${day.level}" title="${esc(fmtDateLong(day.date))} · ${day.sessions ? day.sessions + ' sesión(es)' : 'sin actividad'}"></i>`).join('')}
+    </div>`).join('');
+  return `
+    <div class="heat-scroll">
+      <div class="heat-inner" style="--cols:${cols.length}">
+        <div class="heat-months">${months}</div>
+        <div class="heat-body">
+          <div class="heat-weekdays"><span>L</span><span>M</span><span>X</span><span>J</span><span>V</span><span>S</span><span>D</span></div>
+          <div class="heat-grid">${cells}</div>
+        </div>
+      </div>
+    </div>`;
+}
+function dashTile({ ico, label, value, unit, meta }){
+  return `
+    <article class="tile">
+      <div class="tile-top">
+        <span class="tile-ico">${dashIcon(ico, 16)}</span>
+        <span class="tile-label">${esc(label)}</span>
+      </div>
+      <p class="tile-value">${value}${unit ? `<small>${esc(unit)}</small>` : ''}</p>
+      <p class="tile-meta">${meta}</p>
+    </article>`;
+}
+function dashSessionRow(s){
+  return `
+    <button class="list-row" type="button" data-action="tab" data-route="session/${esc(s.id)}">
+      <span class="list-ico">${dashIcon('dumbbell', 17)}</span>
+      <span class="list-main">
+        <span class="list-title">${esc(s.workoutName || 'Sesión')}</span>
+        <span class="list-meta">${esc(dashRelative(s.date))} · ${dashSessionSets(s)} series · ${(s.exercises || []).length} ejercicios</span>
+      </span>
+      <span class="list-side"><span class="list-value">${dashNum(dashSessionVolume(s))}<small> kg</small></span></span>
+    </button>`;
+}
+function renderHome(main){
+  const d = dataFor(currentUser);
+  const sessions = finishedSessions(d);
+  const total = sessions.length;
+  const weekStart = weekStartISO(todayISO());
+  const weekSessions = sessions.filter(s => String(s.date) >= weekStart);
+  const weekVolume = weekSessions.reduce((a, s) => a + dashSessionVolume(s), 0);
+  const totalVolume = sessions.reduce((a, s) => a + dashSessionVolume(s), 0);
+  const totalSets = sessions.reduce((a, s) => a + dashSessionSets(s), 0);
+  const last = total ? sessions[total - 1] : null;
+  const streak = dashDayStreak(d);
+  const prs = dashPRs(d);
+  const topPr = prs[0] || null;
+  const open = (d.sessions || []).find(s => s && !s.finished && s.status !== 'cancelled');
+  const range = DASH_RANGES.indexOf(dashHeatWeeks) >= 0 ? dashHeatWeeks : 12;
+  const days = dashActivityDays(d, range);
+  const summary = days.reduce((a, day) => ({ sessions: a.sessions + day.sessions, volume: a.volume + day.volume }), { sessions: 0, volume: 0 });
+  const weeks = dashWeekSeries(d, 8);
+  const weekMax = weeks.reduce((a, w) => Math.max(a, w.volume), 0);
+  const prev = weeks.length > 1 ? weeks[weeks.length - 2].volume : 0;
+  const deltaPct = prev > 0 ? Math.round((weekVolume - prev) / prev * 100) : null;
+  const deltaLabel = deltaPct == null ? 'sin datos previos' : deltaPct === 0 ? 'sin cambios' : `${deltaPct > 0 ? '+' : '−'}${Math.abs(deltaPct)}%`;
+  const deltaClass = deltaPct == null || deltaPct === 0 ? 'is-flat' : deltaPct > 0 ? 'is-up' : 'is-down';
+  const recent = sessions.slice(-5).reverse();
+  const muscles = dashMuscleRows(d, 90);
+  const top = dashTopExercises(d, 5);
+  const hour = new Date().getHours();
+  const greet = hour < 6 ? 'Buenas noches' : hour < 12 ? 'Buenos días' : hour < 20 ? 'Buenas tardes' : 'Buenas noches';
+  const hoy = new Date().toLocaleDateString('es', { weekday: 'long', day: 'numeric', month: 'long' });
+
+  const resume = open ? `
+    <section class="resume-card">
+      <span class="resume-glow" aria-hidden="true"></span>
+      <div class="resume-main">
+        <p class="resume-eyebrow">${dashIcon('play', 13)} Sesión sin terminar</p>
+        <h2>${esc(open.workoutName || 'Entrenamiento')}</h2>
+        <p class="resume-meta">${(open.exercises || []).filter(e => e.done).length} de ${(open.exercises || []).length} ejercicios · ${esc(dashRelative(open.date))}</p>
+      </div>
+      <button class="btn btn-primary" type="button" data-action="tab" data-route="session/${esc(open.id)}">Continuar ${dashIcon('arrow-right', 15)}</button>
+    </section>` : '';
+
+  const panelHead = (title, sub, extra) => `
+    <div class="panel-head">
+      <div><h2 class="panel-title">${esc(title)}</h2><p class="panel-sub">${esc(sub)}</p></div>
+      ${extra || ''}
+    </div>`;
+
+  main.innerHTML = `
+    <div class="page dash">
+      <header class="page-head">
+        <div class="page-head-text">
+          <p class="eyebrow">${esc(greet)} · ${esc(hoy)}</p>
+          <h1 class="page-title">Hola, <span class="grad-text">${esc(currentUser)}</span></h1>
+          <p class="page-sub">Este es tu entrenamiento de un vistazo.</p>
+        </div>
+        <div class="page-actions">
+          <button class="btn btn-ghost" type="button" data-action="tab" data-route="weight">${dashIcon('scale', 16)} Peso</button>
+          <button class="btn btn-primary" type="button" data-action="tab" data-route="workouts">${dashIcon('play', 16)} Entrenar</button>
+        </div>
+      </header>
+
+      ${resume}
+
+      <section class="tiles" aria-label="Resumen">
+        ${dashTile({ ico: 'activity', label: 'Esta semana', value: String(weekSessions.length), unit: weekSessions.length === 1 ? 'sesión' : 'sesiones', meta: weekSessions.length ? 'Buen ritmo, sigue así' : 'Aún sin sesiones esta semana' })}
+        ${dashTile({ ico: 'calendar', label: 'Último entreno', value: last ? esc(dashRelative(last.date)) : '—', meta: last ? `${esc(last.workoutName || 'Sesión')} · ${dashSessionSets(last)} series` : 'Sin sesiones registradas' })}
+        ${dashTile({ ico: 'history', label: 'Racha', value: String(streak), unit: streak === 1 ? 'día' : 'días', meta: streak >= 1 ? 'Días consecutivos entrenando' : 'Entrena hoy para empezar' })}
+        ${dashTile({ ico: 'chart', label: 'Volumen 7 días', value: dashCompact(weekVolume), unit: 'kg', meta: 'Total levantado esta semana' })}
+        ${dashTile({ ico: 'dumbbell', label: 'Récords', value: String(prs.length), unit: prs.length === 1 ? 'marca' : 'marcas', meta: topPr ? `Mejor: ${dashKg(topPr.weight)} kg · ${esc(topPr.exercise)}` : 'Registra tu primer récord' })}
+      </section>
+
+      ${total === 0 ? `
+      <article class="panel empty-panel">
+        <span class="empty-ico">${dashIcon('play', 22)}</span>
+        <h2 class="empty-title">Tu primera sesión te está esperando</h2>
+        <p class="empty-text">Elige una rutina de la biblioteca o crea la tuya. Aquí verás tu constancia, tu volumen y tus récords en cuanto registres el primer entrenamiento.</p>
+        <div class="empty-actions">
+          <button class="btn btn-primary" type="button" data-action="tab" data-route="workouts">${dashIcon('play', 16)} Empezar a entrenar</button>
+          <button class="btn btn-ghost" type="button" data-action="tab" data-route="weight">${dashIcon('scale', 16)} Registrar peso</button>
+        </div>
+      </article>` : `
+      <section class="dash-grid">
+        <article class="panel">
+          ${panelHead('Actividad', 'Sesiones completadas por día', `<div class="chips" role="group" aria-label="Rango de actividad">
+            ${DASH_RANGES.map(weeksN => `<button class="chip${weeksN === range ? ' is-active' : ''}" type="button" data-action="dash-range" data-weeks="${weeksN}" aria-pressed="${weeksN === range}">${weeksN === 26 ? '6 meses' : weeksN + ' sem'}</button>`).join('')}
+          </div>`)}
+          <div class="heat-layout">
+            <div class="heat">${dashHeatmapHTML(days)}</div>
+            <div class="heat-stats">
+              <div><span>Sesiones</span><strong>${summary.sessions}</strong></div>
+              <div><span>Volumen</span><strong>${dashCompact(summary.volume)} <small>kg</small></strong></div>
+              <div><span>Media/sem</span><strong>${dashCompact(summary.volume / Math.max(1, range))} <small>kg</small></strong></div>
+            </div>
+          </div>
+          <div class="heat-foot">
+            <p class="muted small">${summary.sessions === 1 ? '1 sesión registrada' : summary.sessions + ' sesiones registradas'} en las últimas ${range} semanas</p>
+            <div class="heat-legend" aria-hidden="true"><span>Menos</span><i class="lv0"></i><i class="lv1"></i><i class="lv2"></i><i class="lv3"></i><i class="lv4"></i><span>Más</span></div>
+          </div>
+        </article>
+
+        <article class="panel">
+          ${panelHead('Volumen semanal', 'Últimas 8 semanas', `<span class="badge ${deltaClass}">${dashIcon('chart', 13)} ${deltaLabel}</span>`)}
+          <div class="vbars" role="img" aria-label="Volumen de las últimas 8 semanas">
+            ${weeks.map(w => `
+              <div class="vbar">
+                <span class="vbar-value">${w.volume ? dashCompact(w.volume) : ''}</span>
+                <span class="vbar-track"><span class="vbar-fill" style="height:${weekMax ? Math.max(3, Math.round(w.volume / weekMax * 100)) : 3}%"></span></span>
+                <span class="vbar-label">${esc(w.label)}</span>
+              </div>`).join('')}
+          </div>
+          <div class="panel-foot">
+            <span class="muted small">${dashCompact(totalVolume)} kg acumulados</span>
+            <span class="muted small">${dashNum(totalSets)} series totales</span>
+          </div>
+        </article>
+      </section>
+
+      <section class="dash-grid dash-grid--even">
+        <article class="panel">
+          ${panelHead('Últimas sesiones', 'Tu historial reciente', `<button class="link-btn" type="button" data-action="tab" data-route="history">Ver todo ${dashIcon('arrow-right', 13)}</button>`)}
+          <div class="list">${recent.map(dashSessionRow).join('')}</div>
+        </article>
+        <article class="panel">
+          ${panelHead('Balance muscular', 'Series por grupo · 90 días')}
+          ${muscles.length ? `<div class="bars">${muscles.map(m => `
+            <div class="bar-row">
+              <span class="bar-label"><i style="background:${m.color}"></i>${esc(m.label)}</span>
+              <span class="bar-track"><span class="bar-fill" style="width:${Math.max(4, m.pct)}%;background:${m.color}"></span></span>
+              <span class="bar-value">${m.sets}</span>
+            </div>`).join('')}</div>`
+          : '<p class="muted small panel-empty">Completa una sesión para ver el reparto de tu trabajo por grupo muscular.</p>'}
+        </article>
+      </section>
+
+      <section class="dash-grid dash-grid--even">
+        <article class="panel">
+          ${panelHead('Más trabajados', 'Volumen acumulado por ejercicio')}
+          ${top.length ? `<div class="rank">${top.map((e, i) => `
+            <div class="rank-row">
+              <span class="rank-pos">${String(i + 1).padStart(2, '0')}</span>
+              <span class="rank-name">${esc(e.name)}</span>
+              <span class="rank-value">${dashNum(e.volume)} <small>kg</small></span>
+            </div>`).join('')}</div>`
+          : '<p class="muted small panel-empty">Todavía no hay volumen registrado.</p>'}
+        </article>
+        <article class="panel">
+          ${panelHead('Récords personales', 'Tus mejores marcas', `<button class="link-btn" type="button" data-action="tab" data-route="progress">Gestionar ${dashIcon('arrow-right', 13)}</button>`)}
+          ${prs.length ? `<div class="pb-grid">${prs.slice(0, 4).map(p => `
+            <div class="pb-card">
+              <p class="pb-name">${esc(p.exercise)}</p>
+              <p class="pb-value">${dashKg(p.weight)}<small> kg</small></p>
+              <p class="pb-meta">${p.reps ? p.reps + ' rep · ' : ''}${esc(dashRelative(p.date))}</p>
+            </div>`).join('')}</div>`
+          : `<div class="pb-empty">
+              <p class="muted small">Aún no hay récords. Registra tu mejor marca y verás aquí tu progreso.</p>
+              <button class="btn btn-ghost btn-sm" type="button" data-action="tab" data-route="progress">${dashIcon('chart', 14)} Ver progreso</button>
+            </div>`}
+        </article>
+      </section>`}
+    </div>`;
 }
 
 /* ---------------- Render principal ---------------- */
@@ -1862,7 +2208,8 @@ function render(){
   setActiveTab(route);
   const main = $('#main');
 
-  if(route === 'session')      renderSession(main, rest[0]);
+  if(route === 'home')         renderHome(main);
+  else if(route === 'session') renderSession(main, rest[0]);
   else if(route === 'editor')  renderEditor(main, rest[0]);
   else if(route === 'start')   renderStart(main);
   else if(route === 'progress') renderProgress(main);
@@ -5547,6 +5894,7 @@ document.addEventListener('click', e => {
     return;
   }
   if(a === 'tab'){ nav('#/' + el.dataset.route); return; }
+  if(a === 'dash-range'){ dashHeatWeeks = Number(el.dataset.weeks) || 12; render(); return; }
   if(a === 'back'){ nav('#/workouts'); return; }
   if(a === 'toggle-section'){
     /* Plegar/desplegar una sección completa (oculta todos sus elementos de golpe) */

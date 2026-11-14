@@ -14,7 +14,7 @@
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="vendor/swiper/swiper-bundle.min.css?v=12">
-<link rel="stylesheet" href="styles.css?v=45">
+<link rel="stylesheet" href="styles.css?v=46">
 </head>
 <body>
 <a class="skip-link" href="#main">Saltar al contenido</a>
@@ -28,7 +28,7 @@
   <symbol id="dt-icon-user" viewBox="0 0 24 24"><circle cx="12" cy="8" r="4"/><path d="M4 21a8 8 0 0 1 16 0"/></symbol>
   <symbol id="dt-icon-play" viewBox="0 0 24 24"><path d="m8 5 12 7-12 7z"/></symbol>
   <symbol id="dt-icon-activity" viewBox="0 0 24 24"><path d="M3 12h4l3-8 4 16 3-8h4"/></symbol>
-  <symbol id="dt-icon-arrow-right" viewBox="0 0 24 24"><path d="M5 12h14M13 6l6 6-6 6"/></symbol>
+  <symbol id="dt-icon-arrow-right" viewBox="0 0 24 24"><path d="M5 12h14M13 6l6 6-6 6"/></symbol><symbol id="dt-icon-home" viewBox="0 0 24 24"><path d="M3 10.5 12 3l9 7.5"/><path d="M5 9.5V21h14V9.5"/><path d="M9.5 21v-6h5v6"/></symbol>
 </svg>
 <div class="bg-glow" aria-hidden="true"></div>
 
@@ -184,7 +184,8 @@
   <div id="offline-bar" class="offline-bar hidden" role="status"></div>
 
   <nav class="sidebar" id="sidebar" aria-label="Secciones principales">
-    <button class="nav-btn active" data-action="tab" data-route="workouts" aria-current="page"><svg class="nav-icon" aria-hidden="true"><use href="#dt-icon-dumbbell"/></svg><span>Entrenamientos</span></button>
+    <button class="nav-btn active" data-action="tab" data-route="home" aria-current="page"><svg class="nav-icon" aria-hidden="true"><use href="#dt-icon-home"/></svg><span>Inicio</span></button>
+    <button class="nav-btn" data-action="tab" data-route="workouts"><svg class="nav-icon" aria-hidden="true"><use href="#dt-icon-dumbbell"/></svg><span>Entrenamientos</span></button>
     <button class="nav-btn" data-action="tab" data-route="plan"><svg class="nav-icon" aria-hidden="true"><use href="#dt-icon-calendar"/></svg><span>Plan</span></button>
     <button class="nav-btn" data-action="tab" data-route="history"><svg class="nav-icon" aria-hidden="true"><use href="#dt-icon-history"/></svg><span>Historial</span></button>
     <button class="nav-btn" data-action="tab" data-route="progress"><svg class="nav-icon" aria-hidden="true"><use href="#dt-icon-chart"/></svg><span>Progreso</span></button>
@@ -193,7 +194,8 @@
   </nav>
 
   <nav class="bottomnav" id="bottomnav" aria-label="Secciones principales (móvil)">
-    <button class="nav-btn active" data-action="tab" data-route="workouts" aria-current="page"><svg class="nav-icon" aria-hidden="true"><use href="#dt-icon-dumbbell"/></svg><span>Entrenamientos</span></button>
+    <button class="nav-btn active" data-action="tab" data-route="home" aria-current="page"><svg class="nav-icon" aria-hidden="true"><use href="#dt-icon-home"/></svg><span>Inicio</span></button>
+    <button class="nav-btn" data-action="tab" data-route="workouts"><svg class="nav-icon" aria-hidden="true"><use href="#dt-icon-dumbbell"/></svg><span>Entrenamientos</span></button>
     <button class="nav-btn" data-action="tab" data-route="plan"><svg class="nav-icon" aria-hidden="true"><use href="#dt-icon-calendar"/></svg><span>Plan</span></button>
     <button class="nav-btn" data-action="tab" data-route="history"><svg class="nav-icon" aria-hidden="true"><use href="#dt-icon-history"/></svg><span>Historial</span></button>
     <button class="nav-btn" data-action="tab" data-route="progress"><svg class="nav-icon" aria-hidden="true"><use href="#dt-icon-chart"/></svg><span>Progreso</span></button>
@@ -216,7 +218,7 @@
 <script src="offline.js?v=2"></script>
 <script src="analytics.js?v=1"></script>
 <script src="activity.js?v=1"></script>
-<script src="app.js?v=65"></script>
+<script src="app.js?v=66"></script>
 <script src="vendor/swiper/swiper-bundle.min.js?v=11" defer></script>
 <script src="landing.js?v=4" defer></script>
 <script src="update-check.js?v=2" defer></script>
