@@ -28,26 +28,38 @@ jobs:
         with:
           node-version: 24
 
-      - name: Comprobar el token de Vercel
+      - name: Diagnóstico del token
         run: |
-          if [ -z "$VERCEL_TOKEN" ]; then
-            echo "::error::Falta el secreto VERCEL_TOKEN. Añádelo en Settings → Secrets and variables → Actions → New repository secret."
-            exit 1
-          fi
+          node -e '
+            const raw = process.env.VERCEL_TOKEN || "";
+            const clean = raw.replace(/\s+/g, "").replace(/^["\x27]|["\x27]$/g, "");
+            const notes = [];
+            if (!raw) notes.push("el secreto está vacío");
+            if (raw !== raw.trim()) notes.push("tiene espacios o saltos de línea en los extremos");
+            if (/^["\x27]|["\x27]$/.test(raw.trim())) notes.push("tiene comillas alrededor");
+            if (/[A-Za-z0-9]{20,}/.test(clean) && clean.length < 20) notes.push("parece demasiado corto");
+            console.log("longitud del valor:", raw.length);
+            console.log("solo alfanumérico tras normalizar:", /^[A-Za-z0-9]+$/.test(clean));
+            if (notes.length) console.log("avisos:", notes.join("; "));
+            if (!clean) process.exit(1);
+          '
 
       - name: Instalar Vercel CLI
         run: npm install --global vercel@latest
 
       - name: Vincular el proyecto
         run: |
+          TOKEN=$(printf '%s' "$VERCEL_TOKEN" | tr -d '[:space:]' | sed 's/^["\x27]//; s/["\x27]$//')
           if [ -n "$VERCEL_ORG_ID" ] && [ -n "$VERCEL_PROJECT_ID" ]; then
             echo "Usando VERCEL_ORG_ID y VERCEL_PROJECT_ID de la configuración."
           else
-            vercel link --yes --project "$VERCEL_PROJECT_NAME" --scope "$VERCEL_SCOPE" --token "$VERCEL_TOKEN"
+            vercel link --yes --project "$VERCEL_PROJECT_NAME" --scope "$VERCEL_SCOPE" --token "$TOKEN"
           fi
 
       - name: Desplegar a producción
-        run: vercel deploy --prod --yes --token "$VERCEL_TOKEN"
+        run: |
+          TOKEN=$(printf '%s' "$VERCEL_TOKEN" | tr -d '[:space:]' | sed 's/^["\x27]//; s/["\x27]$//')
+          vercel deploy --prod --yes --token "$TOKEN"
 
       - name: Resumen
         run: echo "Desplegado el commit ${GITHUB_SHA} en producción (https://drakotrack.vercel.app)."
