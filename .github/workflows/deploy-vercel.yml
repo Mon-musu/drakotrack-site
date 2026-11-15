@@ -33,14 +33,14 @@ jobs:
           node -e '
             const raw = process.env.VERCEL_TOKEN || "";
             const clean = raw.replace(/\s+/g, "").replace(/^["\x27]|["\x27]$/g, "");
-            const notes = [];
-            if (!raw) notes.push("el secreto está vacío");
-            if (raw !== raw.trim()) notes.push("tiene espacios o saltos de línea en los extremos");
-            if (/^["\x27]|["\x27]$/.test(raw.trim())) notes.push("tiene comillas alrededor");
-            if (/[A-Za-z0-9]{20,}/.test(clean) && clean.length < 20) notes.push("parece demasiado corto");
-            console.log("longitud del valor:", raw.length);
-            console.log("solo alfanumérico tras normalizar:", /^[A-Za-z0-9]+$/.test(clean));
-            if (notes.length) console.log("avisos:", notes.join("; "));
+            let kind = "desconocido";
+            if (/^sb_secret_/.test(raw)) kind = "clave secreta de Supabase";
+            else if (/^sb_publishable_/.test(raw)) kind = "clave publicable de Supabase";
+            else if (/^eyJ/.test(raw)) kind = "JWT (clave anon/service de Supabase u otro token)";
+            else if (/^https?:/.test(raw)) kind = "URL";
+            else if (/^(gh[pousr]_|github_pat_)/.test(raw)) kind = "token de GitHub";
+            else if (/^[A-Za-z0-9]{20,30}$/.test(clean)) kind = "posible token de Vercel";
+            console.log("longitud:", raw.length, "| solo alfanumérico:", /^[A-Za-z0-9]+$/.test(clean), "| tipo:", kind);
             if (!clean) process.exit(1);
           '
 
