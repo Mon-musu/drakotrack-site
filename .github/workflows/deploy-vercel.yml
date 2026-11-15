@@ -28,28 +28,19 @@ jobs:
         with:
           node-version: 24
 
-      - name: Diagnóstico del token
+      - name: Comprobar el token de Vercel
         run: |
-          node -e '
-            const raw = process.env.VERCEL_TOKEN || "";
-            const clean = raw.replace(/\s+/g, "").replace(/^["\x27]|["\x27]$/g, "");
-            let kind = "desconocido";
-            if (/^sb_secret_/.test(raw)) kind = "clave secreta de Supabase";
-            else if (/^sb_publishable_/.test(raw)) kind = "clave publicable de Supabase";
-            else if (/^eyJ/.test(raw)) kind = "JWT (clave anon/service de Supabase u otro token)";
-            else if (/^https?:/.test(raw)) kind = "URL";
-            else if (/^(gh[pousr]_|github_pat_)/.test(raw)) kind = "token de GitHub";
-            else if (/^[A-Za-z0-9]{20,30}$/.test(clean)) kind = "posible token de Vercel";
-            console.log("longitud:", raw.length, "| solo alfanumérico:", /^[A-Za-z0-9]+$/.test(clean), "| tipo:", kind);
-            if (!clean) process.exit(1);
-          '
+          if [ -z "$VERCEL_TOKEN" ]; then
+            echo "::error::Falta el secreto VERCEL_TOKEN. Añádelo en Settings → Secrets and variables → Actions → New repository secret."
+            exit 1
+          fi
 
       - name: Instalar Vercel CLI
         run: npm install --global vercel@latest
 
       - name: Vincular el proyecto
         run: |
-          TOKEN=$(printf '%s' "$VERCEL_TOKEN" | tr -d '[:space:]' | sed 's/^["\x27]//; s/["\x27]$//')
+          TOKEN=$(printf '%s' "$VERCEL_TOKEN" | tr -d '[:space:]')
           if [ -n "$VERCEL_ORG_ID" ] && [ -n "$VERCEL_PROJECT_ID" ]; then
             echo "Usando VERCEL_ORG_ID y VERCEL_PROJECT_ID de la configuración."
           else
@@ -58,7 +49,7 @@ jobs:
 
       - name: Desplegar a producción
         run: |
-          TOKEN=$(printf '%s' "$VERCEL_TOKEN" | tr -d '[:space:]' | sed 's/^["\x27]//; s/["\x27]$//')
+          TOKEN=$(printf '%s' "$VERCEL_TOKEN" | tr -d '[:space:]')
           vercel deploy --prod --yes --token "$TOKEN"
 
       - name: Resumen
