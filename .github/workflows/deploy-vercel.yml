@@ -12,32 +12,39 @@ concurrency:
 permissions:
   contents: read
 
+env:
+  VERCEL_ORG_ID: ${{ vars.VERCEL_ORG_ID || secrets.VERCEL_ORG_ID }}
+  VERCEL_PROJECT_ID: ${{ vars.VERCEL_PROJECT_ID || secrets.VERCEL_PROJECT_ID }}
+  VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+  VERCEL_PROJECT_NAME: drakotrack
+  VERCEL_SCOPE: monmusu
+
 jobs:
   deploy:
     runs-on: ubuntu-latest
-    env:
-      VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
-      VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
-      VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
           node-version: 24
 
-      - name: Comprobar credenciales de Vercel
+      - name: Comprobar el token de Vercel
         run: |
-          missing=""
-          [ -n "$VERCEL_TOKEN" ] || missing="$missing VERCEL_TOKEN"
-          [ -n "$VERCEL_ORG_ID" ] || missing="$missing VERCEL_ORG_ID"
-          [ -n "$VERCEL_PROJECT_ID" ] || missing="$missing VERCEL_PROJECT_ID"
-          if [ -n "$missing" ]; then
-            echo "::error::Faltan secretos del repositorio:$missing. Añádelos en Settings → Secrets and variables → Actions → New repository secret."
+          if [ -z "$VERCEL_TOKEN" ]; then
+            echo "::error::Falta el secreto VERCEL_TOKEN. Añádelo en Settings → Secrets and variables → Actions → New repository secret."
             exit 1
           fi
 
       - name: Instalar Vercel CLI
         run: npm install --global vercel@latest
+
+      - name: Vincular el proyecto
+        run: |
+          if [ -n "$VERCEL_ORG_ID" ] && [ -n "$VERCEL_PROJECT_ID" ]; then
+            echo "Usando VERCEL_ORG_ID y VERCEL_PROJECT_ID de la configuración."
+          else
+            vercel link --yes --project "$VERCEL_PROJECT_NAME" --scope "$VERCEL_SCOPE" --token "$VERCEL_TOKEN"
+          fi
 
       - name: Desplegar a producción
         run: vercel deploy --prod --yes --token "$VERCEL_TOKEN"
